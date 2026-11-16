@@ -1,0 +1,27 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 15:03:55 +0000
+Subject: Fix build with dfmify_dev_ui disabled
+
+chrome/browser/BUILD.gn depends on //chrome/browser/dev_ui unconditionally
+on Android. That target exists only when dfmify_dev_ui is true, and
+build/cromite.gn_args sets dfmify_dev_ui to false, so gn gen fails with an
+unresolved dependency. Comment out the dependency.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/BUILD.gn | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -1687,7 +1687,7 @@ source_set("core") {
+       "//chrome/browser/commerce/android:shopping_service_jni",
+       "//chrome/browser/composeplate/android:jni_headers",
+       "//chrome/browser/endpoint_fetcher:jni_headers",
+-      "//chrome/browser/dev_ui",
++      #"//chrome/browser/dev_ui",
+       "//chrome/browser/facilitated_payments",
+       "//chrome/browser/feed",
+       "//chrome/browser/flags:flags_android",
+--
