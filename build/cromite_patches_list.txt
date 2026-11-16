@@ -312,5 +312,6 @@ eyeo-133.0.6943.49-extension_api.patch
 Eyeo-Adblock-for-Cromite.patch
 Fix-build-with-dfmify_dev_ui-disabled.patch
 Fix-build-with-enable_vr-disabled.patch
+Fix-channel-logo-check-in-unbranded-builds.patch
 
 # extension patches
