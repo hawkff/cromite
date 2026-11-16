@@ -1,0 +1,63 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 18:49:48 +0000
+Subject: Fix build with enable_vr disabled
+
+AutocompleteMatch::GetVectorIcon() and OmniboxAction::GetVectorIcon() are
+declared on Android only when enable_vr is true. build/cromite.gn_args sets
+enable_vr to false, but omnibox_edit_model.cc and searchbox_handler.cc are
+compiled for Android and call both functions unconditionally, so the build
+fails. On Android, use an empty vector icon in OmniboxEditModel and leave
+the icon path empty in SearchboxHandler.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/ui/omnibox/omnibox_edit_model.cc               | 4 ++++
+ .../ui/webui/cr_components/searchbox/searchbox_handler.cc     | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/chrome/browser/ui/omnibox/omnibox_edit_model.cc b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
+--- a/chrome/browser/ui/omnibox/omnibox_edit_model.cc
++++ b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
+@@ -1949,8 +1949,12 @@ gfx::Image OmniboxEditModel::GetMatchIcon(const AutocompleteMatch& match,
+     }
+   }
+ 
++#if BUILDFLAG(IS_ANDROID)
++  const auto& vector_icon_type = gfx::VectorIcon::EmptyIcon();
++#else
+   bool is_starred_match = IsStarredMatch(match);
+   const auto& vector_icon_type = match.GetVectorIcon(is_starred_match, turl);
++#endif
+ 
+   return controller_->client()->GetSizedIcon(vector_icon_type,
+                                              vector_icon_color);
+diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
+--- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
++++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
+@@ -921,6 +921,7 @@ SearchboxHandler::CreateAutocompleteMatch(
+   mojom_match->destination_url = match.destination_url;
+   mojom_match->suggestion_group_id =
+       match.suggestion_group_id.value_or(omnibox::GROUP_INVALID);
++#if !BUILDFLAG(IS_ANDROID)
+   const bool is_bookmarked =
+       bookmark_model->IsBookmarked(match.destination_url);
+   // For starter pack suggestions, use template url to generate proper vector
+@@ -931,6 +932,7 @@ SearchboxHandler::CreateAutocompleteMatch(
+           : turl_service->GetTemplateURLForKeyword(match.associated_keyword);
+   mojom_match->icon_path = AutocompleteIconToResourceName(
+       match.GetVectorIcon(is_bookmarked, associated_keyword_turl));
++#endif
+   // For enterprise search aggregator people suggestions, use branded icon if
+   // branded build.
+   if (match.enterprise_search_aggregator_type ==
+@@ -1009,7 +1011,9 @@ SearchboxHandler::CreateAutocompleteMatch(
+ #endif
+       std::string icon_path;
+       if (action->GetIconImage().IsEmpty()) {
++#if !BUILDFLAG(IS_ANDROID)
+         icon_path = AutocompleteIconToResourceName(action->GetVectorIcon());
++#endif
+       } else {
+         icon_path = webui::GetBitmapDataUrl(action->GetIconImage().AsBitmap());
+       }
+--
