@@ -8,10 +8,10 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../TabListViewBinderUtils.java               |  1 +
  .../tasks/tab_management/TabProperties.java   |  5 ++
  .../java/res/xml/privacy_preferences.xml      |  5 ++
- .../chrome/browser/app/ChromeActivity.java    |  4 +-
+ .../chrome/browser/app/ChromeActivity.java    |  3 +-
  .../privacy/settings/PrivacySettings.java     | 46 ++++++++++++++++++-
  .../strings/android_chrome_strings.grd        |  8 ++++
- 7 files changed, 73 insertions(+), 3 deletions(-)
+ 7 files changed, 72 insertions(+), 3 deletions(-)
 
 diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java
 --- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridViewBinder.java
@@ -96,13 +96,12 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActiv
  import org.chromium.chrome.browser.profiles.Profile;
  import org.chromium.chrome.browser.profiles.ProfileManager;
  import org.chromium.chrome.browser.profiles.ProfileManagerUtils;
-@@ -745,7 +746,8 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
+@@ -745,7 +746,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
                      new TabContentManager(
                              this,
                              mBrowserControlsManagerSupplier.get(),
 -                            /* snapshotsEnabled= */ true,
-+                            !TabUiFeatureUtilities.shouldUseListMode()
-+                                && !ContextUtils.getAppSharedPreferences().getBoolean(PrivacySettings.PREF_TABGRID_USE_ICONS, false),
++                            !ContextUtils.getAppSharedPreferences().getBoolean(PrivacySettings.PREF_TABGRID_USE_ICONS, false),
                              tabModelSelector != null ? tabModelSelector::getTabById : null,
                              TabWindowManagerSingleton.getInstance()));
  
@@ -206,7 +205,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -6766,6 +6766,14 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
+@@ -6760,6 +6760,14 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
          Your <ph name="FQDN">%1$s<ex>www.amazon.com</ex></ph> timer ran out. It'll start again tomorrow.
        </message>
  
