@@ -212,13 +212,11 @@ Prevents the unauthorised use by the user of proxies or man-in-the-middle attack
 - (ANDROID) Increase number of autocomplete matches to 10
 - (ANDROID) Keep empty tabs between sessions
 - (ANDROID) Disable screenshots in Incognito mode
-- (ANDROID) Move navigation bar to bottom
 - (ANDROID) Never fetch popular sites
 - (ANDROID) Re-introduce modal dialog flag to close all tabs
 - (ANDROID) Remove help menu item
 - (ANDROID) Readded disable-pull-to-refresh-effect
 - (ANDROID) Show New Tab Page at startup
-- (ANDROID) Use list mode for tab switcher
 - (DESKTOP) Enable menu on reload button
 
 #### Disabled chromium feature
