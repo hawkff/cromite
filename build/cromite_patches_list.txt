@@ -140,7 +140,6 @@ Add-lifetime-options-for-permissions.patch
 Disable-crash-reporting.patch
 Samsung-Note-9-SDK27-crazylinker-workaround.patch
 Disable-TLS-resumption.patch
-Move-navigation-bar-to-bottom.patch
 Welcome-screen.patch
 Add-site-engagement-flag.patch
 Enable-Certificate-Transparency.patch
@@ -230,7 +229,6 @@ Keep-Manta-Service-Disabled.patch
 Disable-Service-and-Shared-workers-on-3P-iframe.patch
 Disable-Real-Box.patch
 Add-PartialLowEndModeOnMidRangeDevices-flag.patch
-Use-list-mode-for-tab-switcher.patch
 Chrome-web-store-protection.patch
 Enables-keyword-based-site-search-on-Android-devices.patch
 Disable-Android-AppRestrictions.patch
@@ -276,7 +274,6 @@ Keep-disabled-cache-sharing-for-pervasive-scripts.patch
 High-Resolution-Timing-Mitigation.patch
 Enable-snackbar-swipe.patch
 Add-cromite-test-support.patch
-Android-Pixel-Perfect-Mode.patch
 Set-caret-blink-interval-to-default.patch
 Set-the-screen-frame-rate-to-60-Hz.patch
 Add-setting-to-enable-Credman-for-passkeys.patch
@@ -315,5 +312,3 @@ eyeo-133.0.6943.49-extension_api.patch
 Eyeo-Adblock-for-Cromite.patch
 
 # extension patches
-Experimental-support-for-extensions-on-Android.patch
-Enable-extension-in-incognito.patch
