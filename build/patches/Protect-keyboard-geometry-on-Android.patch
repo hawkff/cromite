@@ -47,7 +47,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../Android-Protected-Keyboard-Geometry.inc   |    2 +
  .../public/mojom/input/input_handler.mojom    |    4 +
  .../core/frame/local_frame_mojo_handler.cc    |    7 +-
- .../renderer/core/frame/viewport_data.cc      |   13 +-
+ .../renderer/core/frame/viewport_data.cc      |   14 +-
  .../blink/renderer/core/frame/viewport_data.h |    4 +-
  .../core/frame/web_frame_widget_impl.cc       |   20 +
  .../core/frame/web_frame_widget_impl.h        |    1 +
@@ -65,7 +65,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  ui/android/overscroll_refresh.h               |    5 +
  ui/android/overscroll_refresh_handler.cc      |   24 +
  ui/android/overscroll_refresh_handler.h       |    5 +
- 44 files changed, 2433 insertions(+), 30 deletions(-)
+ 44 files changed, 2434 insertions(+), 30 deletions(-)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/compositor/ProtectedViewportScrollView.java
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sAndroidProtectedKeyboardGeometry.java
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/CromiteProtectedKeyboardGeometryContentSetting.java
@@ -293,7 +293,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
  
      private @Nullable OnscreenContentProvider mOnscreenContentProvider;
  
-@@ -383,10 +392,11 @@ public class CompositorViewHolder extends FrameLayout
+@@ -379,10 +388,11 @@ public class CompositorViewHolder extends FrameLayout
                  @Override
                  public void onDidFinishNavigationInPrimaryMainFrame(
                          Tab tab, NavigationHandle navigation) {
@@ -307,7 +307,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
                      }
                  }
  
-@@ -451,6 +461,8 @@ public class CompositorViewHolder extends FrameLayout
+@@ -447,6 +457,8 @@ public class CompositorViewHolder extends FrameLayout
  
      @org.chromium.build.annotations.Initializer
      private void internalInit() {
@@ -316,7 +316,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          addOnLayoutChangeListener(
                  (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
                      Tab tab = getCurrentTab();
-@@ -486,8 +498,8 @@ public class CompositorViewHolder extends FrameLayout
+@@ -482,8 +494,8 @@ public class CompositorViewHolder extends FrameLayout
                  });
  
          mCompositorView = new CompositorView(getContext(), this);
@@ -327,7 +327,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
                  mCompositorView,
                  0,
                  new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-@@ -851,6 +863,8 @@ public class CompositorViewHolder extends FrameLayout
+@@ -847,6 +859,8 @@ public class CompositorViewHolder extends FrameLayout
              PrefService prefService) {
          mActivity = assumeNonNull(windowAndroid.getActivity().get());
          mCompositorView.initNativeCompositor(windowAndroid, tabContentManager);
@@ -336,7 +336,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
  
          if (mControlContainer != null) {
              mCompositorView
-@@ -923,6 +937,11 @@ public class CompositorViewHolder extends FrameLayout
+@@ -919,6 +933,11 @@ public class CompositorViewHolder extends FrameLayout
              if (o.onInterceptTouchEvent(e)) return true;
          }
  
@@ -348,7 +348,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          if (mLayoutManager == null) return false;
  
          int actionMasked = SPenSupport.convertSPenEventAction(e.getActionMasked());
-@@ -1044,9 +1063,123 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1040,9 +1059,123 @@ public class CompositorViewHolder extends FrameLayout
          return handled;
      }
  
@@ -472,10 +472,10 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
      public LayoutManagerImpl getLayoutManager() {
          return mLayoutManager;
      }
-@@ -1193,6 +1326,12 @@ public class CompositorViewHolder extends FrameLayout
-                 && mVirtualKeyboardMode != VirtualKeyboardMode.OVERLAYS_CONTENT) {
-             webContentsHeightInset = 0;
-         }
+@@ -1185,6 +1318,12 @@ public class CompositorViewHolder extends FrameLayout
+         // In OVERLAYS_CONTENT/RESIZES_VISUAL, webContentsHeightInset can be negative to
+         // outset the WebContents and counter the Android View resize caused by the keyboard.
+         int webContentsHeightInset = getEffectiveWebContentsHeightInset();
 +        if (mProtectedViewport != null) {
 +            controlsInsets = mProtectedViewport.protectControlsInsets(
 +                    controlsInsets, width, webContentsHeightInset, mControlsResizeView,
@@ -485,7 +485,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          int verticalViewportInsets = controlsInsets + webContentsHeightInset;
  
          int webContentsWidth = width - horizontalViewportInsets;
-@@ -1261,6 +1400,30 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1253,6 +1392,30 @@ public class CompositorViewHolder extends FrameLayout
              }
          }
  
@@ -514,9 +514,9 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
 +        }
 +
          if (isAttachedToWindow(view)) {
-             webContents.setSize(webContentsWidth, webContentsHeight, verticalViewportInsets);
+             webContents.setSize(webContentsWidth, webContentsHeight);
  
-@@ -1296,6 +1459,9 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1288,6 +1451,9 @@ public class CompositorViewHolder extends FrameLayout
  
      @VirtualKeyboardMode.EnumType
      private int defaultVirtualKeyboardMode() {
@@ -526,7 +526,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          if (mPrefService.getBoolean(Pref.VIRTUAL_KEYBOARD_RESIZES_LAYOUT_BY_DEFAULT)) {
              return VirtualKeyboardMode.RESIZES_CONTENT;
          }
-@@ -1447,6 +1613,9 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1439,6 +1605,9 @@ public class CompositorViewHolder extends FrameLayout
              boolean bottomControlsMinHeightChanged,
              boolean requestNewFrame,
              boolean isVisibilityForced) {
@@ -536,7 +536,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          if (!isVisibilityForced && getResourceManager() != null) {
              getResourceManager()
                      .assertResourceExists(AndroidResourceType.DYNAMIC, R.id.control_container);
-@@ -1463,6 +1632,10 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1455,6 +1624,10 @@ public class CompositorViewHolder extends FrameLayout
          }
  
          updateContentViewChildrenDimension();
@@ -547,7 +547,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
      }
  
      @Override
-@@ -1471,7 +1644,13 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1463,7 +1636,13 @@ public class CompositorViewHolder extends FrameLayout
          if (mTabVisible == null) return;
          onBrowserControlsHeightChanged();
          updateWebContentsSize(getCurrentTab());
@@ -561,7 +561,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
      }
  
      @Override
-@@ -1479,6 +1658,10 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1471,6 +1650,10 @@ public class CompositorViewHolder extends FrameLayout
          if (mTabVisible == null) return;
          onBrowserControlsHeightChanged();
          updateWebContentsSize(getCurrentTab());
@@ -572,7 +572,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          onViewportChanged();
      }
  
-@@ -1834,8 +2017,12 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1826,8 +2009,12 @@ public class CompositorViewHolder extends FrameLayout
  
      @Override
      protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -585,7 +585,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
      }
  
      @Override
-@@ -1881,6 +2068,8 @@ public class CompositorViewHolder extends FrameLayout
+@@ -1873,6 +2060,8 @@ public class CompositorViewHolder extends FrameLayout
       */
      public void setBrowserControlsManager(BrowserControlsManager manager) {
          mBrowserControlsManager = manager;
@@ -594,7 +594,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          mBrowserControlsManager.addObserver(this);
          onViewportChanged();
      }
-@@ -2009,7 +2198,8 @@ public class CompositorViewHolder extends FrameLayout
+@@ -2001,7 +2190,8 @@ public class CompositorViewHolder extends FrameLayout
          if (mView == null) return;
          WebContents webContents = getWebContents();
          if (show) {
@@ -604,7 +604,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
                  return;
              }
              // During tab creation, we temporarily add the new tab's view to a FrameLayout to
-@@ -2025,20 +2215,20 @@ public class CompositorViewHolder extends FrameLayout
+@@ -2017,20 +2207,20 @@ public class CompositorViewHolder extends FrameLayout
  
              // CompositorView always has index of 0.
              // TODO(crbug.com/40770763): Look into enforcing the z-order of the views.
@@ -628,7 +628,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
              }
          }
      }
-@@ -2056,6 +2246,11 @@ public class CompositorViewHolder extends FrameLayout
+@@ -2048,6 +2238,11 @@ public class CompositorViewHolder extends FrameLayout
  
      @VisibleForTesting
      void onWillShowBrowserControls(boolean viewTransitionOptIn) {
@@ -640,7 +640,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
          // TODO(bokan): Flag guarding potential new behavior
          // https://crbug.com/332331777.
          if (!viewTransitionOptIn && !ChromeFeatureList.sBrowserControlsEarlyResize.isEnabled()) {
-@@ -2112,6 +2307,11 @@ public class CompositorViewHolder extends FrameLayout
+@@ -2104,6 +2299,11 @@ public class CompositorViewHolder extends FrameLayout
  
          mTabVisible = tab;
          mView = newView;
@@ -2154,7 +2154,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabWebConte
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 --- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 +++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
-@@ -1725,7 +1725,7 @@ public abstract class ChromeFeatureList {
+@@ -1717,7 +1717,7 @@ public abstract class ChromeFeatureList {
      public static final MutableFlagWithSafeDefault sBookmarksBarNTP =
              newMutableFlagWithSafeDefault(BOOKMARKS_BAR_NTP, false);
      public static final MutableFlagWithSafeDefault sBrowserControlsEarlyResize =
@@ -2820,7 +2820,7 @@ diff --git a/third_party/blink/renderer/core/frame/viewport_data.cc b/third_part
  }
  
 +bool ViewportData::GetVirtualKeyboardOverlaysContent() const {
-+  // The bottom-controls policy keeps the author-controlled mode disabled. The
++  // The setter keeps the author-controlled mode disabled. The
 +  // protected keyboard policy is layered by GetVirtualKeyboardOverlaysContent().
 +  if (document_->GetFrame() && document_->GetPage()
 +        && document_->GetPage()->IsAndroidProtectedKeyboardGeometryEnabled(
@@ -2833,6 +2833,14 @@ diff --git a/third_party/blink/renderer/core/frame/viewport_data.cc b/third_part
  void ViewportData::UpdateViewportDescription() {
    if (!document_->GetFrame())
      return;
+@@ -175,6 +186,7 @@ void ViewportData::SetExpandIntoDisplayCutout(bool expand) {
+ }
+ 
+ void ViewportData::SetVirtualKeyboardOverlaysContent(bool overlays_content) {
++  overlays_content = false;
+   if (virtual_keyboard_overlays_content_ == overlays_content)
+     return;
+ 
 diff --git a/third_party/blink/renderer/core/frame/viewport_data.h b/third_party/blink/renderer/core/frame/viewport_data.h
 --- a/third_party/blink/renderer/core/frame/viewport_data.h
 +++ b/third_party/blink/renderer/core/frame/viewport_data.h
@@ -2859,7 +2867,7 @@ diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc b/th
    }
  
    SetWindowShowState(visual_properties.window_show_state);
-@@ -5085,6 +5087,24 @@ void WebFrameWidgetImpl::ScrollFocusedEditableNodeIntoView() {
+@@ -5063,6 +5065,24 @@ void WebFrameWidgetImpl::ScrollFocusedEditableNodeIntoView() {
    local_frame->ScrollFocusedEditableElementIntoView();
  }
  
@@ -2887,7 +2895,7 @@ diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc b/th
 diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.h b/third_party/blink/renderer/core/frame/web_frame_widget_impl.h
 --- a/third_party/blink/renderer/core/frame/web_frame_widget_impl.h
 +++ b/third_party/blink/renderer/core/frame/web_frame_widget_impl.h
-@@ -1038,6 +1038,7 @@ class CORE_EXPORT WebFrameWidgetImpl
+@@ -1037,6 +1037,7 @@ class CORE_EXPORT WebFrameWidgetImpl
        mojom::blink::SelectionMenuBehavior behavior) override;
    void MoveRangeSelectionExtent(const gfx::Point& extent_in_dips) override;
    void ScrollFocusedEditableNodeIntoView() override;
@@ -2975,7 +2983,7 @@ diff --git a/third_party/blink/renderer/platform/widget/input/frame_widget_input
 diff --git a/third_party/blink/renderer/platform/widget/input/input_handler_proxy.cc b/third_party/blink/renderer/platform/widget/input/input_handler_proxy.cc
 --- a/third_party/blink/renderer/platform/widget/input/input_handler_proxy.cc
 +++ b/third_party/blink/renderer/platform/widget/input/input_handler_proxy.cc
-@@ -1210,6 +1210,13 @@ InputHandlerProxy::EventDisposition InputHandlerProxy::HandleGestureScrollBegin(
+@@ -1192,6 +1192,13 @@ InputHandlerProxy::EventDisposition InputHandlerProxy::HandleGestureScrollBegin(
      InputHandlerScrollEnd(std::nullopt);
    }
  
@@ -2989,7 +2997,7 @@ diff --git a/third_party/blink/renderer/platform/widget/input/input_handler_prox
    cc::ScrollState scroll_state(CreateScrollStateDataForGesture(gesture_event));
    cc::InputHandler::ScrollStatus scroll_status;
    if (gesture_event.data.scroll_begin.target_viewport) {
-@@ -1370,6 +1377,8 @@ InputHandlerProxy::EventDisposition InputHandlerProxy::HandleGestureScrollEnd(
+@@ -1352,6 +1359,8 @@ InputHandlerProxy::EventDisposition InputHandlerProxy::HandleGestureScrollEnd(
      const WebGestureEvent& gesture_event,
      cc::EventMetrics* metrics) {
    TRACE_EVENT0("input", "InputHandlerProxy::HandleGestureScrollEnd");
@@ -2998,7 +3006,7 @@ diff --git a/third_party/blink/renderer/platform/widget/input/input_handler_prox
  
    const cc::ElementId latched_element_id =
        input_handler_->LatchedScrollerElementId();
-@@ -2013,15 +2022,28 @@ void InputHandlerProxy::HandleOverscroll(
+@@ -1995,15 +2004,28 @@ void InputHandlerProxy::HandleOverscroll(
      const cc::InputHandlerScrollResult& scroll_result,
      const blink::WebGestureDevice source_device) {
    DCHECK(client_);
@@ -3062,7 +3070,7 @@ diff --git a/ui/android/event_forwarder.cc b/ui/android/event_forwarder.cc
 +                                           float initial_delta_y) {
 +  CancelFling(env, time_ms, /*prevent_boosting=*/true,
 +              /*is_touchpad_event=*/false);
-+  const float dip_scale = view_->GetDipScaleFactor();
++  const float dip_scale = view_->GetDipScale();
 +  const gfx::PointF location(x / dip_scale, y / dip_scale);
 +
 +  // Do not target the root viewport: cc must hit-test the gesture location and
@@ -3081,7 +3089,7 @@ diff --git a/ui/android/event_forwarder.cc b/ui/android/event_forwarder.cc
 +                                            float x,
 +                                            float y,
 +                                            float delta_y) {
-+  const float dip_scale = view_->GetDipScaleFactor();
++  const float dip_scale = view_->GetDipScale();
 +  const gfx::PointF location(x / dip_scale, y / dip_scale);
 +  view_->OnGestureEvent(GestureEventAndroid(
 +      GESTURE_EVENT_TYPE_SCROLL_BY, location, location, time_ms,
@@ -3097,7 +3105,7 @@ diff --git a/ui/android/event_forwarder.cc b/ui/android/event_forwarder.cc
 +                                         float x,
 +                                         float y,
 +                                         float velocity_y) {
-+  const float dip_scale = view_->GetDipScaleFactor();
++  const float dip_scale = view_->GetDipScale();
 +  const gfx::PointF location(x / dip_scale, y / dip_scale);
 +  if (velocity_y != 0) {
 +    view_->OnGestureEvent(GestureEventAndroid(
