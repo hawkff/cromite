@@ -22,7 +22,6 @@ Enable-fwrapv-in-Clang-for-non-UBSan-builds.patch
 Bromite-package-name.patch
 Restore-classic-new-tab-page.patch
 Always-use-new-tab-page-for-default-home-page.patch
-disable-battery-status-updater.patch
 Battery-API-return-nothing.patch
 Disable-omission-of-URL-elements.patch
 Modify-default-preferences.patch
@@ -35,7 +34,6 @@ ungoogled-chromium-Disable-webRTC-log-uploader.patch
 ungoogled-chromium-Disable-untraceable-URLs.patch
 ungoogled-chromium-Disable-translate-integration.patch
 ungoogled-chromium-Disable-profile-avatar.patch
-ungoogled-chromium-Disable-intranet-detector.patch
 ungoogled-chromium-no-special-hosts-domains.patch
 ungoogled-chromium-Disable-Network-Time-Tracker.patch
 Disable-all-promo-dialogs.patch
@@ -63,7 +61,6 @@ Disable-fetching-of-all-field-trials.patch
 Disable-plugins-enumeration.patch
 dns-send-IPv6-connectivity-probes-to-RIPE-DNS.patch
 Add-flag-to-disable-IPv6-probes.patch
-profile-resetter-disable-send-settings.patch
 Do-not-build-API-keys-infobar.patch
 autofill-miscellaneous.patch
 Enable-native-Android-autofill.patch
@@ -80,7 +77,6 @@ Bromite-subresource-adblocker.patch
 Bromite-auto-updater.patch
 Replace-DoH-probe-domain-with-RIPE-domain.patch
 Increase-number-of-autocomplete-matches-to-10.patch
-Disable-requests-for-single-word-Omnibar-searches.patch
 Disable-some-signed-exchange-features.patch
 DoH-improvements.patch
 Reduce-HTTP-headers-in-DoH-requests-to-bare-minimum.patch
@@ -95,7 +91,6 @@ Revert-removal-of-execution-context-address-space.patch
 Block-gateway-attacks-via-websockets.patch
 Enable-darken-websites-checkbox-in-themes.patch
 Remove-blocklisted-URLs-upon-bookmark-creation.patch
-Disable-the-DIAL-repeating-discovery.patch
 Hardening-against-incognito-mode-detection.patch
 Restore-Simplified-NTP-launch.patch
 Add-option-to-use-home-page-as-NTP.patch
@@ -169,7 +164,6 @@ Enable-HighEfficiencyMode-by-default.patch
 WIN-Disable-TabHoverCard-images.patch
 WIN-Fix-log-to-file.patch
 WIN-Disable-updater.patch
-WIN-Disable-first-run.patch
 WIN-Add-some-prefs-to-secure-preferences.patch
 WIN-Disable-search-for-image.patch
 AudioBuffer-AnalyserNode-fp-mitigations.patch
@@ -217,7 +211,6 @@ Change-popup-site-setting.patch
 Disable-speechSynthesis-getVoices-API.patch
 Remove-support-for-device-memory-and-cpu-recovery.patch
 Log-dangling-attributes-in-some-html-elements.patch
-Keep-Side-Panel-Companion-disabled.patch
 Lock-Profile-Cookie-Database.patch
 Cromite-Branding.patch
 Disable-Feeback-Collector.patch
@@ -227,7 +220,6 @@ Allow-DocumentPiP-if-PopupsAndRedirects-are-active.patch
 allow-the-download-of-clang-for-windows-crossbuild.patch
 Add-option-to-disable-snapshots.patch
 Enable-Android-Dynamic-Performance-Framework.patch
-Fix-crash-on-customize-profile-ui.patch
 Enable-ImprovedBookmarks-by-default.patch
 Partition-MediaDeviceId-by-default.patch
 Keep-disabled-FetchLaterAPI.patch
@@ -237,7 +229,6 @@ Block-Intents-While-Locked.patch
 Keep-Manta-Service-Disabled.patch
 Disable-Service-and-Shared-workers-on-3P-iframe.patch
 Disable-Real-Box.patch
-Always-allow-inspect-fallback.patch
 Add-PartialLowEndModeOnMidRangeDevices-flag.patch
 Use-list-mode-for-tab-switcher.patch
 Chrome-web-store-protection.patch
@@ -252,7 +243,6 @@ Disable-offline-autofetch-flag.patch
 Show-NTP-at-startup.patch
 Enable-platform-aac-audio-and-h264-video.patch
 Disable-Paint-Preview-by-default.patch
-Do-not-use-Windows-ClearType-Text-Tuner-setting.patch
 Private-network-access-content-settings.patch
 Allow-building-without-supervised-users.patch
 Keep-ComputePressure-disabled.patch
@@ -269,14 +259,12 @@ Ask-for-restart-on-connection-change.patch
 Bubble-Locking-on-UI-DevTools.patch
 Add-a-GN-flag-to-disable-trybot-verification.patch
 Override-the-MV2-deprecation.patch
-Remove-sideloading-of-version-dll.patch
 Use-browser-navigation-handler.patch
 Cromite-Branding--improve-settings-ui.patch
 Disable-Posture-API.patch
 PublicKeyCredential-fingerprinting-mitigations.patch
 Disable-Web-Bluetooth-by-default-in-desktop-platforms.patch
 Enable-Cert-Management-UI.patch
-Prevent-mouse-wheel-fingerprinting-on-Windows.patch
 Enable-component-updater.patch
 Android-fonts-fingerprinting-mitigation.patch
 Disable-Android-Tab-Declutter.patch
@@ -291,7 +279,6 @@ Add-cromite-test-support.patch
 Android-Pixel-Perfect-Mode.patch
 Set-caret-blink-interval-to-default.patch
 Set-the-screen-frame-rate-to-60-Hz.patch
-Disable-Device-Attributes-API.patch
 Add-setting-to-enable-Credman-for-passkeys.patch
 Temp-disable-UseContextSnapshot.patch
 Enable-ClientHello-Segmentation.patch
@@ -317,7 +304,6 @@ Never-treat-Proguard-warnings-as-errors.patch
 Temp-disable-experimental-web-platform-features.patch
 Block-leakage-of-urls-in-sandbox-iframes.patch
 Fix-chromium-build-bugs.patch
-Temp-use-PREVIEW-for-IDCompositionDevice5.patch
 Temp-Do-not-compress-devtools-frontend-resources-in-non-debug-mode.patch
 
 # adblock patches
