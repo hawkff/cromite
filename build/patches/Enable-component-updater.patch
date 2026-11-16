@@ -12,7 +12,6 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../nonembedded/webview_apk_process.cc        | 24 +++++----
  .../nonembedded/webview_apk_process.h         |  4 +-
  .../browser/component_updater/registration.cc |  2 +
- .../elevated_recovery_impl.cc                 |  2 +-
  .../component_updater/component_installer.cc  | 54 ++++++++++++-------
  .../component_updater/component_installer.h   |  6 +--
  .../component_updater_url_constants.cc        |  4 +-
@@ -35,7 +34,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  components/update_client/update_engine.cc     |  9 ++++
  components/update_client/utils.cc             |  4 ++
  extensions/browser/sandboxed_unpacker.cc      |  2 +-
- 27 files changed, 152 insertions(+), 66 deletions(-)
+ 26 files changed, 151 insertions(+), 65 deletions(-)
 
 diff --git a/android_webview/nonembedded/webview_apk_application.cc b/android_webview/nonembedded/webview_apk_application.cc
 --- a/android_webview/nonembedded/webview_apk_application.cc
@@ -126,18 +125,6 @@ diff --git a/chrome/browser/component_updater/registration.cc b/chrome/browser/c
  #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
    RegisterRecoveryImprovedComponent(cus, g_browser_process->local_state());
  #endif  // BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC)
-diff --git a/chrome/elevation_service/elevated_recovery_impl.cc b/chrome/elevation_service/elevated_recovery_impl.cc
---- a/chrome/elevation_service/elevated_recovery_impl.cc
-+++ b/chrome/elevation_service/elevated_recovery_impl.cc
-@@ -197,7 +197,7 @@ HRESULT ValidateAndUnpackCRX(const base::FilePath& from_crx_path,
- 
-   std::string public_key;
-   if (crx_file::Verify(to_crx_path, crx_format, {crx_hash}, {}, &public_key,
--                       nullptr, /*compressed_verified_contents=*/nullptr) !=
-+                       nullptr, /*compressed_verified_contents=*/nullptr, /* is_extension */ false) !=
-       crx_file::VerifierResult::OK_FULL) {
-     return CRYPT_E_NO_MATCH;
-   }
 diff --git a/components/component_updater/component_installer.cc b/components/component_updater/component_installer.cc
 --- a/components/component_updater/component_installer.cc
 +++ b/components/component_updater/component_installer.cc

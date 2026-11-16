@@ -11,13 +11,12 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../java/res_base/font/chrome_google_sans_text.xml        | 8 +-------
  .../java/res_base/font/chrome_google_sans_text_medium.xml | 8 +-------
  .../org/chromium/chrome/browser/fonts/FontPreloader.java  | 1 +
- .../side_panel/read_anything/app/read_anything_toolbar.ts | 4 +---
  .../content/browser/dom_distiller_viewer_source.cc        | 2 +-
  .../dom_distiller/core/html/dom_distiller_viewer.html     | 4 ----
  components/dom_distiller/core/html/preview.html           | 2 +-
  .../content/browser/font/AndroidFontLookupImpl.java       | 1 +
  .../crashpad/crashpad/doc/support/crashpad_doxygen.css    | 3 +--
- 13 files changed, 11 insertions(+), 47 deletions(-)
+ 12 files changed, 10 insertions(+), 44 deletions(-)
 
 diff --git a/chrome/android/java/res/font/reader_mode_lexend.xml b/chrome/android/java/res/font/reader_mode_lexend.xml
 --- a/chrome/android/java/res/font/reader_mode_lexend.xml
@@ -117,20 +116,6 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/fonts/FontPrelo
              context = context.getApplicationContext();
              // Create an empty callback so we can call the async version of #getFont.
              var callback =
-diff --git a/chrome/browser/resources/side_panel/read_anything/app/read_anything_toolbar.ts b/chrome/browser/resources/side_panel/read_anything/app/read_anything_toolbar.ts
---- a/chrome/browser/resources/side_panel/read_anything/app/read_anything_toolbar.ts
-+++ b/chrome/browser/resources/side_panel/read_anything/app/read_anything_toolbar.ts
-@@ -520,9 +520,7 @@ export class ReadAnythingToolbarElement extends ReadAnythingToolbarElementBase {
-     const link = document.createElement('link');
-     link.rel = 'preload';
-     link.as = 'style';
--    link.href = 'https://fonts.googleapis.com/css?family=';
--    link.href += chrome.readingMode.allFonts.join('|');
--    link.href = link.href.replace(' ', '+');
-+    this.setFontsLoaded();
- 
-     link.addEventListener('load', () => {
-       link.media = 'all';
 diff --git a/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc b/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc
 --- a/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc
 +++ b/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc

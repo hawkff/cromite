@@ -8,8 +8,7 @@ Patch derived from the ungoogled-chromium patch of the same name.
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
  chrome/app/generated_resources.grd              | 4 ++--
- chrome/browser/ui/views/toolbar/toolbar_view.cc | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
 --- a/chrome/app/generated_resources.grd
@@ -27,16 +26,4 @@ diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources
        </message>
  
        <!-- Tab sharing infobar -->
-diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
---- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
-+++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-@@ -1176,7 +1176,7 @@ void ToolbarView::Update(WebContents* tab) {
- 
-   if (ReloadControl* reload_control = GetReloadButton(); reload_control) {
-     reload_control->SetDevToolsStatus(
--        chrome::IsDebuggerAttachedToCurrentTab(browser_));
-+        true);
-   }
- }
- 
 --

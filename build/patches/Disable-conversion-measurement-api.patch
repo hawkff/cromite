@@ -14,9 +14,6 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../apk/AndroidManifest.xml                   |  3 ---
  chrome/android/java/AndroidManifest.xml       |  4 ----
  .../ChromeSiteSettingsDelegate.java           |  2 ++
- .../privacy_page/privacy_page_index.html      |  9 -------
- chrome/browser/resources/settings/route.ts    |  2 +-
- .../site_settings/site_settings_page.ts       |  1 +
  components/attribution_reporting/features.cc  |  1 +
  .../core/browser/content_settings_registry.cc |  2 +-
  .../origin_trials/features.cc                 |  1 +
@@ -27,7 +24,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  services/network/network_context.cc           | 24 ++++---------------
  .../platform/runtime_enabled_features.json5   | 16 ++++++-------
  ui/events/android/motion_event_android.cc     |  8 +++++--
- 16 files changed, 39 insertions(+), 50 deletions(-)
+ 13 files changed, 37 insertions(+), 40 deletions(-)
  create mode 100644 cromite_flags/services/network/public/cpp/features_cc/Disable-conversion-measurement-api.inc
  create mode 100644 cromite_flags/third_party/blink/common/features_cc/Disable-conversion-measurement-api.inc
 
@@ -77,48 +74,6 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/site_settings/C
              case SiteSettingsCategory.Type.AUTO_DARK_WEB_CONTENT:
                  return ChromeFeatureList.isEnabled(
                          ChromeFeatureList.DARKEN_WEBSITES_CHECKBOX_IN_THEMES_SETTING);
-diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page_index.html b/chrome/browser/resources/settings/privacy_page/privacy_page_index.html
---- a/chrome/browser/resources/settings/privacy_page/privacy_page_index.html
-+++ b/chrome/browser/resources/settings/privacy_page/privacy_page_index.html
-@@ -126,15 +126,6 @@
-     </settings-ar-page>
-   </template>
- 
--  <template is="dom-if" if="[[renderView_(
--      routes_.SITE_SETTINGS_AUTO_VERIFY, currentRoute, inSearchMode)]]"
--      update-when-false>
--    <settings-anti-abuse-page slot="view" id="siteSettingsAutoVerify"
--        data-parent-view-id="privacy"
--        route-path$="[[routes_.SITE_SETTINGS_AUTO_VERIFY.path]]">
--    </settings-anti-abuse-page>
--  </template>
--
-   <template is="dom-if" if="[[renderView_(
-       routes_.SITE_SETTINGS_AUTO_PICTURE_IN_PICTURE, currentRoute,
-       inSearchMode)]]" update-when-false>
-diff --git a/chrome/browser/resources/settings/route.ts b/chrome/browser/resources/settings/route.ts
---- a/chrome/browser/resources/settings/route.ts
-+++ b/chrome/browser/resources/settings/route.ts
-@@ -63,7 +63,7 @@ function addPrivacyChildRoutes(r: Partial<SettingsRoutes>) {
-     r.SITE_SETTINGS_WEB_PRINTING = r.SITE_SETTINGS.createChild('webPrinting');
-   }
-   // </if>
--  r.SITE_SETTINGS_AUTO_VERIFY = r.SITE_SETTINGS.createChild('autoVerify');
-+  // r.SITE_SETTINGS_AUTO_VERIFY = r.SITE_SETTINGS.createChild('autoVerify');
-   r.SITE_SETTINGS_BACKGROUND_SYNC =
-       r.SITE_SETTINGS.createChild('backgroundSync');
-   r.SITE_SETTINGS_CAMERA = r.SITE_SETTINGS.createChild('camera');
-diff --git a/chrome/browser/resources/settings/site_settings/site_settings_page.ts b/chrome/browser/resources/settings/site_settings/site_settings_page.ts
---- a/chrome/browser/resources/settings/site_settings/site_settings_page.ts
-+++ b/chrome/browser/resources/settings/site_settings/site_settings_page.ts
-@@ -67,6 +67,7 @@ function getCategoryItemMap(): Map<ContentSettingsTypes, CategoryListItem> {
-       route: routes.SITE_SETTINGS_AUTO_VERIFY,
-       id: Id.ANTI_ABUSE,
-       label: 'siteSettingsAntiAbuse',
-+      shouldShow: () => false,
-       icon: 'privacy20:person-check',
-       enabledLabel: 'siteSettingsAntiAbuseEnabledSubLabel',
-       disabledLabel: 'siteSettingsAntiAbuseDisabledSubLabel',
 diff --git a/components/attribution_reporting/features.cc b/components/attribution_reporting/features.cc
 --- a/components/attribution_reporting/features.cc
 +++ b/components/attribution_reporting/features.cc

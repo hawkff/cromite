@@ -17,30 +17,19 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  ...ent_browser_client_navigation_throttles.cc |   1 -
  .../domain_reliability/service_factory.cc     |  28 +-
  .../key_management/browser/commands/BUILD.gn  |   1 -
- .../commands/win_key_rotation_command.cc      |   9 +-
  chrome/browser/extensions/BUILD.gn            |   1 -
  chrome/browser/feedback/BUILD.gn              |   1 -
- .../log_sources/chrome_internal_log_source.cc |   5 -
  chrome/browser/first_run/BUILD.gn             |   1 -
- chrome/browser/first_run/first_run.cc         |   8 -
- chrome/browser/google/BUILD.gn                |   4 +-
  .../long_screenshots_tab_service.cc           |  22 --
  chrome/browser/metrics/BUILD.gn               |   1 -
  .../metrics/chrome_metrics_service_client.cc  |   2 +-
  .../chrome_metrics_services_manager_client.cc |   5 +-
  .../metrics/metrics_reporting_state.cc        |  77 +---
  .../net/system_network_context_manager.cc     |   1 -
- .../one_google_bar_loader_impl.cc             |   3 +-
- .../new_tab_page/promos/promo_service.cc      |   6 +-
  chrome/browser/page_load_metrics/BUILD.gn     |   8 -
  .../from_gws_page_load_metrics_observer.cc    |   2 -
  .../page_load_metrics_initialize.cc           |   5 -
  chrome/browser/policy/BUILD.gn                |   4 +-
- .../updater_status_and_value_provider.cc      |  22 +-
- chrome/browser/profile_resetter/BUILD.gn      |   5 +-
- .../profile_resetter/profile_resetter.cc      |   3 +-
- .../settings/autofill_page/autofill_page.html |  16 -
- .../privacy_page/security/security_page.html  |   6 -
  chrome/browser/safe_browsing/BUILD.gn         |   1 -
  chrome/browser/search_engines/BUILD.gn        |   1 -
  .../ui_thread_search_terms_data.cc            |   4 -
@@ -52,11 +41,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../omnibox/LocationBarCoordinator.java       |   2 -
  .../browser/omnibox/LocationBarMediator.java  |  31 +-
  .../omnibox/geo/GeolocationHeader.java        |   1 +
- .../ui/webui/new_tab_page/new_tab_page_ui.cc  |   8 -
- chrome/browser/ui/webui/ntp/new_tab_ui.cc     |   3 +-
- chrome/browser/ui/webui/settings/BUILD.gn     |   2 -
  chrome/browser/upgrade_detector/BUILD.gn      |   2 -
- .../upgrade_detector/upgrade_detector_impl.cc |   6 -
  chrome/common/BUILD.gn                        |   2 -
  .../google_accounts_private_api_util.cc       |   3 +
  .../url_loader_throttle_provider_impl.cc      |  11 -
@@ -83,7 +68,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  ...gled-chromium-no-special-hosts-domains.inc |   1 +
  net/base/url_util.cc                          |  25 +-
  services/network/network_context.cc           |   2 +-
- 76 files changed, 75 insertions(+), 941 deletions(-)
+ 61 files changed, 52 insertions(+), 858 deletions(-)
  create mode 100644 cromite_flags/content/public/common/content_features_cc/ungoogled-chromium-no-special-hosts-domains.inc
 
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WebSearchDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/WebSearchDelegate.java
@@ -359,26 +344,6 @@ diff --git a/chrome/browser/enterprise/connectors/device_trust/key_management/br
        "//chrome/install_static:install_static_util",
        "//chrome/installer/util:with_no_strings",
        "//chrome/updater/app/server/win:updater_legacy_idl",
-diff --git a/chrome/browser/enterprise/connectors/device_trust/key_management/browser/commands/win_key_rotation_command.cc b/chrome/browser/enterprise/connectors/device_trust/key_management/browser/commands/win_key_rotation_command.cc
---- a/chrome/browser/enterprise/connectors/device_trust/key_management/browser/commands/win_key_rotation_command.cc
-+++ b/chrome/browser/enterprise/connectors/device_trust/key_management/browser/commands/win_key_rotation_command.cc
-@@ -49,13 +49,10 @@ HRESULT RunGoogleUpdateElevatedCommand(const wchar_t* command,
-   if (args.size() > kMaxCommandArgs)
-     return E_INVALIDARG;
- 
--  auto get_command_result = GetUpdaterAppCommand(command);
--  if (!get_command_result.has_value()) {
--    return get_command_result.error();
--  }
-+  if ((true))
-+    return E_INVALIDARG;
- 
--  Microsoft::WRL::ComPtr<IAppCommandWeb> app_command =
--      get_command_result.value();
-+  Microsoft::WRL::ComPtr<IAppCommandWeb> app_command;
-   _variant_t vargs[kMaxCommandArgs];
-   for (size_t i = 0; i < args.size(); ++i) {
-     UNSAFE_TODO(vargs[i]) = args[i].c_str();
 diff --git a/chrome/browser/extensions/BUILD.gn b/chrome/browser/extensions/BUILD.gn
 --- a/chrome/browser/extensions/BUILD.gn
 +++ b/chrome/browser/extensions/BUILD.gn
@@ -401,28 +366,6 @@ diff --git a/chrome/browser/feedback/BUILD.gn b/chrome/browser/feedback/BUILD.gn
        "//chrome/browser/metrics",
        "//chrome/browser/performance_manager/public/user_tuning",
        "//chrome/browser/profiles:profile_manager",
-diff --git a/chrome/browser/feedback/system_logs/log_sources/chrome_internal_log_source.cc b/chrome/browser/feedback/system_logs/log_sources/chrome_internal_log_source.cc
---- a/chrome/browser/feedback/system_logs/log_sources/chrome_internal_log_source.cc
-+++ b/chrome/browser/feedback/system_logs/log_sources/chrome_internal_log_source.cc
-@@ -126,7 +126,6 @@ constexpr char kOsVersionTag[] = "OS VERSION";
- #if BUILDFLAG(IS_WIN)
- constexpr char kUsbKeyboardDetected[] = "usb_keyboard_detected";
- constexpr char kIsEnrolledToDomain[] = "enrolled_to_domain";
--constexpr char kInstallerBrandCode[] = "installer_brand_code";
- #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
- constexpr char kInstallResultCode[] = "install_result_code";
- constexpr char kInstallLocation[] = "install_location";
-@@ -660,10 +659,6 @@ void ChromeInternalLogSource::PopulateEnrolledToDomain(
- 
- void ChromeInternalLogSource::PopulateInstallerBrandCode(
-     SystemLogsResponse* response) {
--  std::string brand;
--  google_brand::GetBrand(&brand);
--  response->emplace(kInstallerBrandCode,
--                    brand.empty() ? "Unknown brand code" : brand);
- }
- 
- void ChromeInternalLogSource::PopulateLastUpdateState(
 diff --git a/chrome/browser/first_run/BUILD.gn b/chrome/browser/first_run/BUILD.gn
 --- a/chrome/browser/first_run/BUILD.gn
 +++ b/chrome/browser/first_run/BUILD.gn
@@ -434,45 +377,6 @@ diff --git a/chrome/browser/first_run/BUILD.gn b/chrome/browser/first_run/BUILD.
      "//chrome/browser/headless",
      "//chrome/browser/image_fetcher",
      "//chrome/browser/metrics",
-diff --git a/chrome/browser/first_run/first_run.cc b/chrome/browser/first_run/first_run.cc
---- a/chrome/browser/first_run/first_run.cc
-+++ b/chrome/browser/first_run/first_run.cc
-@@ -317,14 +317,6 @@ void SetupInitialPrefsFromInstallPrefs(
- 
- // -- Platform-specific functions --
- 
--#if !BUILDFLAG(IS_LINUX) && !BUILDFLAG(IS_CHROMEOS) && !BUILDFLAG(IS_BSD)
--bool IsOrganicFirstRun() {
--  std::string brand;
--  google_brand::GetBrand(&brand);
--  return google_brand::IsOrganicFirstRun(brand);
--}
--#endif
--
- FirstRunState DetermineFirstRunState(bool has_sentinel,
-                                      bool force_first_run,
-                                      bool no_first_run) {
-diff --git a/chrome/browser/google/BUILD.gn b/chrome/browser/google/BUILD.gn
---- a/chrome/browser/google/BUILD.gn
-+++ b/chrome/browser/google/BUILD.gn
-@@ -6,7 +6,7 @@ import("//build/config/chrome_build.gni")
- 
- assert(!is_fuchsia, "Fuchsia shouldn't use anything in //chrome")
- 
--source_set("google") {
-+source_set("google_UNUSED") {
-   sources = [
-     "google_brand.cc",
-     "google_brand.h",
-@@ -85,7 +85,7 @@ source_set("unit_tests") {
-   ]
- 
-   deps = [
--    ":google",
-+    ":google_UNUSED",
-     "//base",
-     "//base/test:test_support",
-     "//chrome/common:constants",
 diff --git a/chrome/browser/long_screenshots/long_screenshots_tab_service.cc b/chrome/browser/long_screenshots/long_screenshots_tab_service.cc
 --- a/chrome/browser/long_screenshots/long_screenshots_tab_service.cc
 +++ b/chrome/browser/long_screenshots/long_screenshots_tab_service.cc
@@ -694,38 +598,6 @@ diff --git a/chrome/browser/net/system_network_context_manager.cc b/chrome/brows
  #if BUILDFLAG(ENABLE_REQUEST_HEADER_INTEGRITY)
    request_header_integrity::RequestHeaderIntegrityURLLoaderThrottle::
        UpdateCorsExemptHeaders(network_context_params);
-diff --git a/chrome/browser/new_tab_page/one_google_bar/one_google_bar_loader_impl.cc b/chrome/browser/new_tab_page/one_google_bar/one_google_bar_loader_impl.cc
---- a/chrome/browser/new_tab_page/one_google_bar/one_google_bar_loader_impl.cc
-+++ b/chrome/browser/new_tab_page/one_google_bar/one_google_bar_loader_impl.cc
-@@ -313,10 +313,11 @@ void OneGoogleBarLoaderImpl::SetAdditionalQueryParams(
- }
- 
- GURL OneGoogleBarLoaderImpl::GetApiUrl() const {
-+  if ((true)) return GURL();
-   GURL api_url;
-   GURL google_base_url = google_util::CommandLineGoogleBaseURL();
-   if (!google_base_url.is_valid()) {
--    google_base_url = GURL(google_util::kGoogleHomepageURL);
-+    google_base_url = GURL();
-   }
- 
-   api_url = google_base_url.Resolve(kNewTabOgbApiPath);
-diff --git a/chrome/browser/new_tab_page/promos/promo_service.cc b/chrome/browser/new_tab_page/promos/promo_service.cc
---- a/chrome/browser/new_tab_page/promos/promo_service.cc
-+++ b/chrome/browser/new_tab_page/promos/promo_service.cc
-@@ -82,11 +82,7 @@ bool CanBlockPromos() {
- }
- 
- GURL GetGoogleBaseUrl() {
--  GURL google_base_url = google_util::CommandLineGoogleBaseURL();
--  if (!google_base_url.is_valid()) {
--    google_base_url = GURL(google_util::kGoogleHomepageURL);
--  }
--  return google_base_url;
-+  return GURL();
- }
- 
- GURL GetApiUrl() {
 diff --git a/chrome/browser/page_load_metrics/BUILD.gn b/chrome/browser/page_load_metrics/BUILD.gn
 --- a/chrome/browser/page_load_metrics/BUILD.gn
 +++ b/chrome/browser/page_load_metrics/BUILD.gn
@@ -810,133 +682,6 @@ diff --git a/chrome/browser/policy/BUILD.gn b/chrome/browser/policy/BUILD.gn
        "//chrome/browser/updater",
      ]
      if (is_win) {
-diff --git a/chrome/browser/policy/status_provider/updater_status_and_value_provider.cc b/chrome/browser/policy/status_provider/updater_status_and_value_provider.cc
---- a/chrome/browser/policy/status_provider/updater_status_and_value_provider.cc
-+++ b/chrome/browser/policy/status_provider/updater_status_and_value_provider.cc
-@@ -98,10 +98,10 @@ base::DictValue UpdaterStatusAndValueProvider::GetValues() {
-   client->SetDropDefaultValues(true);
-   // TODO(b/241519819): Find an alternative to using PolicyConversionsClient
-   // directly.
--  updater_policies_data.Set(
--      policy::kPoliciesKey,
--      client->ConvertUpdaterPolicies(updater_policies_->Clone(),
--                                     GetGoogleUpdatePolicySchemas()));
-+  // updater_policies_data.Set(
-+  //     policy::kPoliciesKey,
-+  //     client->ConvertUpdaterPolicies(updater_policies_->Clone(),
-+  //                                    GetGoogleUpdatePolicySchemas()));
- 
-   base::DictValue policy_values;
-   policy_values.Set(kUpdaterPoliciesId, std::move(updater_policies_data));
-@@ -114,7 +114,7 @@ base::DictValue UpdaterStatusAndValueProvider::GetNames() {
-   if (updater_policies_) {
-     base::DictValue updater_policies;
-     updater_policies.Set(policy::kNameKey, kUpdaterPoliciesName);
--    updater_policies.Set(policy::kPolicyNamesKey, GetGoogleUpdatePolicyNames());
-+    // updater_policies.Set(policy::kPolicyNamesKey, GetGoogleUpdatePolicyNames());
-     names.Set(kUpdaterPoliciesId, std::move(updater_policies));
-   }
-   return names;
-@@ -152,12 +152,12 @@ void UpdaterStatusAndValueProvider::DoRefresh() {
-       }).Then(barrier));
- 
-   // Fetch policies JSON and parse into PolicyMap.
--  updater::GetSystemPoliciesJson(
--      base::BindOnce([](const std::string& json) {
--        policy::PolicyMap p;
--        ParsePoliciesJsonIntoPolicyMap(json, GetUpdaterAppId(), &p);
--        return GoogleUpdatePoliciesAndState{.policies = std::move(p)};
--      }).Then(barrier));
-+  // updater::GetSystemPoliciesJson(
-+  //     base::BindOnce([](const std::string& json) {
-+  //       policy::PolicyMap p;
-+  //       ParsePoliciesJsonIntoPolicyMap(json, GetUpdaterAppId(), &p);
-+  //       return GoogleUpdatePoliciesAndState{.policies = std::move(p)};
-+  //     }).Then(barrier));
- }
- 
- void UpdaterStatusAndValueProvider::OnUpdaterPoliciesRefreshed(
-diff --git a/chrome/browser/profile_resetter/BUILD.gn b/chrome/browser/profile_resetter/BUILD.gn
---- a/chrome/browser/profile_resetter/BUILD.gn
-+++ b/chrome/browser/profile_resetter/BUILD.gn
-@@ -61,7 +61,7 @@ if (!is_android) {
-       "//chrome/browser/content_settings:content_settings_factory",
-       "//chrome/browser/extensions",
-       "//chrome/browser/file_system_access",
--      "//chrome/browser/google",
-+      #"//chrome/browser/google",
-       "//chrome/browser/prefs:util",
-       "//chrome/browser/profiles:profile",
-       "//chrome/browser/search/background",
-@@ -124,7 +124,6 @@ if (!is_android) {
-     deps = [
-       ":impl",
-       "//chrome/browser/browsing_data:constants",
--      "//chrome/browser/google",
-       "//chrome/browser/search/background",
-       "//chrome/browser/search_engines",
-       "//chrome/test:test_support",
-@@ -206,7 +205,7 @@ if (!is_android) {
-       "//chrome/browser/content_settings:content_settings_factory",
-       "//chrome/browser/extensions",
-       "//chrome/browser/extensions:test_support",
--      "//chrome/browser/google",
-+      #"//chrome/browser/google",
-       "//chrome/browser/prefs",
-       "//chrome/browser/prefs:util",
-       "//chrome/browser/search/background",
-diff --git a/chrome/browser/profile_resetter/profile_resetter.cc b/chrome/browser/profile_resetter/profile_resetter.cc
---- a/chrome/browser/profile_resetter/profile_resetter.cc
-+++ b/chrome/browser/profile_resetter/profile_resetter.cc
-@@ -104,8 +104,7 @@ ProfileResetter::ProfileResetter(Profile* profile)
-   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-   DCHECK(profile_);
- 
--  google_brand::GetBrand(&brandcode_);
--  if (brandcode_.empty()) {
-+  if ((true)) {
-     return;
-   }
-   config_fetcher_ = std::make_unique<BrandcodeConfigFetcher>(
-diff --git a/chrome/browser/resources/settings/autofill_page/autofill_page.html b/chrome/browser/resources/settings/autofill_page/autofill_page.html
---- a/chrome/browser/resources/settings/autofill_page/autofill_page.html
-+++ b/chrome/browser/resources/settings/autofill_page/autofill_page.html
-@@ -125,19 +125,3 @@
-   </collapsible-autofill-settings-card>
- </settings-section>
- 
--<settings-section page-title="$i18n{yourSavedInfoRelatedServicesTitle}">
--  <div route-path="default">
--    <cr-link-row id="passwordManagerButton" label="$i18n{localPasswordManager}"
--        on-click="onPasswordManagerRelatedServiceClick_"
--        start-icon="cr20:password-manager" external>
--    </cr-link-row>
--    <cr-link-row id="googleWalletButton" label="$i18n{googleWalletTitle}"
--        on-click="onGoogleWalletRelatedServiceClick_"
--        start-icon="settings20:wallet" external>
--    </cr-link-row>
--    <cr-link-row id="googleAccountButton" label="$i18n{googleAccount}"
--        on-click="onGoogleAccountRelatedServiceClick_"
--        start-icon="settings20:google" external>
--    </cr-link-row>
--  </div>
--</settings-section>
-diff --git a/chrome/browser/resources/settings/privacy_page/security/security_page.html b/chrome/browser/resources/settings/privacy_page/security/security_page.html
---- a/chrome/browser/resources/settings/privacy_page/security/security_page.html
-+++ b/chrome/browser/resources/settings/privacy_page/security/security_page.html
-@@ -292,12 +292,6 @@
-         on-click="onManageCertificatesClick_" external>
-     </cr-link-row>
- 
--    <cr-link-row id="advancedProtectionProgramLink" class="hr"
--        label="$i18n{advancedProtectionProgramTitle}"
--        sub-label="$i18n{advancedProtectionProgramDesc}"
--        on-click="onAdvancedProtectionProgramLinkClick_"
--        external>
--    </cr-link-row>
-     <template is="dom-if" if="[[showDisableSafebrowsingDialog_]]" restamp>
-       <settings-simple-confirmation-dialog
-           title-text="$i18n{safeBrowsingDisableDialog}"
 diff --git a/chrome/browser/safe_browsing/BUILD.gn b/chrome/browser/safe_browsing/BUILD.gn
 --- a/chrome/browser/safe_browsing/BUILD.gn
 +++ b/chrome/browser/safe_browsing/BUILD.gn
@@ -1154,70 +899,6 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
          try (TraceEvent e = TraceEvent.scoped("GeolocationHeader.geoHeaderStateForUrl")) {
              if (OmniboxFeatures.sPlatformAgnosticXGeo.isEnabled()) {
                  return HeaderState.HEADER_DISABLED;
-diff --git a/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc b/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
---- a/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
-+++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_ui.cc
-@@ -19,7 +19,6 @@
- #include "base/strings/string_number_conversions.h"
- #include "base/strings/string_split.h"
- #include "base/strings/string_util.h"
--#include "base/strings/stringprintf.h"
- #include "base/strings/utf_string_conversions.h"
- #include "base/time/time.h"
- #include "base/values.h"
-@@ -92,7 +91,6 @@
- #include "components/contextual_search/contextual_search_metrics_recorder.h"
- #include "components/contextual_search/contextual_search_service.h"
- #include "components/favicon_base/favicon_url_parser.h"
--#include "components/google/core/common/google_util.h"
- #include "components/grit/components_scaled_resources.h"
- #include "components/history_clusters/core/features.h"
- #include "components/lens/lens_features.h"
-@@ -850,12 +848,6 @@ content::WebUIDataSource* CreateAndAddNewTabPageUiHtmlSource(
-   // chrome-untrusted://new-tab-page for other external content and resources.
-   // NOTE: Use caution when overriding content security policies as that cean
-   // lead to subtle security bugs such as https://crbug.com/40057334.
--  source->OverrideContentSecurityPolicy(
--      network::mojom::CSPDirectiveName::ChildSrc,
--      base::StringPrintf("child-src https: %s %s %s;",
--                         google_util::CommandLineGoogleBaseURL().spec().c_str(),
--                         chrome::kChromeUIUntrustedNewTabPageUrl,
--                         chrome::kChromeUIUntrustedNtpMicrosoftAuthURL));
-   source->OverrideContentSecurityPolicy(
-       network::mojom::CSPDirectiveName::MediaSrc,
-       "media-src blob: data: 'self';");
-diff --git a/chrome/browser/ui/webui/ntp/new_tab_ui.cc b/chrome/browser/ui/webui/ntp/new_tab_ui.cc
---- a/chrome/browser/ui/webui/ntp/new_tab_ui.cc
-+++ b/chrome/browser/ui/webui/ntp/new_tab_ui.cc
-@@ -205,8 +205,7 @@ std::string NewTabUI::NewTabHTMLSource::GetContentSecurityPolicy(
-     network::mojom::CSPDirectiveName directive) {
-   if (directive == network::mojom::CSPDirectiveName::ScriptSrc) {
-     // 'unsafe-inline' and google resources are added to script-src.
--    return "script-src chrome://resources 'self' 'unsafe-eval' 'unsafe-inline' "
--           "*.google.com *.gstatic.com;";
-+    return "script-src chrome://resources 'self' 'unsafe-eval' 'unsafe-inline' ";
-   } else if (directive == network::mojom::CSPDirectiveName::StyleSrc) {
-     return "style-src 'self' chrome://resources 'unsafe-inline' "
-            "chrome://theme;";
-diff --git a/chrome/browser/ui/webui/settings/BUILD.gn b/chrome/browser/ui/webui/settings/BUILD.gn
---- a/chrome/browser/ui/webui/settings/BUILD.gn
-+++ b/chrome/browser/ui/webui/settings/BUILD.gn
-@@ -209,7 +209,6 @@ source_set("impl") {
-     "//chrome/browser/file_system_access",
-     "//chrome/browser/glic",
-     "//chrome/browser/glic/actor",
--    "//chrome/browser/google",
-     "//chrome/browser/gpu",
-     "//chrome/browser/hid",
-     "//chrome/browser/history",
-@@ -536,7 +535,6 @@ if (!is_android) {
-       "//chrome/browser/extensions:test_support",
-       "//chrome/browser/file_system_access",
-       "//chrome/browser/first_run",
--      "//chrome/browser/google",
-       "//chrome/browser/hid",
-       "//chrome/browser/history",
-       "//chrome/browser/infobars",
 diff --git a/chrome/browser/upgrade_detector/BUILD.gn b/chrome/browser/upgrade_detector/BUILD.gn
 --- a/chrome/browser/upgrade_detector/BUILD.gn
 +++ b/chrome/browser/upgrade_detector/BUILD.gn
@@ -1237,22 +918,6 @@ diff --git a/chrome/browser/upgrade_detector/BUILD.gn b/chrome/browser/upgrade_d
        "//components/enterprise:test_support",
        "//components/network_time",
        "//content/test:test_support",
-diff --git a/chrome/browser/upgrade_detector/upgrade_detector_impl.cc b/chrome/browser/upgrade_detector/upgrade_detector_impl.cc
---- a/chrome/browser/upgrade_detector/upgrade_detector_impl.cc
-+++ b/chrome/browser/upgrade_detector/upgrade_detector_impl.cc
-@@ -70,12 +70,6 @@ constexpr auto kOutdatedBuildAge = base::Days(7) * 8;
- 
- bool ShouldDetectOutdatedBuilds() {
- #if BUILDFLAG(ENABLE_UPDATE_NOTIFICATIONS) && !BUILDFLAG(IS_CHROMEOS)
--  // Don't show the bubble if we have a brand code that is NOT organic
--  std::string brand;
--  if (google_brand::GetBrand(&brand) && !google_brand::IsOrganic(brand)) {
--    return false;
--  }
--
-   // Don't show the bubble for Enterprise users.
-   if (policy::ManagementServiceFactory::GetForPlatform()->IsManaged()) {
-     return false;
 diff --git a/chrome/common/BUILD.gn b/chrome/common/BUILD.gn
 --- a/chrome/common/BUILD.gn
 +++ b/chrome/common/BUILD.gn

@@ -12,13 +12,9 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  .../java/res/xml/privacy_preferences.xml      |  6 ++
  .../privacy/settings/PrivacySettings.java     | 63 +++++++++++++++++++
- .../api/settings_private/prefs_util.cc        |  4 ++
  .../history/history_service_factory.cc        |  2 +
  chrome/browser/profiles/profile_impl.cc       |  1 +
- .../settings/privacy_page/privacy_page.html   |  9 +++
- .../settings/privacy_page/privacy_page.ts     | 20 ++++++
  .../strings/android_chrome_strings.grd        | 12 ++++
- .../settings_localized_strings_provider.cc    |  5 ++
  .../preference_spinner_single_line.xml        | 26 ++++++--
  .../java/res/layout/preference_spinner.xml    |  7 +++
  .../layout/preference_spinner_single_line.xml |  7 +++
@@ -36,7 +32,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../history_embeddings/core/sql_database.cc   |  2 +-
  .../omnibox/browser/shortcuts_backend.cc      |  4 +-
  .../utility/safari_data_importer.cc           |  2 +-
- 26 files changed, 266 insertions(+), 17 deletions(-)
+ 22 files changed, 228 insertions(+), 17 deletions(-)
  create mode 100644 components/cromite_components_strings_grd/History-number-of-days-privacy-setting.grdp
 
 diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
@@ -156,27 +152,6 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
      @Override
      public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
          menu.clear();
-diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
---- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
-+++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
-@@ -48,6 +48,7 @@
- #include "components/contextual_tasks/public/prefs.h"
- #include "components/dom_distiller/core/pref_names.h"
- #include "components/drive/drive_pref_names.h"
-+#include "components/history/core/common/pref_names.h"
- #include "components/embedder_support/pref_names.h"
- #include "components/language/core/browser/pref_names.h"
- #include "components/live_caption/pref_names.h"
-@@ -309,6 +310,9 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
-   (*s_allowlist)[::prefs::kSplitViewDragAndDropEnabled] =
-       settings_api::PrefType::kBoolean;
- 
-+  (*s_allowlist)[::prefs::kExpireDaysThreshold] =
-+      settings_api::PrefType::kNumber;
-+
-   // Appearance settings.
-   (*s_allowlist)[::prefs::kCtrlTabMru] = settings_api::PrefType::kBoolean;
-   (*s_allowlist)[::prefs::kCurrentThemeID] = settings_api::PrefType::kString;
 diff --git a/chrome/browser/history/history_service_factory.cc b/chrome/browser/history/history_service_factory.cc
 --- a/chrome/browser/history/history_service_factory.cc
 +++ b/chrome/browser/history/history_service_factory.cc
@@ -200,76 +175,6 @@ diff --git a/chrome/browser/profiles/profile_impl.cc b/chrome/browser/profiles/p
    registry->RegisterBooleanPref(prefs::kAllowDeletingBrowserHistory, true);
    registry->RegisterBooleanPref(policy::policy_prefs::kForceGoogleSafeSearch,
                                  false);
-diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page.html b/chrome/browser/resources/settings/privacy_page/privacy_page.html
---- a/chrome/browser/resources/settings/privacy_page/privacy_page.html
-+++ b/chrome/browser/resources/settings/privacy_page/privacy_page.html
-@@ -43,6 +43,15 @@
-         sub-label="$i18n{siteSettingsSublabel}"
-         on-click="onSiteSettingsLinkRowClick_"
-         role-description="$i18n{subpageArrowRoleDescription}"></cr-link-row>
-+    <div class="cr-row">
-+      <div class="flex cr-padded-text" aria-hidden="true">
-+        $i18n{expireHistory}
-+      </div>
-+      <settings-dropdown-menu id="expireDaysThreshold" label="$i18n{expireHistory}"
-+          pref="{{prefs.history.expire_days_threshold}}"
-+          menu-options="[[historyExpireDaysThresholdOptions_]]">
-+      </settings-dropdown-menu>
-+    </div>
-     <cr-toast id="deleteBrowsingDataToast" duration="5000">
-       <div>[[dbdDeletionConfirmationToastLabel_]]</div>
-     </cr-toast>
-diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page.ts b/chrome/browser/resources/settings/privacy_page/privacy_page.ts
---- a/chrome/browser/resources/settings/privacy_page/privacy_page.ts
-+++ b/chrome/browser/resources/settings/privacy_page/privacy_page.ts
-@@ -8,6 +8,7 @@
-  * security settings.
-  */
- import '/shared/settings/prefs/prefs.js';
-+import '../controls/settings_dropdown_menu.js';
- import 'chrome://resources/cr_elements/icons.html.js';
- import 'chrome://resources/cr_elements/cr_link_row/cr_link_row.js';
- import 'chrome://resources/cr_elements/cr_shared_style.css.js';
-@@ -25,6 +26,7 @@ import {I18nMixin} from 'chrome://resources/cr_elements/i18n_mixin.js';
- import {assert, assertNotReached} from 'chrome://resources/js/assert.js';
- import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
- import {afterNextRender, PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-+import {loadTimeData} from 'chrome://resources/js/load_time_data.js';
- 
- import type {MetricsBrowserProxy} from '../metrics_browser_proxy.js';
- import {MetricsBrowserProxyImpl, PrivacyGuideInteractions} from '../metrics_browser_proxy.js';
-@@ -61,6 +63,23 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
- 
-   static get properties() {
-     return {
-+      historyExpireDaysThresholdOptions_: {
-+        readOnly: true,
-+        type: Array,
-+        value() {
-+          return [
-+            {value: 0, name: loadTimeData.getString('noHistory')},
-+            {value: 1, name: "1 " + loadTimeData.getString('dayHistory')},
-+            {value: 7, name: "7 " + loadTimeData.getString('daysHistory')},
-+            {value: 15, name: "15 " + loadTimeData.getString('daysHistory')},
-+            {value: 30, name: "30 " + loadTimeData.getString('daysHistory')},
-+            {value: 60, name: "60 " + loadTimeData.getString('daysHistory')},
-+            {value: 90, name: "90 " + loadTimeData.getString('daysHistory')},
-+            {value: 0xFFFF, name: loadTimeData.getString('foreverHistory')},
-+          ];
-+        },
-+      },
-+
-       showClearBrowsingDataDialog_: Boolean,
-       showPrivacyGuideDialog_: Boolean,
- 
-@@ -78,6 +97,7 @@ export class SettingsPrivacyPageElement extends SettingsPrivacyPageElementBase {
-     };
-   }
- 
-+  declare private historyExpireDaysThresholdOptions_: object[];
-   declare private showClearBrowsingDataDialog_: boolean;
-   declare private showPrivacyGuideDialog_: boolean;
-   declare private dbdDeletionConfirmationToastLabel_: string;
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
@@ -292,21 +197,6 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
        <message name="IDS_CLEAR_COOKIES_AND_SITE_DATA_TITLE" desc="Title for Clear Cookies and site data in Clear Browsing Data dialog">
          Cookies and site data
        </message>
-diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
---- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-+++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -2614,6 +2614,11 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
-        IDS_SETTINGS_SAFEBROWSING_ENHANCED_THINGS_TO_CONSIDER_BULLET_THREE},
-       {"safeBrowsingStandard", IDS_SETTINGS_SAFEBROWSING_STANDARD},
-       {"safeBrowsingStandardDesc", IDS_SETTINGS_SAFEBROWSING_STANDARD_DESC},
-+      {"expireHistory", IDS_SETTINGS_EXPIRE_HISTORY},
-+      {"noHistory", IDS_SETTINGS_NO_HISTORY},
-+      {"dayHistory", IDS_SETTINGS_DAY_HISTORY_DESCRIPTION},
-+      {"daysHistory", IDS_SETTINGS_DAYS_HISTORY_DESCRIPTION},
-+      {"foreverHistory", IDS_SETTINGS_FOREVER_HISTORY_DESCRIPTION},
- #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
-       {"safeBrowsingStandardDescProxy",
-        IDS_SETTINGS_SAFEBROWSING_STANDARD_DESC_PROXY},
 diff --git a/components/browser_ui/settings/android/java/res/layout-sw360dp/preference_spinner_single_line.xml b/components/browser_ui/settings/android/java/res/layout-sw360dp/preference_spinner_single_line.xml
 --- a/components/browser_ui/settings/android/java/res/layout-sw360dp/preference_spinner_single_line.xml
 +++ b/components/browser_ui/settings/android/java/res/layout-sw360dp/preference_spinner_single_line.xml

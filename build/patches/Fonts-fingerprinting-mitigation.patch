@@ -18,15 +18,13 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../Fonts-fingerprinting-mitigation.inc       |   8 +
  .../Fonts-fingerprinting-mitigation.inc       |   1 +
  .../Fonts-fingerprinting-mitigation.inc       |  10 +
- skia/ext/skia_utils_win.cc                    |  20 ++
  skia/ext/skia_utils_win.h                     |   3 +
  third_party/blink/public/common/features.h    |   3 +
  third_party/blink/renderer/platform/BUILD.gn  |   1 +
  .../renderer/platform/fonts/font_cache.h      |   2 +-
  .../fonts/skia/bromite_allowed_fonts.h        | 271 ++++++++++++++++++
  .../platform/fonts/skia/font_cache_skia.cc    |  46 ++-
- .../platform/fonts/win/font_cache_skia_win.cc |   9 +-
- 11 files changed, 363 insertions(+), 11 deletions(-)
+ 9 files changed, 338 insertions(+), 7 deletions(-)
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Fonts-fingerprinting-mitigation.inc
  create mode 100644 cromite_flags/content/common/features_cc/Fonts-fingerprinting-mitigation.inc
  create mode 100644 cromite_flags/third_party/blink/common/features_cc/Fonts-fingerprinting-mitigation.inc
@@ -66,36 +64,6 @@ new file mode 100644
 +                base::FEATURE_ENABLED_BY_DEFAULT
 +#endif
 +);
-diff --git a/skia/ext/skia_utils_win.cc b/skia/ext/skia_utils_win.cc
---- a/skia/ext/skia_utils_win.cc
-+++ b/skia/ext/skia_utils_win.cc
-@@ -369,6 +369,26 @@ void CreateBitmapHeaderForXRGB888(int width,
-   CreateBitmapHeaderWithColorDepth(width, height, 32, hdr);
- }
- 
-+void DWriteFontTypeface_GetGDIFamilyName(SkTypeface* typeface, SkString* familyName) {
-+  DWriteFontTypeface* tf = reinterpret_cast<DWriteFontTypeface*>(typeface);
-+  SkString localSkGDIName;
-+  SkTScopedComPtr<IDWriteLocalizedStrings> familyNames;
-+  BOOL exists = FALSE;
-+  if (FAILED(tf->fDWriteFont->GetInformationalStrings(
-+                  DWRITE_INFORMATIONAL_STRING_WIN32_FAMILY_NAMES,
-+                  &familyNames,
-+                  &exists)) ||
-+      !exists ||
-+      FAILED(sk_get_locale_string(familyNames.get(), nullptr, &localSkGDIName)))
-+  {
-+      HRV(tf->fDWriteFontFamily->GetFamilyNames(&familyNames));
-+      sk_get_locale_string(familyNames.get(), nullptr/*fMgr->fLocaleName.get()*/, familyName);
-+  }
-+  if (familyName) {
-+      *familyName = localSkGDIName;
-+  }
-+}
-+
- base::win::ScopedGDIObject<HBITMAP> CreateHBitmapXRGB8888(int width,
-                                                           int height,
-                                                           HANDLE shared_section,
 diff --git a/skia/ext/skia_utils_win.h b/skia/ext/skia_utils_win.h
 --- a/skia/ext/skia_utils_win.h
 +++ b/skia/ext/skia_utils_win.h
@@ -532,45 +500,4 @@ diff --git a/third_party/blink/renderer/platform/fonts/skia/font_cache_skia.cc b
  #endif
  
    if (!typeface)
-diff --git a/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc b/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc
---- a/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc
-+++ b/third_party/blink/renderer/platform/fonts/win/font_cache_skia_win.cc
-@@ -414,8 +414,9 @@ const FontPlatformData* FontCache::CreateFontPlatformData(
-   sk_sp<SkTypeface> typeface;
- 
-   std::string name;
-+  std::string original_name;
- 
--  if (alternate_font_name == AlternateFontName::kLocalUniqueFace) {
-+  if (((false)) && alternate_font_name == AlternateFontName::kLocalUniqueFace) {
-     typeface = CreateTypefaceFromUniqueName(creation_params);
- 
-     // We do not need to try any heuristic around the font name, as below, for
-@@ -424,7 +425,7 @@ const FontPlatformData* FontCache::CreateFontPlatformData(
-       return nullptr;
- 
-   } else {
--    typeface = CreateTypeface(font_description, creation_params, name);
-+    typeface = CreateTypeface(font_description, creation_params, name, original_name);
- 
-     // For a family match, Windows will always give us a valid pointer here,
-     // even if the face name is non-existent. We have to double-check and see if
-@@ -458,7 +459,7 @@ const FontPlatformData* FontCache::CreateFontPlatformData(
-         FontDescription adjusted_font_description = font_description;
-         adjusted_font_description.SetWeight(variant_weight);
-         typeface =
--            CreateTypeface(adjusted_font_description, adjusted_params, name);
-+            CreateTypeface(adjusted_font_description, adjusted_params, name, original_name);
-         if (!typeface ||
-             !TypefacesMatchesFamily(typeface.get(), adjusted_name)) {
-           return nullptr;
-@@ -470,7 +471,7 @@ const FontPlatformData* FontCache::CreateFontPlatformData(
-         FontDescription adjusted_font_description = font_description;
-         adjusted_font_description.SetStretch(variant_stretch);
-         typeface =
--            CreateTypeface(adjusted_font_description, adjusted_params, name);
-+            CreateTypeface(adjusted_font_description, adjusted_params, name, original_name);
-         if (!typeface ||
-             !TypefacesMatchesFamily(typeface.get(), adjusted_name)) {
-           return nullptr;
 --

@@ -14,12 +14,11 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../settings/SettingsNavigationImpl.java      |  5 +--
  .../search/SearchIndexProviderRegistry.java   |  2 --
  chrome/browser/android/BUILD.gn               |  1 -
- .../privacy_page/privacy_page_index.ts        |  2 +-
  chrome/browser/safety_check/android/BUILD.gn  |  2 --
  .../safety_check/SafetyCheckBridge.java       |  4 +--
  .../suggestions/action/OmniboxPedal.java      |  3 --
  .../Disable-safety-check.inc                  |  1 +
- 15 files changed, 7 insertions(+), 85 deletions(-)
+ 14 files changed, 6 insertions(+), 84 deletions(-)
  create mode 100644 cromite_flags/chrome/common/chrome_features_cc/Disable-safety-check.inc
 
 diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
@@ -273,18 +272,6 @@ diff --git a/chrome/browser/android/BUILD.gn b/chrome/browser/android/BUILD.gn
        "//chrome/browser/safety_hub/android",
        "//chrome/browser/serial/android:jni_headers",
        "//chrome/browser/signin/services/android:jni_headers",
-diff --git a/chrome/browser/resources/settings/privacy_page/privacy_page_index.ts b/chrome/browser/resources/settings/privacy_page/privacy_page_index.ts
---- a/chrome/browser/resources/settings/privacy_page/privacy_page_index.ts
-+++ b/chrome/browser/resources/settings/privacy_page/privacy_page_index.ts
-@@ -222,7 +222,7 @@ export class SettingsPrivacyPageIndexElement extends
-     }
- 
-     if (this.showPage_(this.pageVisibility_.safetyHub)) {
--      defaultViews.push('safetyHubEntryPoint');
-+      // defaultViews.push('safetyHubEntryPoint');
-     }
- 
-     return defaultViews;
 diff --git a/chrome/browser/safety_check/android/BUILD.gn b/chrome/browser/safety_check/android/BUILD.gn
 --- a/chrome/browser/safety_check/android/BUILD.gn
 +++ b/chrome/browser/safety_check/android/BUILD.gn

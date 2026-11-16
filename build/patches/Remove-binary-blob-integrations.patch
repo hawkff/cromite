@@ -58,7 +58,6 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../externalauth/ExternalAuthUtils.java       |  34 +-
  .../UserRecoverableErrorHandler.java          |   8 -
  .../gcm_driver/GoogleCloudMessagingV2.java    |   2 +
- components/gcm_driver/gcm_client_impl.cc      |   4 +
  .../gcm_driver/instance_id/android/BUILD.gn   |   3 -
  .../instance_id/InstanceIDBridge.java         |  56 +-
  .../InstalledAppProviderImpl.java             |   2 +-
@@ -110,7 +109,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../gms/ChromiumPlayServicesAvailability.java |  17 +-
  third_party/androidx/customizations.gni       |  14 +-
  third_party/cardboard/BUILD.gn                |   4 -
- 86 files changed, 133 insertions(+), 2703 deletions(-)
+ 85 files changed, 129 insertions(+), 2703 deletions(-)
  create mode 100644 components/webauthn/android/java/src/org/chromium/components/webauthn/ConditionalUiState.java
 
 diff --git a/android_webview/expectations/system_webview_bundle.AndroidManifest.expected b/android_webview/expectations/system_webview_bundle.AndroidManifest.expected
@@ -1363,41 +1362,6 @@ diff --git a/components/gcm_driver/android/java/src/org/chromium/components/gcm_
          if (Looper.getMainLooper() == Looper.myLooper()) {
              throw new IOException(ERROR_MAIN_THREAD);
          }
-diff --git a/components/gcm_driver/gcm_client_impl.cc b/components/gcm_driver/gcm_client_impl.cc
---- a/components/gcm_driver/gcm_client_impl.cc
-+++ b/components/gcm_driver/gcm_client_impl.cc
-@@ -431,6 +431,7 @@ void GCMClientImpl::StartGCM() {
- 
- void GCMClientImpl::InitializeMCSClient() {
-   DCHECK(network_connection_tracker_);
-+  if ((true)) return;
-   std::vector<GURL> endpoints;
-   endpoints.push_back(gservices_settings_.GetMCSMainEndpoint());
-   GURL fallback_endpoint = gservices_settings_.GetMCSFallbackEndpoint();
-@@ -599,6 +600,7 @@ void GCMClientImpl::AddHeartbeatInterval(const std::string& scope,
-                                          int interval_ms) {
-   DCHECK(io_task_runner_->RunsTasksInCurrentSequence());
-   DCHECK(mcs_client_);
-+  if ((true)) return;
-   mcs_client_->AddHeartbeatInterval(scope, interval_ms);
- }
- 
-@@ -610,6 +612,7 @@ void GCMClientImpl::RemoveHeartbeatInterval(const std::string& scope) {
- 
- void GCMClientImpl::StartCheckin() {
-   DCHECK(io_task_runner_->RunsTasksInCurrentSequence());
-+  if ((true)) return;
- 
-   // Make sure no checkin is in progress.
-   if (checkin_request_)
-@@ -683,6 +686,7 @@ void GCMClientImpl::SetGServicesSettingsCallback(bool success) {
- 
- void GCMClientImpl::SchedulePeriodicCheckin() {
-   DCHECK(io_task_runner_->RunsTasksInCurrentSequence());
-+  if ((true)) return;
- 
-   // Make sure no checkin is in progress.
-   if (checkin_request_.get() || !device_checkin_info_.accounts_set)
 diff --git a/components/gcm_driver/instance_id/android/BUILD.gn b/components/gcm_driver/instance_id/android/BUILD.gn
 --- a/components/gcm_driver/instance_id/android/BUILD.gn
 +++ b/components/gcm_driver/instance_id/android/BUILD.gn

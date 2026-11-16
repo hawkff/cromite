@@ -39,14 +39,12 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../include/ports/SkFontConfigInterface.h     |    2 +
  .../skia/include/ports/SkFontMgr_android.h    |   42 +-
  .../skia/src/ports/SkFontConfigInterface.cpp  |    5 +
- .../ports/SkFontConfigInterface_direct.cpp    |    5 +
- .../src/ports/SkFontConfigInterface_direct.h  |    1 +
  .../skia/src/ports/SkFontMgr_android.cpp      |  286 ++-
  .../skia/src/ports/SkFontMgr_android_data.cpp | 1641 +++++++++++++++++
  .../skia/src/ports/SkFontMgr_android_ndk.cpp  |    2 +-
  .../src/ports/SkFontMgr_android_parser.cpp    |   69 +-
  .../skia/src/ports/SkFontMgr_android_parser.h |    5 +-
- 40 files changed, 2440 insertions(+), 89 deletions(-)
+ 38 files changed, 2434 insertions(+), 89 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Android-fonts-fingerprinting-mitigation.grdp
  create mode 100644 components/component_updater/installer_policies/fonts_pack_component_installer.cc
  create mode 100644 components/component_updater/installer_policies/fonts_pack_component_installer.h
@@ -1003,29 +1001,6 @@ diff --git a/third_party/skia/src/ports/SkFontConfigInterface.cpp b/third_party/
  }
  
  void SkFontConfigInterface::SetGlobal(sk_sp<SkFontConfigInterface> fc) {
-diff --git a/third_party/skia/src/ports/SkFontConfigInterface_direct.cpp b/third_party/skia/src/ports/SkFontConfigInterface_direct.cpp
---- a/third_party/skia/src/ports/SkFontConfigInterface_direct.cpp
-+++ b/third_party/skia/src/ports/SkFontConfigInterface_direct.cpp
-@@ -738,3 +738,8 @@ bool SkFontConfigInterfaceDirect::matchFamilyName(const char familyName[],
- SkStreamAsset* SkFontConfigInterfaceDirect::openStream(const FontIdentity& identity) {
-     return SkStream::MakeFromFile(identity.fString.c_str()).release();
- }
-+
-+SkStreamAsset* SkFontConfigInterfaceDirect::openStreamFromName(const char* filename) {
-+    SkASSERT(false);
-+    return nullptr;
-+}
-diff --git a/third_party/skia/src/ports/SkFontConfigInterface_direct.h b/third_party/skia/src/ports/SkFontConfigInterface_direct.h
---- a/third_party/skia/src/ports/SkFontConfigInterface_direct.h
-+++ b/third_party/skia/src/ports/SkFontConfigInterface_direct.h
-@@ -29,6 +29,7 @@ public:
-                          SkFontStyle* outStyle) override;
- 
-     SkStreamAsset* openStream(const FontIdentity&) override;
-+    SkStreamAsset* openStreamFromName(const char* filename) override;
- 
- protected:
-     virtual bool isAccessible(const char* filename);
 diff --git a/third_party/skia/src/ports/SkFontMgr_android.cpp b/third_party/skia/src/ports/SkFontMgr_android.cpp
 --- a/third_party/skia/src/ports/SkFontMgr_android.cpp
 +++ b/third_party/skia/src/ports/SkFontMgr_android.cpp
