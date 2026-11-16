@@ -9578,15 +9578,15 @@ diff --git a/chrome/browser/tab_group_sync/android/java/src/org/chromium/chrome/
 diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/suggestions/OmniboxSuggestionsContainer.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/suggestions/OmniboxSuggestionsContainer.java
 --- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/suggestions/OmniboxSuggestionsContainer.java
 +++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/suggestions/OmniboxSuggestionsContainer.java
-@@ -23,6 +23,7 @@ import org.chromium.base.TraceEvent;
+@@ -22,6 +22,7 @@ import org.chromium.base.TraceEvent;
  import org.chromium.base.metrics.TimingMetric;
  import org.chromium.base.task.PostTask;
  import org.chromium.base.task.TaskTraits;
 +import org.chromium.base.ui.KeyboardUtils;
  import org.chromium.build.annotations.NullMarked;
  import org.chromium.build.annotations.Nullable;
- import org.chromium.chrome.browser.flags.ChromeFeatureList;
-@@ -101,8 +102,11 @@ public class OmniboxSuggestionsContainer extends FrameLayout {
+ import org.chromium.chrome.browser.omnibox.OmniboxMetrics;
+@@ -99,8 +100,11 @@ public class OmniboxSuggestionsContainer extends FrameLayout {
          // Omnibox.
          // Making the container `clickable=true` achieves similar goal, but this consumes all
          // activators, including keyboard <Enter> key.
@@ -9603,7 +9603,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -2408,7 +2408,7 @@ Your Google account may have other forms of browsing history like searches and a
+@@ -2402,7 +2402,7 @@ Your Google account may have other forms of browsing history like searches and a
          About Chrome
        </message>
        <message name="IDS_LEGAL_INFORMATION_SUMMARY" desc="Summary for legal information" meaning="Android">
@@ -9612,7 +9612,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
        </message>
        <message name="IDS_APPLICATION_VERSION_TITLE" desc="Title for application version">
          Application version
-@@ -6014,7 +6014,7 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
+@@ -6008,7 +6008,7 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
  
        <!-- Storage Preference UI strings for clearing storage. -->
        <message name="IDS_STORAGE_MANAGEMENT_ACTIVITY_LABEL" desc="Title for Chrome's Manage Space Activity.">

@@ -71,7 +71,7 @@ diff --git a/chrome/android/java/res/values/ids.xml b/chrome/android/java/res/va
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
-@@ -166,6 +166,24 @@ public class ChromeAccessibilitySettingsDelegate implements AccessibilitySetting
+@@ -130,6 +130,24 @@ public class ChromeAccessibilitySettingsDelegate implements AccessibilitySetting
              mSnackbarManagerSupplier.get().showSnackbar(mSnackbar);
      }
  
@@ -179,7 +179,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabContextM
 diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
 --- a/chrome/browser/flags/android/chrome_feature_list.cc
 +++ b/chrome/browser/flags/android/chrome_feature_list.cc
-@@ -478,6 +478,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
+@@ -476,6 +476,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
      &kShareCustomActionsInCCT,
      &kSharedIntentUI,
      &kShortCircuitUnfocusAnimation,
@@ -190,25 +190,25 @@ diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browse
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 --- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 +++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
-@@ -638,6 +638,8 @@ public abstract class ChromeFeatureList {
+@@ -636,6 +636,8 @@ public abstract class ChromeFeatureList {
+     public static final String MOST_VISITED_TILES_RESELECT = "MostVisitedTilesReselect";
      public static final String MOVE_TO_FRONT_IN_LAUNCH_INTENT_DISPATCHER =
              "MoveToFrontInLaunchIntentDispatcher";
-     public static final String MOVE_TOP_TOOLBAR_TO_BOTTOM = "MoveTopToolbarToBottom";
 +    public static final String SHOW_ALWAYS_CONTEXT_MENU_ON_LINKS =
 +            "ShowAlwaysContextMenuOnLinks";
      public static final String MULTI_INSTANCE_SHARED_PREFS_MIGRATION =
              "MultiInstanceSharedPrefsMigration";
      public static final String MVC_UPDATE_VIEW_WHEN_MODEL_CHANGED = "MvcUpdateViewWhenModelChanged";
-@@ -1268,6 +1270,8 @@ public abstract class ChromeFeatureList {
+@@ -1262,6 +1264,8 @@ public abstract class ChromeFeatureList {
+                     MOVE_TO_FRONT_IN_LAUNCH_INTENT_DISPATCHER,
+                     /* defaultValue= */ true,
                      /* defaultValueInTests= */ true);
-     public static final CachedFlag sMoveTopToolbarToBottom =
-             newCachedFlag(MOVE_TOP_TOOLBAR_TO_BOTTOM, false);
 +    public static final CachedFlag sShowAlwaysContextMenuOnLinks =
 +            newCachedFlag(SHOW_ALWAYS_CONTEXT_MENU_ON_LINKS, false);
      public static final CachedFlag sMultiInstanceSharedPrefsMigration =
              newCachedFlag(MULTI_INSTANCE_SHARED_PREFS_MIGRATION, true);
      public static final CachedFlag sMvcUpdateViewWhenModelChanged =
-@@ -1632,6 +1636,7 @@ public abstract class ChromeFeatureList {
+@@ -1624,6 +1628,7 @@ public abstract class ChromeFeatureList {
                      sSettingsInTabUrlNav,
                      sSettingsMultiColumn,
                      sSettingsSingleActivity,
@@ -219,9 +219,9 @@ diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/f
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -1585,6 +1585,12 @@ Your Google account may have other forms of browsing history like searches and a
-       <message name="IDS_DISABLE_TOOLBAR_SWIPE_UP" desc="Summary of the preference that allows the user to disable toolbar swipeup.">
-         Disable toolbar swipe up
+@@ -1579,6 +1579,12 @@ Your Google account may have other forms of browsing history like searches and a
+       <message name="IDS_FORCE_TABLET_UI_TITLE" desc="Title of the preference that allows the user to update force tablet UI settings.">
+         Force Tablet Mode
        </message>
 +      <message name="IDS_ALWAYS_SHOW_CONTEXTMENU_ON_LINKS_TITLE" desc="Title of the preference that open the context menu in links.">
 +        Always open the context menu in the links
@@ -232,7 +232,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
  
        <!-- Safety check -->
        <message name="IDS_PREFS_SAFETY_CHECK" desc="Title of the Safety check element in settings, allowing the user to check multiple areas of browser safety. [CHAR_LIMIT=32]">
-@@ -3211,6 +3217,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
+@@ -3205,6 +3211,9 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
        <message name="IDS_CONTEXTMENU_OPEN_IN_NEW_CHROME_TAB" desc="Context sensitive menu item to open the selected link in a new Chrome tab from Chrome Custom Tab. [CHAR_LIMIT=30]">
          Open in new Chrome tab
        </message>
@@ -260,9 +260,9 @@ diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibil
 diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
 --- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
 +++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettings.java
-@@ -96,6 +96,9 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
-     private BooleanPreferenceDelegate mMoveTopToolbarToBottomDelegate;
-     private BooleanPreferenceDelegate mDisableToolbarSwipeUpDelegate;
+@@ -91,6 +91,9 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
+     private BooleanPreferenceDelegate mForceTabletUIDelegate;
+     static final String PREF_FORCE_TABLET_UI = "force_tablet_ui";
  
 +    static final String PREF_ALWAYS_SHOW_CONTEXTMENU_ON_LINKS = "always_show_contextmenu_on_links";
 +    private BooleanPreferenceDelegate mShowAlwaysContextMenuOnLinksDelegate;
@@ -270,9 +270,9 @@ diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/c
      private PageZoomPreference mPageZoomDefaultZoomPref;
      private ChromeSwitchPreference mPageZoomIncludeOSAdjustment;
      private ChromeSwitchPreference mPageZoomAlwaysShowPref;
-@@ -203,6 +206,12 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
-         mDisableToolbarSwipeUpPref.setChecked(mDisableToolbarSwipeUpDelegate.getValue());
-         mDisableToolbarSwipeUpPref.setOnPreferenceChangeListener(this);
+@@ -186,6 +189,12 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
+         forceTabletUiPref.setChecked(mForceTabletUIDelegate.getValue());
+         forceTabletUiPref.setOnPreferenceChangeListener(this);
  
 +        ChromeSwitchPreference mShowAlwaysContextMenuOnLinksPref =
 +                (ChromeSwitchPreference) findPreference(PREF_ALWAYS_SHOW_CONTEXTMENU_ON_LINKS);
@@ -283,10 +283,10 @@ diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/c
          Preference captions = findPreference(PREF_CAPTIONS);
          captions.setOnPreferenceClickListener(
                  preference -> {
-@@ -348,6 +357,9 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
-         } else if (PREF_DISABLE_TOOLBAR_SWIPE_UP.equals(preference.getKey())) {
-             mDisableToolbarSwipeUpDelegate.setValue((Boolean) newValue);
-             mDelegate.requestRestart(getActivity());
+@@ -325,6 +334,9 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
+                     mDelegate.getBrowserContextHandle(), (Integer) newValue);
+         } else if (PREF_PAGE_ZOOM_ALWAYS_SHOW.equals(preference.getKey())) {
+             PageZoomUtils.setShouldAlwaysShowZoomMenuItem((Boolean) newValue);
 +        } else if (PREF_ALWAYS_SHOW_CONTEXTMENU_ON_LINKS.equals(preference.getKey())) {
 +            mShowAlwaysContextMenuOnLinksDelegate.setValue((Boolean) newValue);
 +            mDelegate.requestRestart(getActivity());
@@ -296,9 +296,9 @@ diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/c
 diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
 --- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
 +++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
-@@ -45,6 +45,8 @@ public interface AccessibilitySettingsDelegate {
-     BooleanPreferenceDelegate getMoveTopToolbarToBottomDelegate();
-     BooleanPreferenceDelegate getDisableToolbarSwipeUpDelegate();
+@@ -42,6 +42,8 @@ public interface AccessibilitySettingsDelegate {
+ 
+     void requestRestart(Activity activity);
  
 +    BooleanPreferenceDelegate getShowAlwaysContextMenuOnLinksDelegate();
 +
