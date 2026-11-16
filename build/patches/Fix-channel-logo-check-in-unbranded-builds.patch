@@ -1,0 +1,31 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Mon, 16 Nov 2026 19:04:35 +0000
+Subject: Fix channel logo check in unbranded builds
+
+On Android, chrome://management builds its data source with
+webui::CurrentChannelLogoResourceId(). Without Google Chrome branding, that
+function calls CHECK_IS_TEST() for the canary, dev, beta and stable
+channels. build/cromite.gn_args sets android_channel to "stable", so outside
+tests the CHECK fails and opening chrome://management crashes the browser.
+Return the generic product logo IDR_PRODUCT_LOGO_32 for these channels, the
+same resource the unknown channel already uses.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/ui/webui/current_channel_logo.cc | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/chrome/browser/ui/webui/current_channel_logo.cc b/chrome/browser/ui/webui/current_channel_logo.cc
+--- a/chrome/browser/ui/webui/current_channel_logo.cc
++++ b/chrome/browser/ui/webui/current_channel_logo.cc
+@@ -29,8 +29,7 @@ int CurrentChannelLogoResourceId() {
+     case version_info::Channel::DEV:
+     case version_info::Channel::BETA:
+     case version_info::Channel::STABLE:
+-      CHECK_IS_TEST();
+-      [[fallthrough]];
++      return IDR_PRODUCT_LOGO_32;
+ #endif
+     case version_info::Channel::UNKNOWN:
+       return IDR_PRODUCT_LOGO_32;
+--
