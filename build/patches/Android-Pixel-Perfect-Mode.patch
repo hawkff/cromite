@@ -51,7 +51,6 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../viz/service/layers/layer_context_impl.cc  |  2 +-
  .../selection/selection_popup_controller.cc   |  5 +-
  .../cross_process_frame_connector.cc          | 10 ++--
- .../renderer_host/delegated_frame_host.cc     |  2 +-
  ...selection_controller_client_child_frame.cc |  2 +-
  .../renderer_host/render_frame_host_impl.cc   |  2 +-
  .../renderer_host/render_widget_host_impl.cc  | 29 +++++++++--
@@ -109,7 +108,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  ui/display/mojom/screen_info_mojom_traits.h   |  4 ++
  ui/display/screen_info.h                      |  1 +
  ui/events/blink/blink_event_util.cc           |  2 +-
- 99 files changed, 529 insertions(+), 136 deletions(-)
+ 98 files changed, 528 insertions(+), 135 deletions(-)
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sPixelPerfect.java
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Pixel-perfect-mode.grdp
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Pixel-perfect-mode.inc
@@ -998,18 +997,6 @@ diff --git a/content/browser/renderer_host/cross_process_frame_connector.cc b/co
      const gfx::Rect& rect_in_parent_view) {
    gfx::Rect old_rect = rect_in_parent_view_in_dip_;
    const float dsf = screen_infos_.current().device_scale_factor;
-diff --git a/content/browser/renderer_host/delegated_frame_host.cc b/content/browser/renderer_host/delegated_frame_host.cc
---- a/content/browser/renderer_host/delegated_frame_host.cc
-+++ b/content/browser/renderer_host/delegated_frame_host.cc
-@@ -192,7 +192,7 @@ void DelegatedFrameHost::CopyFromCompositingSurfaceAsTexture(
-       base::TimeDelta(), std::move(callback));
- }
- 
--void DelegatedFrameHost::CopyFromCompositingSurfaceInternal(
-+void DelegatedFrameHost::CopyFromCompositingSurfaceInternal( // POI
-     const gfx::Rect& src_subrect,
-     const gfx::Size& output_size,
-     const viz::SurfaceId& surface_id,
 diff --git a/content/browser/renderer_host/input/touch_selection_controller_client_child_frame.cc b/content/browser/renderer_host/input/touch_selection_controller_client_child_frame.cc
 --- a/content/browser/renderer_host/input/touch_selection_controller_client_child_frame.cc
 +++ b/content/browser/renderer_host/input/touch_selection_controller_client_child_frame.cc

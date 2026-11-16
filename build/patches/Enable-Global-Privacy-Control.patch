@@ -11,17 +11,10 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../browser/privacy/settings/GpcSettings.java |  58 +++++++++
  .../privacy/settings/PrivacySettings.java     |   9 ++
  chrome/app/settings_strings.grdp              |  15 +++
- .../api/settings_private/prefs_util.cc        |   1 +
  chrome/browser/renderer_preferences_util.cc   |   2 +
- chrome/browser/resources/settings/BUILD.gn    |   1 +
- .../settings/privacy_page/cookies_page.html   |   2 +
- .../settings/privacy_page/cookies_page.ts     |   1 +
- .../settings/privacy_page/gpc_toggle.html     |  32 +++++
- .../settings/privacy_page/gpc_toggle.ts       | 112 ++++++++++++++++++
  .../Enable-Global-Privacy-Control.grdp        |  15 +++
  chrome/browser/ui/browser_ui_prefs.cc         |   1 +
  chrome/browser/ui/prefs/pref_watcher.cc       |   2 +
- .../settings_localized_strings_provider.cc    |   3 +
  chrome/common/pref_names.h                    |   2 +
  .../browser_initiated_resource_request.cc     |   2 +-
  content/renderer/render_frame_impl.cc         |   2 +-
@@ -34,11 +27,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../web_service_worker_fetch_context_impl.cc  |   2 +-
  ...shared_worker_global_scope_context_impl.cc |   2 +-
  .../platform/runtime_enabled_features.json5   |  13 +-
- 30 files changed, 301 insertions(+), 13 deletions(-)
+ 23 files changed, 149 insertions(+), 13 deletions(-)
  create mode 100644 chrome/android/java/res/xml/gpc_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/GpcSettings.java
- create mode 100644 chrome/browser/resources/settings/privacy_page/gpc_toggle.html
- create mode 100644 chrome/browser/resources/settings/privacy_page/gpc_toggle.ts
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Enable-Global-Privacy-Control.grdp
 
 diff --git a/chrome/android/chrome_java_resources.gni b/chrome/android/chrome_java_resources.gni
@@ -211,17 +202,6 @@ diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
      <message name="IDS_SETTINGS_PERMISSIONS_DESCRIPTION" desc="Description of the controls available on the permissions and site content settings page">
        Controls what information sites can use and show (location, camera, pop-ups, and more)
      </message>
-diff --git a/chrome/browser/extensions/api/settings_private/prefs_util.cc b/chrome/browser/extensions/api/settings_private/prefs_util.cc
---- a/chrome/browser/extensions/api/settings_private/prefs_util.cc
-+++ b/chrome/browser/extensions/api/settings_private/prefs_util.cc
-@@ -494,6 +494,7 @@ const PrefsUtil::TypedPrefMap& PrefsUtil::GetAllowlistedKeys() {
-   (*s_allowlist)[::prefs::kPrivacySandboxRelatedWebsiteSetsEnabled] =
-       settings_api::PrefType::kBoolean;
-   (*s_allowlist)[::prefs::kEnableDoNotTrack] = settings_api::PrefType::kBoolean;
-+  (*s_allowlist)[::prefs::kEnableGPC] = settings_api::PrefType::kBoolean;
- 
-   // Sync and personalization page.
-   (*s_allowlist)[::prefs::kSearchSuggestEnabled] =
 diff --git a/chrome/browser/renderer_preferences_util.cc b/chrome/browser/renderer_preferences_util.cc
 --- a/chrome/browser/renderer_preferences_util.cc
 +++ b/chrome/browser/renderer_preferences_util.cc
@@ -234,194 +214,6 @@ diff --git a/chrome/browser/renderer_preferences_util.cc b/chrome/browser/render
    prefs->enable_encrypted_media =
        pref_service->GetBoolean(prefs::kEnableEncryptedMedia);
  
-diff --git a/chrome/browser/resources/settings/BUILD.gn b/chrome/browser/resources/settings/BUILD.gn
---- a/chrome/browser/resources/settings/BUILD.gn
-+++ b/chrome/browser/resources/settings/BUILD.gn
-@@ -111,6 +111,7 @@ build_webui("build") {
-     "people_page/sync_page.ts",
-     "privacy_page/cookies_page.ts",
-     "privacy_page/do_not_track_toggle.ts",
-+    "privacy_page/gpc_toggle.ts",
-     "privacy_page/personalization_options.ts",
-     "privacy_page/privacy_guide/privacy_guide_completion_fragment.ts",
-     "privacy_page/privacy_guide/privacy_guide_cookies_fragment.ts",
-diff --git a/chrome/browser/resources/settings/privacy_page/cookies_page.html b/chrome/browser/resources/settings/privacy_page/cookies_page.html
---- a/chrome/browser/resources/settings/privacy_page/cookies_page.html
-+++ b/chrome/browser/resources/settings/privacy_page/cookies_page.html
-@@ -138,6 +138,8 @@
-     </h2>
-     <settings-do-not-track-toggle id="doNotTrack" prefs="{{prefs}}">
-     </settings-do-not-track-toggle>
-+    <settings-gpc-toggle id="gpc" prefs="{{prefs}}">
-+    </settings-gpc-toggle>
-     <cr-link-row id="siteDataTrigger" class="hr"
-         on-click="onSiteDataClick_" label="$i18n{cookiePageAllSitesLink}"
-         role-description="$i18n{subpageArrowRoleDescription}">
-diff --git a/chrome/browser/resources/settings/privacy_page/cookies_page.ts b/chrome/browser/resources/settings/privacy_page/cookies_page.ts
---- a/chrome/browser/resources/settings/privacy_page/cookies_page.ts
-+++ b/chrome/browser/resources/settings/privacy_page/cookies_page.ts
-@@ -21,6 +21,7 @@ import '../privacy_icons.html.js';
- import '../settings_page/settings_subpage.js';
- import '../settings_shared.css.js';
- import '../site_settings/site_list.js';
-+import './gpc_toggle.js';
- import './do_not_track_toggle.js';
- 
- import {PrefsMixin} from '/shared/settings/prefs/prefs_mixin.js';
-diff --git a/chrome/browser/resources/settings/privacy_page/gpc_toggle.html b/chrome/browser/resources/settings/privacy_page/gpc_toggle.html
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/resources/settings/privacy_page/gpc_toggle.html
-@@ -0,0 +1,32 @@
-+    <style include="settings-shared">
-+      .toggle {
-+        padding: 0 var(--cr-section-padding);
-+        margin-bottom: var(--cr-section-vertical-padding);
-+      }
-+    </style>
-+    <settings-toggle-button id="toggle" class="toggle"
-+      label="$i18n{gpc}"
-+      pref="{{prefs.enable_gpc}}"
-+      on-settings-boolean-control-change="onToggleChange_"
-+      icon="settings:forward"
-+      no-set-pref>
-+    </settings-toggle-button>
-+    <template is="dom-if" if="[[showDialog_]]"
-+        on-dom-change="onDomChange_" restamp>
-+      <cr-dialog id="confirmDialog"
-+          close-text="$i18n{close}" on-cancel="onDialogCancel_"
-+          on-close="onDialogClosed_">
-+        <div slot="title">$i18n{gpcDialogTitle}</div>
-+        <div slot="body">$i18n{gpcDialogMessage}</div>
-+        <div slot="button-container">
-+          <cr-button class="cancel-button"
-+              on-click="onDialogCancel_">
-+            $i18n{cancel}
-+          </cr-button>
-+          <cr-button class="action-button"
-+              on-click="onDialogConfirm_">
-+            $i18n{confirm}
-+          </cr-button>
-+        </div>
-+      </cr-dialog>
-+    </template>
-diff --git a/chrome/browser/resources/settings/privacy_page/gpc_toggle.ts b/chrome/browser/resources/settings/privacy_page/gpc_toggle.ts
-new file mode 100644
---- /dev/null
-+++ b/chrome/browser/resources/settings/privacy_page/gpc_toggle.ts
-@@ -0,0 +1,112 @@
-+// Copyright 2020 The Chromium Authors
-+// Use of this source code is governed by a BSD-style license that can be
-+// found in the LICENSE file.
-+
-+import 'chrome://resources/cr_elements/cr_button/cr_button.js';
-+import 'chrome://resources/cr_elements/cr_dialog/cr_dialog.js';
-+import '../settings_shared.css.js';
-+import '../controls/settings_toggle_button.js';
-+
-+import {focusWithoutInk} from 'chrome://resources/js/focus_without_ink.js';
-+import {PolymerElement} from 'chrome://resources/polymer/v3_0/polymer/polymer_bundled.min.js';
-+
-+import type {SettingsToggleButtonElement} from '../controls/settings_toggle_button.js';
-+
-+import {getTemplate} from './gpc_toggle.html.js';
-+
-+export interface SettingsGpcToggleElement {
-+  $: {
-+    toggle: SettingsToggleButtonElement,
-+  };
-+}
-+
-+export class SettingsGpcToggleElement extends PolymerElement {
-+  static get is() {
-+    return 'settings-gpc-toggle';
-+  }
-+
-+  static get template() {
-+    return getTemplate();
-+  }
-+
-+  static get properties() {
-+    return {
-+      /**
-+       * Preferences state.
-+       */
-+      prefs: {
-+        type: Object,
-+        notify: true,
-+      },
-+
-+      showDialog_: {
-+        type: Boolean,
-+        value: false,
-+      },
-+    };
-+  }
-+
-+  declare prefs: {enable_gpc: chrome.settingsPrivate.PrefObject};
-+  declare private showDialog_: boolean;
-+
-+  private onDomChange_() {
-+    if (this.showDialog_) {
-+      this.shadowRoot!.querySelector('cr-dialog')!.showModal();
-+    }
-+  }
-+
-+  /**
-+   * Handles the change event for the do-not-track toggle. Shows a
-+   * confirmation dialog when enabling the setting.
-+   */
-+  private onToggleChange_(event: Event) {
-+    const target = event.target as SettingsToggleButtonElement;
-+    if (!target.checked) {
-+      // Always allow disabling the pref.
-+      target.sendPrefChange();
-+      return;
-+    }
-+
-+    this.showDialog_ = true;
-+  }
-+
-+  private closeDialog_() {
-+    this.shadowRoot!.querySelector('cr-dialog')!.close();
-+    this.showDialog_ = false;
-+  }
-+
-+  private onDialogClosed_() {
-+    focusWithoutInk(this.toggle_);
-+  }
-+
-+  /**
-+   * Handles the shared proxy confirmation dialog 'Confirm' button.
-+   */
-+  private onDialogConfirm_() {
-+    this.toggle_.sendPrefChange();
-+    this.closeDialog_();
-+  }
-+
-+  /**
-+   * Handles the shared proxy confirmation dialog 'Cancel' button or a cancel
-+   * event.
-+   */
-+  private onDialogCancel_() {
-+    this.toggle_.resetToPrefValue();
-+    this.closeDialog_();
-+  }
-+
-+  private get toggle_(): SettingsToggleButtonElement {
-+    return this.shadowRoot!.querySelector<SettingsToggleButtonElement>(
-+        '#toggle')!;
-+  }
-+}
-+
-+declare global {
-+  interface HTMLElementTagNameMap {
-+    'settings-gpc-toggle': SettingsGpcToggleElement;
-+  }
-+}
-+
-+customElements.define(
-+  SettingsGpcToggleElement.is, SettingsGpcToggleElement);
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Enable-Global-Privacy-Control.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Enable-Global-Privacy-Control.grdp
 new file mode 100644
 --- /dev/null
@@ -465,19 +257,6 @@ diff --git a/chrome/browser/ui/prefs/pref_watcher.cc b/chrome/browser/ui/prefs/p
    profile_pref_change_registrar_.Add(
        autofill::prefs::kAutofillAtMemoryTriggerInfo, renderer_callback);
  
-diff --git a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
---- a/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-+++ b/chrome/browser/ui/webui/settings/settings_localized_strings_provider.cc
-@@ -2530,6 +2530,9 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source,
-       {"doNotTrackDialogMessage", IDS_SETTINGS_ENABLE_DO_NOT_TRACK_DIALOG_TEXT},
-       {"doNotTrackDialogLearnMoreA11yLabel",
-        IDS_SETTINGS_ENABLE_DO_NOT_TRACK_DIALOG_LEARN_MORE_ACCESSIBILITY_LABEL},
-+      {"gpc", IDS_SETTINGS_ENABLE_GPC},
-+      {"gpcDialogTitle", IDS_SETTINGS_ENABLE_GPC_DIALOG_TITLE},
-+      {"gpcDialogMessage", IDS_SETTINGS_ENABLE_GPC_DIALOG_TEXT},
-       {"siteSettingsSublabel", IDS_SETTINGS_PERMISSIONS_DESCRIPTION},
-       {"securityPageTitle", IDS_SETTINGS_SECURITY},
-       {"securityPageDescription", IDS_SETTINGS_SECURITY_DESCRIPTION},
 diff --git a/chrome/common/pref_names.h b/chrome/common/pref_names.h
 --- a/chrome/common/pref_names.h
 +++ b/chrome/common/pref_names.h

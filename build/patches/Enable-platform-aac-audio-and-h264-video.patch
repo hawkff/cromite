@@ -13,14 +13,11 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  media/BUILD.gn                                      |  2 ++
  .../src/org/chromium/media/AudioManagerAndroid.java |  2 ++
  media/base/android/media_codec_util.cc              |  4 ++++
- media/base/win/mf_helpers.cc                        |  4 ++++
  media/filters/ffmpeg_audio_decoder.cc               | 10 ++++++++++
  media/filters/ffmpeg_demuxer.cc                     |  1 +
  media/filters/ffmpeg_video_decoder.cc               | 11 +++++++++++
- media/filters/win/media_foundation_audio_decoder.cc |  9 +++++++++
- media/gpu/windows/supported_profile_helpers.cc      | 13 ++++++++++++-
  media/media_options.gni                             |  8 ++++++++
- 11 files changed, 70 insertions(+), 1 deletion(-)
+ 8 files changed, 45 insertions(+)
  create mode 100644 cromite_flags/media/base/media_switches_cc/Enable-platform-aac-audio-and-h264-video.inc
 
 diff --git a/cromite_flags/media/base/media_switches_cc/Enable-platform-aac-audio-and-h264-video.inc b/cromite_flags/media/base/media_switches_cc/Enable-platform-aac-audio-and-h264-video.inc
@@ -80,21 +77,6 @@ diff --git a/media/base/android/media_codec_util.cc b/media/base/android/media_c
    // Passthrough is possible for some bitstream formats.
    if (sample_format == kSampleFormatDts ||
        sample_format == kSampleFormatDtsxP2 ||
-diff --git a/media/base/win/mf_helpers.cc b/media/base/win/mf_helpers.cc
---- a/media/base/win/mf_helpers.cc
-+++ b/media/base/win/mf_helpers.cc
-@@ -538,7 +538,11 @@ HRESULT GetAacAudioType(const AudioDecoderConfig& decoder_config,
- 
-   size_t extra_size = wave_format_size - sizeof(WAVEFORMATEX);
-   aac_wave_format->wfx.cbSize = static_cast<WORD>(extra_size);
-+#if BUILDFLAG(ENABLE_PLATFORM_AAC_AUDIO)
-+  aac_wave_format->wPayloadType = 1;  // Audio Data Transport Stream (ADTS)
-+#else
-   aac_wave_format->wPayloadType = 0;  // RAW AAC
-+#endif
-   aac_wave_format->wAudioProfileLevelIndication =
-       0xFE;                          // no audio profile specified
-   aac_wave_format->wStructType = 0;  // audio specific config follows
 diff --git a/media/filters/ffmpeg_audio_decoder.cc b/media/filters/ffmpeg_audio_decoder.cc
 --- a/media/filters/ffmpeg_audio_decoder.cc
 +++ b/media/filters/ffmpeg_audio_decoder.cc
@@ -154,70 +136,6 @@ diff --git a/media/filters/ffmpeg_video_decoder.cc b/media/filters/ffmpeg_video_
    // We only build support for H.264.
    return codec == VideoCodec::kH264 && IsDecoderBuiltInVideoCodec(codec);
  }
-diff --git a/media/filters/win/media_foundation_audio_decoder.cc b/media/filters/win/media_foundation_audio_decoder.cc
---- a/media/filters/win/media_foundation_audio_decoder.cc
-+++ b/media/filters/win/media_foundation_audio_decoder.cc
-@@ -101,11 +101,15 @@ std::optional<MFT_REGISTER_TYPE_INFO> GetTypeInfo(
- #endif
- #if BUILDFLAG(USE_PROPRIETARY_CODECS)
-     case AudioCodec::kAAC:
-+#if BUILDFLAG(ENABLE_PLATFORM_AAC_AUDIO)
-+      return MFT_REGISTER_TYPE_INFO{MFMediaType_Audio, MFAudioFormat_AAC};
-+#else
-       if (config.profile() == AudioCodecProfile::kXHE_AAC &&
-           base::win::GetVersion() >= base::win::Version::WIN11_22H2) {
-         return MFT_REGISTER_TYPE_INFO{MFMediaType_Audio, MFAudioFormat_AAC};
-       }
-       [[fallthrough]];
-+#endif // BUILDFLAG(ENABLE_PLATFORM_AAC_AUDIO)
- #endif
- #if BUILDFLAG(ENABLE_PLATFORM_AC4_AUDIO)
-     case AudioCodec::kAC4:
-@@ -334,8 +338,13 @@ void MediaFoundationAudioDecoder::Reset(base::OnceClosure reset_cb) {
- }
- 
- bool MediaFoundationAudioDecoder::NeedsBitstreamConversion() const {
-+#if BUILDFLAG(ENABLE_PLATFORM_AAC_AUDIO)
-+  // An AAC stream needs to be converted as ADTS stream.
-+  return config_.codec() == AudioCodec::kAAC;
-+#else
-   // DTS does not require any header/bit stream conversion
-   return false;
-+#endif
- }
- 
- HRESULT MediaFoundationAudioDecoder::CreateDecoder() {
-diff --git a/media/gpu/windows/supported_profile_helpers.cc b/media/gpu/windows/supported_profile_helpers.cc
---- a/media/gpu/windows/supported_profile_helpers.cc
-+++ b/media/gpu/windows/supported_profile_helpers.cc
-@@ -364,7 +364,11 @@ SupportedResolutionRangeMap GetSupportedD3DVideoDecoderResolutions(
-   //
-   // On Windows 7 the maximum resolution supported by media foundation is
-   // 1920 x 1088. We use 1088 to account for 16x16 macro-blocks.
-+#if BUILDFLAG(ENABLE_PLATFORM_H264_VIDEO)
-+  constexpr gfx::Size kDefaultMaxH264Resolution(4096, 2304);
-+#else
-   constexpr gfx::Size kDefaultMaxH264Resolution(1920, 1088);
-+#endif
-   SupportedResolutionRange h264_profile;
-   h264_profile.min_resolution = kMinResolution;
-   h264_profile.max_landscape_resolution = kDefaultMaxH264Resolution;
-@@ -372,7 +376,14 @@ SupportedResolutionRangeMap GetSupportedD3DVideoDecoderResolutions(
-   // We don't have a way to map DXVA support to specific H.264 profiles, so just
-   // mark all the common ones with the same level of support.
-   constexpr VideoCodecProfile kSupportedH264Profiles[] = {
--      H264PROFILE_BASELINE, H264PROFILE_MAIN, H264PROFILE_HIGH};
-+      H264PROFILE_BASELINE, H264PROFILE_MAIN, H264PROFILE_HIGH
-+#if BUILDFLAG(ENABLE_PLATFORM_H264_VIDEO)
-+      // even if they are not supported, we add the items so that play
-+      // is still attempted. On the contrary, non-support would appear immediately.
-+      , H264PROFILE_HIGH10PROFILE, H264PROFILE_HIGH422PROFILE,
-+      H264PROFILE_HIGH444PREDICTIVEPROFILE
-+#endif
-+  };
-   for (const auto profile : kSupportedH264Profiles)
-     supported_resolutions[profile] = h264_profile;
- 
 diff --git a/media/media_options.gni b/media/media_options.gni
 --- a/media/media_options.gni
 +++ b/media/media_options.gni

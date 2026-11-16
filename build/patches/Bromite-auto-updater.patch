@@ -27,7 +27,6 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../endpoint_fetcher/EndpointResponse.java    |  30 ++
  .../flags/android/chrome_feature_list.cc      |   1 +
  .../browser/flags/ChromeFeatureList.java      |   1 +
- .../access_code_cast_discovery_interface.cc   |   2 +-
  chrome/browser/omaha/android/BUILD.gn         |   3 +
  .../chrome/browser/omaha/OmahaPrefUtils.java  |  52 +++-
  .../chrome/browser/omaha/UpdateConfigs.java   |  27 +-
@@ -35,7 +34,6 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../browser/omaha/VersionNumberGetter.java    |   4 +-
  .../omaha/inline/InlineUpdateController.java  |  57 ++++
  .../safety_hub/SafetyHubFetchService.java     |   5 -
- .../browser/save_to_drive/drive_uploader.cc   |   2 +-
  .../strings/android_chrome_strings.grd        |  23 +-
  .../ui/lens/lens_overlay_query_controller.cc  |   2 +-
  components/commerce/core/account_checker.cc   |   2 +-
@@ -49,7 +47,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../notebooks_network_service_impl.cc         |   2 +-
  .../Bromite-auto-updater.inc                  |   3 +
  .../Bromite-auto-updater.inc                  |   1 +
- 41 files changed, 1151 insertions(+), 105 deletions(-)
+ 39 files changed, 1149 insertions(+), 103 deletions(-)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/omaha/CromiteUpdateStatusProvider.java
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java
  create mode 100644 chrome/browser/endpoint_fetcher/BUILD.gn
@@ -1031,18 +1029,6 @@ diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/f
      public static final String IN_APP_WINDOW_MANAGER_DEPRECATION = "InAppWindowManagerDeprecation";
      public static final String KEYBOARD_ESC_BACK_NAVIGATION = "KeyboardEscBackNavigation";
      public static final String LAUNCH_CAUSE_SCREEN_OFF_FIX = "LaunchCauseScreenOffFix";
-diff --git a/chrome/browser/media/router/discovery/access_code/access_code_cast_discovery_interface.cc b/chrome/browser/media/router/discovery/access_code/access_code_cast_discovery_interface.cc
---- a/chrome/browser/media/router/discovery/access_code/access_code_cast_discovery_interface.cc
-+++ b/chrome/browser/media/router/discovery/access_code/access_code_cast_discovery_interface.cc
-@@ -265,7 +265,7 @@ AccessCodeCastDiscoveryInterface::CreateEndpointFetcher(
-           .SetTimeout(kTimeout)
-           .SetUrl(GURL(base::StrCat({GetDiscoveryUrl(), "/", access_code})))
-           .SetPostData(kEmptyPostData)
--          .Build());
-+          .Build(), kTrafficAnnotation);
- }
- 
- void AccessCodeCastDiscoveryInterface::ValidateDiscoveryAccessCode(
 diff --git a/chrome/browser/omaha/android/BUILD.gn b/chrome/browser/omaha/android/BUILD.gn
 --- a/chrome/browser/omaha/android/BUILD.gn
 +++ b/chrome/browser/omaha/android/BUILD.gn
@@ -1610,18 +1596,6 @@ diff --git a/chrome/browser/safety_hub/android/java/src/org/chromium/chrome/brow
      }
  
      /** See {@link ChromeActivitySessionTracker#onForegroundSessionStart()}. */
-diff --git a/chrome/browser/save_to_drive/drive_uploader.cc b/chrome/browser/save_to_drive/drive_uploader.cc
---- a/chrome/browser/save_to_drive/drive_uploader.cc
-+++ b/chrome/browser/save_to_drive/drive_uploader.cc
-@@ -290,7 +290,7 @@ DriveUploader::CreateEndpointFetcher(
-   return std::make_unique<endpoint_fetcher::EndpointFetcher>(
-       /*url_loader_factory=*/url_loader_factory_.get(),
-       /*identity_manager=*/identity_manager_,
--      /*request_params=*/std::move(request_params));
-+      /*request_params=*/std::move(request_params), kTrafficAnnotationTag);
- }
- 
- DriveUploaderType DriveUploader::get_drive_uploader_type() const {
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd

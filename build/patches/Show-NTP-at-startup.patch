@@ -19,23 +19,17 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../cromite/sShowNtpAtStartupAndroid.java     | 33 +++++++++++++++++++
  .../magic_stack/HomeModulesMediator.java      |  8 +++++
  .../browser/magic_stack/ModuleRegistry.java   |  3 +-
- .../policies/background_tab_loading_policy.cc |  2 ++
  .../preferences/ChromePreferenceKeys.java     |  2 ++
  .../LegacyChromePreferenceKeys.java           |  1 +
- .../on_startup_page/on_startup_page.ts        |  1 +
  .../client_util/HomeModulesRankingHelper.java |  2 --
- chrome/browser/sessions/session_restore.cc    |  8 +++++
  .../res/layout/single_tab_module_layout.xml   | 17 +++++-----
  .../SingleTabSwitcherCoordinator.java         |  2 +-
  .../SingleTabSwitcherOnNtpMediator.java       |  5 +--
  .../show-ntp-at-startup.grdp                  |  9 +++++
- chrome/browser/ui/browser_tabrestore.cc       |  2 +-
- .../startup/startup_browser_creator_impl.cc   |  8 +++++
- chrome/browser/ui/tabs/tab_strip_model.cc     | 18 +++++++++-
  .../about_flags_cc/show-ntp-at-startup.inc    | 12 +++++++
  .../show-ntp-at-startup.inc                   |  5 +++
  .../show-ntp-at-startup.inc                   |  1 +
- 27 files changed, 169 insertions(+), 25 deletions(-)
+ 21 files changed, 132 insertions(+), 23 deletions(-)
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sShowNtpAtStartupAndroid.java
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/show-ntp-at-startup.grdp
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc
@@ -300,25 +294,6 @@ diff --git a/chrome/browser/magic_stack/android/java/src/org/chromium/chrome/bro
          mModuleBuildersMap.put(moduleType, builder);
      }
  
-diff --git a/chrome/browser/performance_manager/policies/background_tab_loading_policy.cc b/chrome/browser/performance_manager/policies/background_tab_loading_policy.cc
---- a/chrome/browser/performance_manager/policies/background_tab_loading_policy.cc
-+++ b/chrome/browser/performance_manager/policies/background_tab_loading_policy.cc
-@@ -387,6 +387,7 @@ base::DictValue BackgroundTabLoadingPolicy::DescribeSystemNodeData(
- 
- bool BackgroundTabLoadingPolicy::ShouldLoad(
-     const PageNodeToLoadData& page_node_data) {
-+  if ((true)) return false;
-   if (tab_loads_started_ < min_tabs_to_load_) {
-     return true;
-   }
-@@ -582,6 +583,7 @@ void BackgroundTabLoadingPolicy::MaybeLoadSomeTabs() {
-   // Continue to load tabs while possible. This is in a loop with a
-   // recalculation of GetMaxNewTabLoads() as reentrancy can cause conditions
-   // to change as each tab load is initiated.
-+  if ((false))
-   while (GetMaxNewTabLoads() > 0) {
-     LoadNextTab();
-   }
 diff --git a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
 --- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
 +++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
@@ -342,17 +317,6 @@ diff --git a/chrome/browser/preferences/android/java/src/org/chromium/chrome/bro
                  ChromePreferenceKeys.TABMODEL_ACTIVE_TAB_ID,
                  ChromePreferenceKeys.TABMODEL_HAS_COMPUTED_MAX_ID,
                  ChromePreferenceKeys.TABMODEL_HAS_RUN_FILE_MIGRATION,
-diff --git a/chrome/browser/resources/settings/on_startup_page/on_startup_page.ts b/chrome/browser/resources/settings/on_startup_page/on_startup_page.ts
---- a/chrome/browser/resources/settings/on_startup_page/on_startup_page.ts
-+++ b/chrome/browser/resources/settings/on_startup_page/on_startup_page.ts
-@@ -113,6 +113,7 @@ export class SettingsOnStartupPageElement extends
-    *     policy.
-    */
-   protected showContinueAndOpenSpecific_(): boolean {
-+    if ((true)) return true;
-     if (!this.restoreOnStartupPref_) {
-       return false;
-     }
 diff --git a/chrome/browser/segmentation_platform/android/java/src/org/chromium/chrome/browser/segmentation_platform/client_util/HomeModulesRankingHelper.java b/chrome/browser/segmentation_platform/android/java/src/org/chromium/chrome/browser/segmentation_platform/client_util/HomeModulesRankingHelper.java
 --- a/chrome/browser/segmentation_platform/android/java/src/org/chromium/chrome/browser/segmentation_platform/client_util/HomeModulesRankingHelper.java
 +++ b/chrome/browser/segmentation_platform/android/java/src/org/chromium/chrome/browser/segmentation_platform/client_util/HomeModulesRankingHelper.java
@@ -372,31 +336,6 @@ diff --git a/chrome/browser/segmentation_platform/android/java/src/org/chromium/
      }
  
      /**
-diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
---- a/chrome/browser/sessions/session_restore.cc
-+++ b/chrome/browser/sessions/session_restore.cc
-@@ -1037,6 +1037,13 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
-       // be selected as ShowBrowser() will load the selected tab.
-       bool is_selected_tab =
-           (initial_tab_count == 0) && (i == selected_tab_index);
-+      if (is_selected_tab && !startup_tabs_.empty()) {
-+        is_selected_tab = false;
-+        if (browser != browser_) {
-+          BrowserInitState::From(browser)->set_is_session_restore(false);
-+          did_show_browser = true;
-+        }
-+      }
- 
-       // Convert the last active time because WebContents needs a TimeTicks.
-       const base::TimeTicks last_active_time_ticks =
-@@ -1400,6 +1407,7 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
-     }
-     if (last_normal_browser && !normal_startup_tabs.empty()) {
-       AppendURLsToBrowser(last_normal_browser, normal_startup_tabs);
-+      last_normal_browser->GetWindow()->Show();
-     }
-     if (!startup_tabs_from_last_and_urls_pref.empty()) {
-       BrowserWindowCreateParams params(profile_, /*from_user_gesture=*/false);
 diff --git a/chrome/browser/single_tab/android/java/res/layout/single_tab_module_layout.xml b/chrome/browser/single_tab/android/java/res/layout/single_tab_module_layout.xml
 --- a/chrome/browser/single_tab/android/java/res/layout/single_tab_module_layout.xml
 +++ b/chrome/browser/single_tab/android/java/res/layout/single_tab_module_layout.xml
@@ -514,68 +453,6 @@ new file mode 100644
 +        Enable showing a NewTabPage at startup and allows selection of the last open tab
 +    </message>
 +</grit-part>
-diff --git a/chrome/browser/ui/browser_tabrestore.cc b/chrome/browser/ui/browser_tabrestore.cc
---- a/chrome/browser/ui/browser_tabrestore.cc
-+++ b/chrome/browser/ui/browser_tabrestore.cc
-@@ -248,7 +248,7 @@ WebContents* AddRestoredTabImpl(std::unique_ptr<WebContents> web_contents,
- 
-   // Immediate load if the browser activeness is true or unknown. That is, do
-   // not do immediate load for browsers that are known to be inactive.
--  bool should_load = is_active_browser.value_or(true);
-+  bool should_load = false;
- 
- // On OS_MAC, `LoadRestoredTabIfVisible` by default so that its tab loading
- // behaves like other platforms to make FirstWebContentsProfiler wor
-diff --git a/chrome/browser/ui/startup/startup_browser_creator_impl.cc b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
---- a/chrome/browser/ui/startup/startup_browser_creator_impl.cc
-+++ b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
-@@ -702,6 +702,14 @@ StartupBrowserCreatorImpl::DetermineStartupTabs(
-     if (prefs_tabs_originally_empty) {
-       AppendTabs(provider.GetNewTabPageTabs(*command_line_, profile_), &tabs);
-     }
-+
-+    SessionStartupPref session_startup_pref =
-+        SessionStartupPref::GetStartupPref(profile_);
-+    if (session_startup_pref.type == SessionStartupPref::LAST_AND_URLS) {
-+      StartupTabs new_tabs;
-+      new_tabs.emplace_back(GURL(chrome::kChromeUINewTabURL));
-+      AppendTabs(new_tabs, &tabs);
-+    }
-   }
- 
-   // Maybe add any tabs which the user has previously pinned.
-diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
---- a/chrome/browser/ui/tabs/tab_strip_model.cc
-+++ b/chrome/browser/ui/tabs/tab_strip_model.cc
-@@ -5664,11 +5664,27 @@ std::optional<int> TabStripModel::DetermineNewSelectedIndex(
- 
-   // Third preference is the block's opener.
-   for (size_t i = block_tabs.start(); i < block_tabs.end(); ++i) {
--    tabs::TabInterface* opener = GetTabModelAtIndex(i)->opener();
-+    tabs::TabModel* tab = GetTabModelAtIndex(i);
-+    tabs::TabInterface* opener = tab->opener();
-     int opener_index = opener ? GetIndexOfTab(opener) : TabStripModel::kNoTab;
-     if (opener_index != TabStripModel::kNoTab &&
-         !block_tabs.Contains(gfx::Range(opener_index)) &&
-         !IsTabCollapsed(opener_index)) {
-+
-+      tabs::TabInterface* tab_interface = tab;
-+      const tabs::TabCollection* parent = tab_interface ? tab_interface->GetParentCollection() : nullptr;
-+
-+      bool is_detached_root_tab = parent &&
-+                                  parent->type() != tabs::TabCollection::Type::GROUP &&
-+                                  parent->type() != tabs::TabCollection::Type::SPLIT;
-+
-+      if (opener_index == 0 && is_detached_root_tab) {
-+        if (block_tabs.start() > 0) {
-+          int left_tab_index = static_cast<int>(block_tabs.start()) - 1;
-+          return GetTabIndexAfterClosing(left_tab_index, block_tabs);
-+        }
-+      }
-+
-       return GetTabIndexAfterClosing(opener_index, block_tabs);
-     }
-   }
 diff --git a/cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc b/cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc
 new file mode 100644
 --- /dev/null

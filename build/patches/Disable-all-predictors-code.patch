@@ -21,7 +21,6 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../model_validator_keyed_service.cc          |   8 ++
  .../optimization_guide_keyed_service.cc       | 113 ++----------------
  .../optimization_guide_keyed_service.h        |   8 +-
- .../password_change_delegate_impl.cc          |   2 +
  ...ld_classification_model_handler_factory.cc |  16 +--
  chrome/browser/permissions/BUILD.gn           |  24 ++--
  .../permissions/chrome_permissions_client.cc  |   2 -
@@ -43,17 +42,9 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../preloading/AndroidPrerenderManager.java   |   1 +
  .../ui/autofill/chrome_autofill_client.cc     |  11 --
  chrome/browser/ui/tab_helpers.cc              |   1 -
- .../autofill_ml_internals_page_handler.cc     |   2 +
- .../autofill_ml_internals_page_handler.h      |   3 +
- .../autofill_ml_internals_ui.cc               |   4 +-
- .../new_tab_page/new_tab_page_handler.cc      |  10 +-
  .../webui/new_tab_page/new_tab_page_handler.h |   4 +-
  .../ui/webui/omnibox/omnibox_page_handler.cc  |   5 +-
- .../ui/webui/on_device_internals/BUILD.gn     |   5 +-
- .../on_device_internals_page_handler.h        |   2 +
- .../read_anything/read_aloud_app_model.cc     |  16 ++-
  .../read_anything/read_aloud_app_model.h      |   9 +-
- .../read_anything_app_controller.cc           |  12 ++
  .../read_anything_app_controller.h            |   2 +
  chrome/test/BUILD.gn                          |   4 +-
  chrome/utility/BUILD.gn                       |   2 +-
@@ -128,7 +119,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../core/html/parser/html_document_parser.cc  |   1 +
  .../document_speculation_rules.cc             |   1 +
  .../platform/runtime_enabled_features.json5   |   2 +-
- 123 files changed, 393 insertions(+), 442 deletions(-)
+ 114 files changed, 344 insertions(+), 435 deletions(-)
  create mode 100644 cromite_flags/chrome/browser/browser_features_cc/Disable-all-predictors-code.inc
  create mode 100644 cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Disable-all-predictors-code.inc
  create mode 100644 cromite_flags/chrome/common/chrome_features_cc/Disable-all-predictors-code.inc
@@ -760,20 +751,6 @@ diff --git a/chrome/browser/optimization_guide/optimization_guide_keyed_service.
  
  #if BUILDFLAG(IS_ANDROID)
    // Manage and fetch the java object that wraps this OptimizationGuide on
-diff --git a/chrome/browser/password_manager/password_change_delegate_impl.cc b/chrome/browser/password_manager/password_change_delegate_impl.cc
---- a/chrome/browser/password_manager/password_change_delegate_impl.cc
-+++ b/chrome/browser/password_manager/password_change_delegate_impl.cc
-@@ -348,8 +348,10 @@ void PasswordChangeDelegateImpl::StartPasswordChangeFlow() {
-   // download of a local ML model for field classification.
-   // TODO(452883239): Clean this up when model is downloaded on start-up for
-   // everybody.
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   PasswordFieldClassificationModelHandlerFactory::GetForBrowserContext(
-       originator_->GetBrowserContext());
-+#endif
- }
- 
- void PasswordChangeDelegateImpl::OnLoginStateCheckedWithoutPIResult(
 diff --git a/chrome/browser/password_manager/password_field_classification_model_handler_factory.cc b/chrome/browser/password_manager/password_field_classification_model_handler_factory.cc
 --- a/chrome/browser/password_manager/password_field_classification_model_handler_factory.cc
 +++ b/chrome/browser/password_manager/password_field_classification_model_handler_factory.cc
@@ -1268,121 +1245,6 @@ diff --git a/chrome/browser/ui/tab_helpers.cc b/chrome/browser/ui/tab_helpers.cc
    if (optimization_guide::features::IsOptimizationHintsEnabled()) {
      OptimizationGuideWebContentsObserver::CreateForWebContents(web_contents);
    }
-diff --git a/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.cc b/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.cc
---- a/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.cc
-+++ b/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.cc
-@@ -13,9 +13,11 @@ AutofillMlInternalsPageHandlerImpl::AutofillMlInternalsPageHandlerImpl(
-     mojo::PendingRemote<autofill_ml_internals::mojom::Page> page,
-     autofill::MlLogRouter* log_router)
-     : receiver_(this, std::move(receiver)), page_(std::move(page)) {
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   if (log_router) {
-     log_router_observation_.Observe(log_router);
-   }
-+#endif
- }
- 
- void AutofillMlInternalsPageHandlerImpl::ProcessLog(
-diff --git a/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.h b/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.h
---- a/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.h
-+++ b/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_page_handler.h
-@@ -8,6 +8,7 @@
- #include "base/scoped_observation.h"
- #include "components/autofill/core/browser/ml_model/logging/autofill_ml_internals.mojom.h"
- #include "components/autofill/core/browser/ml_model/logging/ml_log_router.h"
-+#include "components/optimization_guide/machine_learning_tflite_buildflags.h"
- #include "mojo/public/cpp/bindings/pending_receiver.h"
- #include "mojo/public/cpp/bindings/receiver.h"
- #include "mojo/public/cpp/bindings/remote.h"
-@@ -32,8 +33,10 @@ class AutofillMlInternalsPageHandlerImpl
-  private:
-   mojo::Receiver<autofill_ml_internals::mojom::PageHandler> receiver_;
-   mojo::Remote<autofill_ml_internals::mojom::Page> page_;
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   base::ScopedObservation<autofill::MlLogRouter, autofill::MlLogReceiver>
-       log_router_observation_{this};
-+#endif
- };
- 
- #endif  // CHROME_BROWSER_UI_WEBUI_AUTOFILL_ML_INTERNALS_AUTOFILL_ML_INTERNALS_PAGE_HANDLER_H_
-diff --git a/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_ui.cc b/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_ui.cc
---- a/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_ui.cc
-+++ b/chrome/browser/ui/webui/autofill_ml_internals/autofill_ml_internals_ui.cc
-@@ -11,6 +11,7 @@
- #include "chrome/grit/autofill_ml_internals_resources.h"
- #include "chrome/grit/autofill_ml_internals_resources_map.h"
- #include "components/autofill/core/browser/ml_model/logging/autofill_ml_internals.mojom.h"
-+#include "components/optimization_guide/machine_learning_tflite_buildflags.h"
- #include "content/public/browser/web_ui.h"
- #include "content/public/browser/web_ui_data_source.h"
- #include "ui/webui/webui_util.h"
-@@ -39,8 +40,7 @@ void AutofillMlInternalsUI::CreatePageHandler(
-     mojo::PendingReceiver<autofill_ml_internals::mojom::PageHandler> receiver) {
-   page_handler_ = std::make_unique<AutofillMlInternalsPageHandlerImpl>(
-       std::move(receiver), std::move(page),
--      autofill::MlLogRouterFactory::GetForProfile(
--          Profile::FromWebUI(MojoWebUIController::web_ui())));
-+      nullptr);
- }
- 
- WEB_UI_CONTROLLER_TYPE_IMPL(AutofillMlInternalsUI)
-diff --git a/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc b/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc
---- a/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc
-+++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.cc
-@@ -517,8 +517,8 @@ NewTabPageHandler::NewTabPageHandler(
-     const base::Time& ntp_navigation_start_time,
-     base::TimeTicks ntp_navigation_start_time_ticks,
-     const std::vector<ntp::ModuleIdDetail>* module_id_details)
--    : SettingsEnabledObserver(
--          optimization_guide::UserVisibleFeatureKey::kWallpaperSearch),
-+    : // SettingsEnabledObserver(
-+      //    optimization_guide::UserVisibleFeatureKey::kWallpaperSearch),
-       logger_(profile,
-               chrome::ChromeUINewTabPageURLAsGURL(),
-               ntp_navigation_start_time_ticks),
-@@ -573,6 +573,7 @@ NewTabPageHandler::NewTabPageHandler(
-     microsoft_auth_service_->AddObserver(this);
-   }
- #if !BUILDFLAG(IS_ANDROID)
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   if (customize_chrome::IsWallpaperSearchEnabledForProfile(profile_)) {
-     optimization_guide_keyed_service_ =
-         OptimizationGuideKeyedServiceFactory::GetForProfile(profile_);
-@@ -581,6 +582,7 @@ NewTabPageHandler::NewTabPageHandler(
-           ->AddModelExecutionSettingsEnabledObserver(this);
-     }
-   }
-+#endif
- #endif  // !BUILDFLAG(IS_ANDROID)
- 
-   OnBrowserWindowInterfaceChanged();
-@@ -632,11 +634,13 @@ NewTabPageHandler::NewTabPageHandler(
- }
- 
- NewTabPageHandler::~NewTabPageHandler() {
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   if (optimization_guide_keyed_service_) {
-     optimization_guide_keyed_service_
-         ->RemoveModelExecutionSettingsEnabledObserver(this);
-     optimization_guide_keyed_service_ = nullptr;
-   }
-+#endif
- // TODO(b/502297163): Implement for Android.
- #if !BUILDFLAG(IS_ANDROID)
-   if (microsoft_auth_service_) {
-@@ -1301,10 +1305,12 @@ void NewTabPageHandler::OnPromoServiceShuttingDown() {
-   promo_service_ = nullptr;
- }
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- void NewTabPageHandler::OnChangeInFeatureCurrentlyEnabledState(
-     bool is_now_enabled) {
-   page_->SetWallpaperSearchButtonVisibility(is_now_enabled);
- }
-+#endif
- 
- void NewTabPageHandler::OnAuthStateUpdated() {
-   UpdateModulesLoadable();
 diff --git a/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h b/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h
 --- a/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h
 +++ b/chrome/browser/ui/webui/new_tab_page/new_tab_page_handler.h
@@ -1418,119 +1280,6 @@ diff --git a/chrome/browser/ui/webui/omnibox/omnibox_page_handler.cc b/chrome/br
 -             : nullptr;
 +  return nullptr;
  }
-diff --git a/chrome/browser/ui/webui/on_device_internals/BUILD.gn b/chrome/browser/ui/webui/on_device_internals/BUILD.gn
---- a/chrome/browser/ui/webui/on_device_internals/BUILD.gn
-+++ b/chrome/browser/ui/webui/on_device_internals/BUILD.gn
-@@ -20,7 +20,7 @@ mojom("mojom") {
- source_set("on_device_internals") {
-   public = [ "on_device_internals_ui.h" ]
-   sources = [
--    "on_device_internals_crx_component.cc",
-+    # "on_device_internals_crx_component.cc",
-     "on_device_internals_crx_component.h",
-     "on_device_internals_page_handler.cc",
-     "on_device_internals_page_handler.h",
-@@ -44,6 +44,9 @@ source_set("on_device_internals") {
-     "//ui/base",
-     "//ui/webui",
-   ]
-+  deps -= [
-+    "//services/on_device_model/ml:ml_no_internal",
-+  ]
-   if (is_chromeos) {
-     deps += [ "//chromeos/ash/components/mojo_service_manager" ]
-   }
-diff --git a/chrome/browser/ui/webui/on_device_internals/on_device_internals_page_handler.h b/chrome/browser/ui/webui/on_device_internals/on_device_internals_page_handler.h
---- a/chrome/browser/ui/webui/on_device_internals/on_device_internals_page_handler.h
-+++ b/chrome/browser/ui/webui/on_device_internals/on_device_internals_page_handler.h
-@@ -114,7 +114,9 @@ class PageHandler : public mojom::PageHandler,
-   on_device_model::mojom::DevicePerformanceInfoPtr perf_info_;
-   on_device_model::mojom::DeviceInfoPtr device_info_;
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   OnDeviceInternalsCrxObserver download_observer_{*this};
-+#endif
- 
- #if BUILDFLAG(USE_CHROMEOS_MODEL_SERVICE)
-   mojo::Remote<PlatformService> platform_service_;
-diff --git a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc b/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc
---- a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc
-+++ b/chrome/renderer/accessibility/read_anything/read_aloud_app_model.cc
-@@ -17,7 +17,9 @@
- #include "base/task/thread_pool.h"
- #include "base/time/time.h"
- #include "base/values.h"
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- #include "chrome/renderer/accessibility/phrase_segmentation/dependency_parser_model.h"
-+#endif
- #include "chrome/renderer/accessibility/phrase_segmentation/dependency_tree.h"
- #include "chrome/renderer/accessibility/phrase_segmentation/phrase_segmenter.h"
- #include "chrome/renderer/accessibility/phrase_segmentation/token_boundaries.h"
-@@ -27,6 +29,7 @@
- 
- namespace {
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- // Returns the dependency parser model for this renderer process.
- // All access to this model is asynchronous and safely executed on a background
- // sequenced task runner.
-@@ -36,6 +39,7 @@ base::SequenceBound<DependencyParserModel>& GetDependencyParserModel_() {
-           {base::MayBlock(), base::TaskPriority::BEST_EFFORT}));
-   return *instance;
- }
-+#endif
- 
- }  // namespace
- 
-@@ -153,11 +157,14 @@ void ReadAloudAppModel::PreprocessTextForSpeech(
-   }
- }
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- base::SequenceBound<DependencyParserModel>&
- ReadAloudAppModel::GetDependencyParserModel() {
-   return GetDependencyParserModel_();
- }
-+#endif
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- void ReadAloudAppModel::CalculatePhrases(
-     a11y::ReadAloudCurrentGranularity& granularity) {
-   if (!features::IsReadAnythingReadAloudPhraseHighlightingEnabled()) {
-@@ -214,19 +221,23 @@ void ReadAloudAppModel::CalculatePhrases(
-       .Then(base::BindOnce(&ReadAloudAppModel::UpdatePhraseBoundaries,
-                            weak_ptr_factory_.GetWeakPtr(), phrase_tokens));
- }
-+#endif
- 
--static const Strategy kPhraseStrategy = Strategy::kWords;
--static const int kPhraseStrategyParameter = 5;
-+[[maybe_unused]] static const Strategy kPhraseStrategy = Strategy::kWords;
-+[[maybe_unused]] static const int kPhraseStrategyParameter = 5;
- 
- void ReadAloudAppModel::StartPhraseCalculation() {
-   if (processed_granularities_on_current_page_.size() > 0) {
-     current_phrase_calculation_index_ = 0;
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-     CalculatePhrases(processed_granularities_on_current_page_[0]);
-+#endif
-   }
- }
- 
- void ReadAloudAppModel::UpdatePhraseBoundaries(std::vector<std::string> tokens,
-                                                std::vector<size_t> heads) {
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   // Reset the phrase calculation flag, so that the next phrase calculation can
-   // be scheduled, if needed.
-   is_calculating_phrases = false;
-@@ -288,6 +299,7 @@ void ReadAloudAppModel::UpdatePhraseBoundaries(std::vector<std::string> tokens,
-     current_phrase_calculation_index_ = -1;
-     LOG(WARNING) << "All phrases calculated!";
-   }
-+#endif
- }
- 
- // TODO(crbug.com/40927698): Update to use AXRange to better handle multiple
 diff --git a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.h b/chrome/renderer/accessibility/read_anything/read_aloud_app_model.h
 --- a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.h
 +++ b/chrome/renderer/accessibility/read_anything/read_aloud_app_model.h
@@ -1577,78 +1326,6 @@ diff --git a/chrome/renderer/accessibility/read_anything/read_aloud_app_model.h 
  
    // Which sentence (index into `processed_granularities_on_current_page`) is
    // currently being processed for phrases. -1 if none.
-diff --git a/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc b/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc
---- a/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc
-+++ b/chrome/renderer/accessibility/read_anything/read_anything_app_controller.cc
-@@ -32,7 +32,9 @@
- #include "chrome/common/read_anything/read_anything.mojom-shared.h"
- #include "chrome/common/read_anything/read_anything_util.h"
- #include "chrome/renderer/accessibility/ax_tree_distiller.h"
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- #include "chrome/renderer/accessibility/phrase_segmentation/dependency_parser_model.h"
-+#endif
- #include "chrome/renderer/accessibility/read_anything/read_aloud_traversal_utils.h"
- #include "chrome/renderer/accessibility/read_anything/read_anything_app_model.h"
- #include "chrome/renderer/accessibility/read_anything/read_anything_node_utils.h"
-@@ -2522,6 +2524,7 @@ void ReadAnythingAppController::OnConnected() {
-   render_frame()->GetBrowserInterfaceBroker().GetInterface(
-       std::move(page_handler_factory_receiver));
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   // Asynchronously check the availability of the sequence-bound dependency
-   // parser model used by phrase-based highlighting.
-   if (features::IsReadAnythingReadAloudPhraseHighlightingEnabled()) {
-@@ -2531,6 +2534,7 @@ void ReadAnythingAppController::OnConnected() {
-                                  OnDependencyParserModelAvailabilityChecked,
-                              weak_ptr_factory_.GetWeakPtr()));
-   }
-+#endif
-   SetDistillationState(
-       read_anything::mojom::ReadAnythingDistillationState::kNotAttempted);
- }
-@@ -2542,9 +2546,11 @@ void ReadAnythingAppController::OnDependencyParserModelAvailabilityChecked(
-     return;
-   }
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   page_handler_->GetDependencyParserModel(
-       base::BindOnce(&ReadAnythingAppController::UpdateDependencyParserModel,
-                      weak_ptr_factory_.GetWeakPtr()));
-+#endif
- }
- 
- void ReadAnythingAppController::OnCopy() const {
-@@ -2837,8 +2843,10 @@ std::u16string ReadAnythingAppController::GetCurrentTextContent() {
- }
- 
- void ReadAnythingAppController::PreprocessTextForSpeech() {
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   read_aloud_model_.PreprocessTextForSpeech(model_.is_pdf(), model_.IsDocs(),
-                                             model_.GetCurrentlyVisibleNodes());
-+#endif
- }
- 
- void ReadAnythingAppController::MovePositionToNextGranularity() {
-@@ -3272,15 +3280,19 @@ bool ReadAnythingAppController::IsDocsLoadMoreButtonVisible() const {
- 
- void ReadAnythingAppController::UpdateDependencyParserModel(
-     base::File model_file) {
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
-   read_aloud_model_.GetDependencyParserModel()
-       .AsyncCall(&DependencyParserModel::UpdateWithFile)
-       .WithArgs(std::move(model_file));
-+#endif
- }
- 
-+#if false /*BUILDFLAG(BUILD_WITH_TFLITE_LIB)*/
- base::SequenceBound<DependencyParserModel>&
- ReadAnythingAppController::GetDependencyParserModelForTesting() {
-   return read_aloud_model_.GetDependencyParserModel();
- }
-+#endif
- 
- void ReadAnythingAppController::OnTreeAdded(ui::AXTree* tree) {
-   auto observation =
 diff --git a/chrome/renderer/accessibility/read_anything/read_anything_app_controller.h b/chrome/renderer/accessibility/read_anything/read_anything_app_controller.h
 --- a/chrome/renderer/accessibility/read_anything/read_anything_app_controller.h
 +++ b/chrome/renderer/accessibility/read_anything/read_anything_app_controller.h
