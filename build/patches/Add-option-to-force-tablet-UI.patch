@@ -6,40 +6,41 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
  .../layout/custom_tabs_control_container.xml  |  2 +-
  .../java/res/layout/recent_tabs_page.xml      |  2 +-
- .../java/res/values-sw600dp/dimens.xml        |  3 ++-
- chrome/android/java/res/values/dimens.xml     |  3 ++-
+ .../java/res/values-sw600dp/dimens.xml        |  3 +-
+ chrome/android/java/res/values/dimens.xml     |  3 +-
  ...ain_forked_with_secondary_ui_container.xml |  2 +-
- .../browser/ChromeBaseAppCompatActivity.java  |  3 +++
- .../chrome/browser/WarmupManager.java         |  7 +++++--
- .../ChromeAccessibilitySettingsDelegate.java  | 19 +++++++++++++++++++
- .../chrome/browser/app/ChromeActivity.java    |  5 ++++-
+ .../browser/ChromeBaseAppCompatActivity.java  |  3 ++
+ .../chrome/browser/WarmupManager.java         |  7 ++-
+ .../ChromeAccessibilitySettingsDelegate.java  | 53 +++++++++++++++++++
+ .../chrome/browser/app/ChromeActivity.java    |  5 +-
  .../layouts/LayoutManagerChromeTablet.java    |  2 +-
  .../layouts/phone/NewTabAnimationLayout.java  |  2 +-
- .../strip/StripLayoutHelperManager.java       |  6 +++++-
- .../scene_layer/TabStripSceneLayer.java       |  8 ++++++++
- .../init/ChromeBrowserInitializer.java        |  2 ++
- .../tabbed_mode/TabbedRootUiCoordinator.java  |  4 +++-
- .../chrome/browser/ui/RootUiCoordinator.java  |  6 +++++-
+ .../strip/StripLayoutHelperManager.java       |  6 ++-
+ .../scene_layer/TabStripSceneLayer.java       |  8 +++
+ .../init/ChromeBrowserInitializer.java        |  2 +
+ .../settings/FragmentDependencyProvider.java  |  5 ++
+ .../tabbed_mode/TabbedRootUiCoordinator.java  |  4 +-
+ .../chrome/browser/ui/RootUiCoordinator.java  |  6 ++-
  chrome/browser/preferences/BUILD.gn           |  1 +
  .../preferences/ChromePreferenceKeys.java     |  1 +
- .../preferences/ChromeSharedPreferences.java  | 12 ++++++++++++
+ .../preferences/ChromeSharedPreferences.java  | 12 +++++
  .../LegacyChromePreferenceKeys.java           |  1 +
- .../ui/desktop_windowing/AppHeaderUtils.java  |  2 ++
+ .../ui/desktop_windowing/AppHeaderUtils.java  |  2 +
  .../omnibox/LocationBarCoordinator.java       |  2 +-
- .../strings/android_chrome_strings.grd        |  7 +++++++
- .../java/res/layout/control_container.xml     |  8 ++++----
+ .../strings/android_chrome_strings.grd        |  7 +++
+ .../java/res/layout/control_container.xml     |  8 +--
  .../java/res/layout/toolbar_tablet.xml        |  2 +-
- .../java/res/values-sw600dp/dimens.xml        |  5 +++--
- .../toolbar/java/res/values/dimens.xml        |  6 ++++--
- .../toolbar/top/ToolbarControlContainer.java  |  8 +++++++-
- .../browser/toolbar/top/ToolbarLayout.java    |  5 ++++-
- .../tab_strip/HeightTransitionHandler.java    |  2 ++
- .../TabStripTransitionCoordinator.java        |  6 +++++-
- .../res/xml/accessibility_preferences.xml     |  5 +++++
- .../accessibility/AccessibilitySettings.java  | 13 +++++++++++++
- .../AccessibilitySettingsDelegate.java        |  2 ++
- .../chromium/ui/base/DeviceFormFactor.java    | 14 ++++++++++++++
- 35 files changed, 152 insertions(+), 26 deletions(-)
+ .../java/res/values-sw600dp/dimens.xml        |  5 +-
+ .../toolbar/java/res/values/dimens.xml        |  6 ++-
+ .../toolbar/top/ToolbarControlContainer.java  |  8 ++-
+ .../browser/toolbar/top/ToolbarLayout.java    |  5 +-
+ .../tab_strip/HeightTransitionHandler.java    |  2 +
+ .../TabStripTransitionCoordinator.java        |  6 ++-
+ .../res/xml/accessibility_preferences.xml     |  5 ++
+ .../accessibility/AccessibilitySettings.java  | 17 ++++++
+ .../AccessibilitySettingsDelegate.java        |  6 +++
+ .../chromium/ui/base/DeviceFormFactor.java    | 14 +++++
+ 36 files changed, 199 insertions(+), 26 deletions(-)
 
 diff --git a/chrome/android/java/res/layout/custom_tabs_control_container.xml b/chrome/android/java/res/layout/custom_tabs_control_container.xml
 --- a/chrome/android/java/res/layout/custom_tabs_control_container.xml
@@ -150,7 +151,22 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.j
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/accessibility/settings/ChromeAccessibilitySettingsDelegate.java
-@@ -66,6 +66,25 @@ public class ChromeAccessibilitySettingsDelegate implements AccessibilitySetting
+@@ -21,6 +21,14 @@ import org.chromium.chrome.browser.flags.CromiteNativeUtils;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+ 
++import org.chromium.chrome.R;
++import android.app.Activity;
++import java.util.function.Supplier;
++import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
++import org.chromium.chrome.browser.ui.messages.snackbar.INeedSnackbarManager;
++import org.chromium.chrome.browser.ui.messages.snackbar.Snackbar;
++import org.chromium.chrome.browser.lifetime.ApplicationLifetime;
++
+ /** The Chrome implementation of AccessibilitySettingsDelegate. */
+ @NullMarked
+ public class ChromeAccessibilitySettingsDelegate implements AccessibilitySettingsDelegate {
+@@ -66,6 +74,31 @@ public class ChromeAccessibilitySettingsDelegate implements AccessibilitySetting
          }
      }
  
@@ -173,9 +189,42 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/accessibility/s
 +        return new ForceTabletUIDelegate();
 +    }
 +
++    private Supplier<SnackbarManager> mSnackbarManagerSupplier;
++
++    public void setSnackbarManagerSupplier(Supplier<SnackbarManager> snackbarManager) {
++        mSnackbarManagerSupplier = snackbarManager;
++    }
++
      private final Profile mProfile;
  
      /**
+@@ -77,6 +110,26 @@ public class ChromeAccessibilitySettingsDelegate implements AccessibilitySetting
+         mProfile = profile;
+     }
+ 
++    @Override
++    public void requestRestart(Activity activity) {
++        Snackbar mSnackbar = Snackbar.make(activity.getString(R.string.ui_relaunch_notice),
++                new SnackbarManager.SnackbarController() {
++                        @Override
++                        public void onDismissNoAction(Object actionData) { }
++
++                        @Override
++                        public void onAction(Object actionData) {
++                                ApplicationLifetime.terminate(true);
++                        }
++                }, Snackbar.TYPE_NOTIFICATION, Snackbar.UMA_UNKNOWN)
++                .setDefaultLines(false)
++                .setAction(activity.getString(R.string.relaunch),
++                        /*actionData*/null)
++                .setDuration(/*durationMs*/70000);
++        if (!mSnackbarManagerSupplier.get().isShowing())
++            mSnackbarManagerSupplier.get().showSnackbar(mSnackbar);
++    }
++
+     @Override
+     public BrowserContextHandle getBrowserContextHandle() {
+         return mProfile;
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
@@ -275,6 +324,21 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/init/ChromeBrow
          ProcessInitializationHandler.getInstance().initializePreNative();
          ProcessInitializationHandler.getInstance().initializePreNativeLibraryLoad();
          try (TraceEvent e = TraceEvent.scoped("ChromeBrowserInitializer.preInflationStartup")) {
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/FragmentDependencyProvider.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/FragmentDependencyProvider.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/FragmentDependencyProvider.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/FragmentDependencyProvider.java
+@@ -247,6 +247,11 @@ public class FragmentDependencyProvider extends FragmentManager.FragmentLifecycl
+         if (fragment instanceof INeedSnackbarManager) {
+             ((INeedSnackbarManager)fragment).setSnackbarManagerSupplier(mSnackbarManagerSupplier);
+         }
++        if (fragment instanceof AccessibilitySettings) {
++            ((ChromeAccessibilitySettingsDelegate)
++                ((AccessibilitySettings) fragment)
++                    .getDelegate()).setSnackbarManagerSupplier(mSnackbarManagerSupplier);
++        }
+         if (fragment instanceof AccountManagementFragment) {
+             ((AccountManagementFragment) fragment)
+                     .setSnackbarManagerSupplier(mSnackbarManagerSupplier);
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
@@ -632,7 +696,18 @@ diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/c
      private PageZoomPreference mPageZoomDefaultZoomPref;
      private ChromeSwitchPreference mPageZoomIncludeOSAdjustment;
      private ChromeSwitchPreference mPageZoomAlwaysShowPref;
-@@ -172,6 +176,12 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
+@@ -108,6 +112,10 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
+         mDelegate = delegate;
+     }
+ 
++    public AccessibilitySettingsDelegate getDelegate() {
++        return mDelegate;
++    }
++
+     @Override
+     public MonotonicObservableSupplier<String> getPageTitle() {
+         return mPageTitle;
+@@ -172,6 +180,12 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
              readerEnableLinks.setOnPreferenceChangeListener(this);
          }
  
@@ -645,7 +720,7 @@ diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/c
          Preference captions = findPreference(PREF_CAPTIONS);
          captions.setOnPreferenceClickListener(
                  preference -> {
-@@ -287,6 +297,9 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
+@@ -287,6 +301,9 @@ public class AccessibilitySettings extends ChromeBaseSettingsFragment
          assertNonNull(mDelegate);
          if (PREF_FORCE_ENABLE_ZOOM.equals(preference.getKey())) {
              mDelegate.getForceEnableZoomAccessibilityDelegate().setValue((Boolean) newValue);
@@ -658,7 +733,23 @@ diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/c
 diff --git a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
 --- a/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
 +++ b/components/browser_ui/accessibility/android/java/src/org/chromium/components/browser_ui/accessibility/AccessibilitySettingsDelegate.java
-@@ -43,6 +43,8 @@ public interface AccessibilitySettingsDelegate {
+@@ -4,6 +4,8 @@
+ 
+ package org.chromium.components.browser_ui.accessibility;
+ 
++import android.app.Activity;
++
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.components.browser_ui.settings.SettingsNavigation;
+@@ -38,11 +40,15 @@ public interface AccessibilitySettingsDelegate {
+         void setValue(boolean value);
+     }
+ 
++    void requestRestart(Activity activity);
++
+     /**
+      * @return The BrowserContextHandle that should be used to read and update settings.
       */
      BrowserContextHandle getBrowserContextHandle();
  
