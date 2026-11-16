@@ -321,9 +321,9 @@ diff --git a/components/android_autofill/browser/java/src/org/chromium/component
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 --- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 +++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
-@@ -89,4 +89,28 @@ found in the LICENSE file.
-         android:key="disable_toolbar_swipeup"
-         android:title="@string/disable_toolbar_swipe_up" />
+@@ -81,4 +81,28 @@ found in the LICENSE file.
+         app:featureName="disable-pull-to-refresh-effect"
+         app:needRestart="true" />
  
 +    <PreferenceCategory
 +        android:key="customize_selecton_popup_section"

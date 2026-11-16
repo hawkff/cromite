@@ -33,7 +33,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/cc/base/features.cc b/cc/base/features.cc
 --- a/cc/base/features.cc
 +++ b/cc/base/features.cc
-@@ -158,6 +158,7 @@ BASE_FEATURE(kInitImageDecodeLastUseTime, base::FEATURE_ENABLED_BY_DEFAULT);
+@@ -150,6 +150,7 @@ BASE_FEATURE(kInitImageDecodeLastUseTime, base::FEATURE_ENABLED_BY_DEFAULT);
  
  BASE_FEATURE(kThrottleRepeatedNoDamageFrames,
               base::FEATURE_DISABLED_BY_DEFAULT);
@@ -41,7 +41,7 @@ diff --git a/cc/base/features.cc b/cc/base/features.cc
  
  BASE_FEATURE_PARAM(int,
                     kThrottleRepeatedNoDamageFramesThreshold1,
-@@ -184,13 +185,7 @@ BASE_FEATURE_PARAM(int,
+@@ -176,13 +177,7 @@ BASE_FEATURE_PARAM(int,
                     2);
  
  // Enabled on Android, after a field trial showed improvements.
@@ -110,10 +110,10 @@ diff --git a/cc/scheduler/scheduler_state_machine.cc b/cc/scheduler/scheduler_st
 diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
 --- a/chrome/android/java/res/xml/privacy_preferences.xml
 +++ b/chrome/android/java/res/xml/privacy_preferences.xml
-@@ -88,6 +88,12 @@ found in the LICENSE file.
-         android:summary="@string/tab_switcher_list_mode_summary"
-         app:featureName="TabSwitcherListMode"
-         app:needRestart="true" />
+@@ -82,6 +82,12 @@ found in the LICENSE file.
+         android:summary="@string/allow_external_intent_requests_summary"
+         app:featureName="AllowExternalIntentRequests"
+         app:needRestart="false" />
 +    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
 +        android:key="throttle_main_thread_to_60hz"
 +        android:title="@string/throttle_main_thread_to_60hz_title"
@@ -199,7 +199,7 @@ diff --git a/components/viz/common/features.cc b/components/viz/common/features.
  
  #if BUILDFLAG(IS_ANDROID)
  #include "base/android/device_info.h"
-@@ -429,6 +430,8 @@ int MaxOverlaysConsidered() {
+@@ -428,6 +429,8 @@ int MaxOverlaysConsidered() {
  }
  
  bool ShouldOnBeginFrameThrottleVideo() {
