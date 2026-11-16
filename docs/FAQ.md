@@ -34,7 +34,7 @@ You can use F-Droid client to install and receive updates via [the official Crom
 Many years of experience with chromium code leads me to think that it is indeed the best browser out there. Its flaws are Google's priority to its customers over its users, but I don't have that problem.
 
 ## Does Cromite support extensions in Android?
-No. But there is an intention to explore this issue further.
+No.
 
 ## Why do push notifications not work on this website?
 
