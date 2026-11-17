@@ -313,5 +313,10 @@ Eyeo-Adblock-for-Cromite.patch
 Fix-build-with-dfmify_dev_ui-disabled.patch
 Fix-build-with-enable_vr-disabled.patch
 Fix-channel-logo-check-in-unbranded-builds.patch
+Show-plain-HTTP-pages-as-dangerous.patch
+Send-a-reduced-Accept-Language-header.patch
+Use-origin-keyed-processes-by-default.patch
+Always-show-trivial-subdomains-in-formatted-URLs.patch
+Turn-off-heap-profiler-reporting.patch
 
 # extension patches

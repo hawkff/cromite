@@ -1,0 +1,29 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:24:57 +0000
+Subject: Use origin-keyed processes by default
+
+Enable the OriginKeyedProcessesByDefault feature. Every origin that does
+not opt out with the "Origin-Agent-Cluster: ?0" response header gets an
+origin-keyed agent cluster and a renderer process locked to that origin,
+so pages from different subdomains of one site never share a process.
+This build already isolates every site and enables strict origin
+isolation, which places each http and https origin in its own process, so
+the number of renderer processes does not change in practice. The feature
+keys those processes by origin rather than by a site URL that happens to
+be an origin, which is how upstream intends per-origin isolation to work,
+and it keeps per-origin processes if strict origin isolation is turned off
+in chrome://flags. GrapheneOS Vanadium uses the same default.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../Use-origin-keyed-processes-by-default.inc                    | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 cromite_flags/content/public/common/content_features_cc/Use-origin-keyed-processes-by-default.inc
+
+diff --git a/cromite_flags/content/public/common/content_features_cc/Use-origin-keyed-processes-by-default.inc b/cromite_flags/content/public/common/content_features_cc/Use-origin-keyed-processes-by-default.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/content/public/common/content_features_cc/Use-origin-keyed-processes-by-default.inc
+@@ -0,0 +1 @@
++SET_CROMITE_FEATURE_ENABLED(kOriginKeyedProcessesByDefault);
+--

@@ -1,0 +1,32 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:24:54 +0000
+Subject: Show plain HTTP pages as dangerous
+
+Pages loaded over plain HTTP that were shown with the WARNING security
+level now get the DANGEROUS level. Potentially trustworthy origins such as
+localhost keep their level. On Android the address bar shows the "Not
+secure" icon and label in red instead of the toolbar color, the toolbar
+stays on screen while the page scrolls, and the page theme color is not
+applied to the browser UI. Anyone on the network path can read and change
+an HTTP page, and the stronger signal makes that harder to overlook, in
+particular after the user continues past the HTTPS-Only Mode warning.
+GrapheneOS Vanadium uses the same default.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ components/security_state/core/security_state.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/components/security_state/core/security_state.cc b/components/security_state/core/security_state.cc
+--- a/components/security_state/core/security_state.cc
++++ b/components/security_state/core/security_state.cc
+@@ -132,7 +132,7 @@ SecurityLevel GetSecurityLevel(
+         return NONE;
+       }
+ #endif  // !BUILDFLAG(IS_ANDROID)
+-      return WARNING;
++      return DANGEROUS;
+     }
+     return NONE;
+   }
+--

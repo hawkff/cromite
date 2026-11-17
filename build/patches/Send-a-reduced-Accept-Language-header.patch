@@ -1,0 +1,31 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:24:55 +0000
+Subject: Send a reduced Accept-Language header
+
+Enable the ReduceAcceptLanguage feature. navigator.languages now exposes
+only the first language of the user's list, the same one that
+navigator.language already reports in this browser. The Accept-Language
+header carries a single language instead of the full list: by default
+that first language, and for an origin that announced its languages, the
+language that the browser negotiated and stored for it. When a site lists
+the languages it offers in an Avail-Language response header and the
+first language is not among them, the browser picks the best match from
+the rest of the user's list, restarts the navigation once with it, and
+remembers the choice for that origin for 30 days. For such an origin the
+header and navigator.languages name different languages. The full language
+list is a stable fingerprinting signal sent to every server, and this
+reduces it to one value. GrapheneOS Vanadium uses the same default.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../cpp/features_cc/Send-a-reduced-Accept-Language-header.inc    | 1 +
+ 1 file changed, 1 insertion(+)
+ create mode 100644 cromite_flags/services/network/public/cpp/features_cc/Send-a-reduced-Accept-Language-header.inc
+
+diff --git a/cromite_flags/services/network/public/cpp/features_cc/Send-a-reduced-Accept-Language-header.inc b/cromite_flags/services/network/public/cpp/features_cc/Send-a-reduced-Accept-Language-header.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/services/network/public/cpp/features_cc/Send-a-reduced-Accept-Language-header.inc
+@@ -0,0 +1 @@
++SET_CROMITE_FEATURE_ENABLED(kReduceAcceptLanguage);
+--
