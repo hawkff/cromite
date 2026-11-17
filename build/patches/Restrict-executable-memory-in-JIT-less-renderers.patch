@@ -1,0 +1,233 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 23:01:36 +0000
+Subject: Restrict executable memory in JIT-less renderers
+
+A renderer for a site with JIT blocked runs V8 with --jitless. V8 then
+runs bytecode in its interpreter and its builtins from the loaded
+library, and keeps its code pages without execute permission, so the
+renderer has no use for new executable memory.
+
+Add two flags for Android, both off by default:
+
+"Block executable memory in renderers without JIT" makes the seccomp
+filter of such a renderer end the renderer when it asks for new
+executable memory through mmap, mmap2, mprotect or pkey_mprotect. Memory
+that is already mapped both writable and executable stays usable, which
+includes the code cache of the Java runtime in renderers on Android
+versions before 17, and the rule does not cover writes through
+/proc/self/mem.
+
+"Report executable memory in renderers without JIT" logs these requests
+and lets them succeed, so that test runs can show whether anything in
+such a renderer still needs executable memory before the block is
+turned on. A renderer in this mode makes one request right after the
+filter starts, which shows in the log that reporting works.
+
+The block takes precedence over the report flag. A renderer counts as
+JIT-less when --jitless is one of its --js-flags, the same test that
+turns on dynamic code prohibition for renderers on Windows. Renderers
+for sites with JIT allowed are not affected.
+
+With either flag, the renderer also logs the executable mappings it
+already has that are writable, shared or anonymous, such as the code
+cache of the Java runtime. The filter cannot take those away.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ ...renderer_main_platform_delegate_android.cc | 93 +++++++++++++++++++
+ ...xecutable-memory-in-JIT-less-renderers.inc | 25 +++++
+ sandbox/policy/features.cc                    | 11 +++
+ sandbox/policy/features.h                     |  2 +
+ 4 files changed, 131 insertions(+)
+ create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Restrict-executable-memory-in-JIT-less-renderers.inc
+
+diff --git a/content/renderer/renderer_main_platform_delegate_android.cc b/content/renderer/renderer_main_platform_delegate_android.cc
+--- a/content/renderer/renderer_main_platform_delegate_android.cc
++++ b/content/renderer/renderer_main_platform_delegate_android.cc
+@@ -12,15 +12,79 @@
+ #include "sandbox/sandbox_buildflags.h"
+ 
+ #if BUILDFLAG(USE_SECCOMP_BPF)
++#include <sys/mman.h>
++
++#include <algorithm>
++#include <string>
++#include <string_view>
++#include <vector>
++
++#include "base/command_line.h"
++#include "base/files/file_path.h"
++#include "base/files/file_util.h"
++#include "base/logging.h"
++#include "base/memory/page_size.h"
++#include "base/strings/string_split.h"
+ #include "sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.h"
+ #include "sandbox/policy/features.h"
+ #include "sandbox/policy/linux/bpf_renderer_policy_linux.h"
+ #include "sandbox/policy/mojom/sandbox.mojom.h"
+ #include "sandbox/policy/sandbox_type.h"
++#include "third_party/blink/public/common/switches.h"
+ #endif
+ 
+ namespace content {
+ 
++#if BUILDFLAG(USE_SECCOMP_BPF)
++namespace {
++
++// Same test as the one that turns on dynamic code prohibition for renderers on
++// Windows. The browser always writes this exact token for renderers with JIT
++// blocked; hand-written --js-flags that turn JIT off with another spelling are
++// not recognized.
++bool IsJitless(const base::CommandLine& command_line) {
++  const std::string js_flags =
++      command_line.GetSwitchValueASCII(blink::switches::kJavaScriptFlags);
++  return std::ranges::contains(
++      base::SplitStringPiece(js_flags, ",", base::TRIM_WHITESPACE,
++                             base::SPLIT_WANT_NONEMPTY),
++      std::string_view("--jitless"));
++}
++
++// Logs the executable mappings that already exist and that are not read-only
++// private file mappings, such as the code cache of a Java runtime. The filter
++// only governs new requests, so these stay usable.
++void LogPreexistingExecMemory() {
++  std::string maps;
++  if (!base::ReadFileToString(base::FilePath("/proc/self/maps"), &maps)) {
++    return;
++  }
++  for (std::string_view line : base::SplitStringPiece(
++           maps, "\n", base::KEEP_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++    // Fields: range, permissions, offset, device, inode, optional path.
++    const std::vector<std::string_view> fields = base::SplitStringPiece(
++        line, " ", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
++    if (fields.size() < 5 || fields[1].size() != 4 || fields[1][2] != 'x') {
++      continue;
++    }
++    const bool read_only_private =
++        fields[1][1] != 'w' && fields[1][3] == 'p';
++    const bool file_backed = fields[4] != "0";
++    // Only the kernel's own executable mappings are skipped by name.
++    const bool kernel_provided =
++        fields.size() > 5 &&
++        (fields[5] == "[vdso]" || fields[5] == "[vectors]" ||
++         fields[5] == "[sigpage]" || fields[5] == "[vsyscall]");
++    if ((read_only_private && file_backed) || kernel_provided) {
++      continue;
++    }
++    LOG(WARNING) << "Executable mapping before the sandbox: " << line;
++  }
++}
++
++}  // namespace
++#endif
++
+ RendererMainPlatformDelegate::RendererMainPlatformDelegate(
+     const MainFunctionParams& parameters) {}
+ 
+@@ -54,6 +118,23 @@ bool RendererMainPlatformDelegate::EnableSandbox() {
+           sandbox::policy::features::kRestrictCloneParameters)) {
+     options.should_restrict_clone_params = true;
+   }
++  // A renderer without JIT needs no new executable memory: V8 runs its
++  // interpreter and builtins from the loaded library.
++  if (IsJitless(*base::CommandLine::ForCurrentProcess())) {
++    if (base::FeatureList::IsEnabled(
++            sandbox::policy::features::kNoExecMemoryInJitlessRenderers)) {
++      options.exec_memory = sandbox::BaselinePolicyAndroid::ExecMemory::kDeny;
++    } else if (base::FeatureList::IsEnabled(
++                   sandbox::policy::features::
++                       kReportExecMemoryInJitlessRenderers)) {
++      options.exec_memory =
++          sandbox::BaselinePolicyAndroid::ExecMemory::kReport;
++    }
++    if (options.exec_memory !=
++        sandbox::BaselinePolicyAndroid::ExecMemory::kAllow) {
++      LogPreexistingExecMemory();
++    }
++  }
+   if (sandbox::policy::SandboxTypeFromCommandLine(
+           *base::CommandLine::ForCurrentProcess()) ==
+           sandbox::mojom::Sandbox::kRenderer &&
+@@ -67,6 +148,18 @@ bool RendererMainPlatformDelegate::EnableSandbox() {
+   }
+ #endif
+   starter.StartSandbox();
++#if BUILDFLAG(USE_SECCOMP_BPF)
++  if (options.exec_memory ==
++      sandbox::BaselinePolicyAndroid::ExecMemory::kReport) {
++    // One request right after the start shows in the log that reporting works.
++    const size_t size = base::GetPageSize();
++    void* probe = mmap(nullptr, size, PROT_READ | PROT_EXEC,
++                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++    if (probe != MAP_FAILED) {
++      munmap(probe, size);
++    }
++  }
++#endif
+ 
+   SetSeccompSandboxStatus(starter.status());
+ 
+diff --git a/cromite_flags/chrome/browser/about_flags_cc/Restrict-executable-memory-in-JIT-less-renderers.inc b/cromite_flags/chrome/browser/about_flags_cc/Restrict-executable-memory-in-JIT-less-renderers.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/chrome/browser/about_flags_cc/Restrict-executable-memory-in-JIT-less-renderers.inc
+@@ -0,0 +1,25 @@
++#ifdef FLAG_SECTION
++
++#if BUILDFLAG(IS_ANDROID)
++
++    {"report-exec-memory-in-jitless-renderers",
++     "Report executable memory in renderers without JIT",
++     "Logs every request of a renderer without JIT to map executable memory "
++     "or to make memory executable, and lets the request succeed. For "
++     "diagnosis only.", kOsAndroid,
++     FEATURE_VALUE_TYPE(
++         sandbox::policy::features::kReportExecMemoryInJitlessRenderers)},
++
++    {"no-exec-memory-in-jitless-renderers",
++     "Block executable memory in renderers without JIT",
++     "Ends a renderer without JIT when it asks for new executable memory "
++     "through mmap, mmap2, mprotect or pkey_mprotect. Memory that is already "
++     "writable and executable, such as the Java runtime's code cache before "
++     "Android 17, stays usable, and writes through /proc/self/mem are not "
++     "covered. Takes precedence over the report flag.", kOsAndroid,
++     FEATURE_VALUE_TYPE(
++         sandbox::policy::features::kNoExecMemoryInJitlessRenderers)},
++
++#endif
++
++#endif // ifdef FLAG_SECTION
+diff --git a/sandbox/policy/features.cc b/sandbox/policy/features.cc
+--- a/sandbox/policy/features.cc
++++ b/sandbox/policy/features.cc
+@@ -141,6 +141,17 @@ BASE_FEATURE(kRestrictRendererPoliciesInBaseline,
+ // When enabled, restrict clone to just flags used by fork and pthread_create on
+ // android.
+ BASE_FEATURE(kRestrictCloneParameters, base::FEATURE_ENABLED_BY_DEFAULT);
++// Logs the requests of renderers running V8 with --jitless to map executable
++// memory or to make memory executable, and lets them succeed.
++CROMITE_FEATURE(kReportExecMemoryInJitlessRenderers,
++                "ReportExecMemoryInJitlessRenderers",
++                base::FEATURE_DISABLED_BY_DEFAULT);
++// Crashes renderers running V8 with --jitless when they ask to map executable
++// memory or to make memory executable. Takes precedence over
++// kReportExecMemoryInJitlessRenderers.
++CROMITE_FEATURE(kNoExecMemoryInJitlessRenderers,
++                "NoExecMemoryInJitlessRenderers",
++                base::FEATURE_DISABLED_BY_DEFAULT);
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+ #if BUILDFLAG(IS_WIN)
+diff --git a/sandbox/policy/features.h b/sandbox/policy/features.h
+--- a/sandbox/policy/features.h
++++ b/sandbox/policy/features.h
+@@ -60,6 +60,8 @@ SANDBOX_POLICY_EXPORT BASE_DECLARE_FEATURE(kSeccompFilterGpuSandbox);
+ SANDBOX_POLICY_EXPORT BASE_DECLARE_FEATURE(kUseRendererProcessPolicy);
+ SANDBOX_POLICY_EXPORT BASE_DECLARE_FEATURE(kRestrictRendererPoliciesInBaseline);
+ SANDBOX_POLICY_EXPORT BASE_DECLARE_FEATURE(kRestrictCloneParameters);
++SANDBOX_POLICY_EXPORT BASE_DECLARE_FEATURE(kReportExecMemoryInJitlessRenderers);
++SANDBOX_POLICY_EXPORT BASE_DECLARE_FEATURE(kNoExecMemoryInJitlessRenderers);
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+ #if BUILDFLAG(IS_WIN)
+--

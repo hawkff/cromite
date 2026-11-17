@@ -327,5 +327,7 @@ Build-the-WebAssembly-interpreter-on-Android.patch
 Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.patch
 Download-filter-lists-and-components-from-the-project-site.patch
 Point-document-links-at-the-hawkff-cromite-repository.patch
+Add-an-executable-memory-rule-to-the-Android-seccomp-policy.patch
+Restrict-executable-memory-in-JIT-less-renderers.patch
 
 # extension patches
