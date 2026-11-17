@@ -1,0 +1,34 @@
+# Unmodified copies of the filter lists below, retrieved 2026-11-17T21:17Z.
+# Each list keeps its own header with its title, homepage and license.
+easylist.txt https://easylist-downloads.adblockplus.org/easylist.txt
+badblock_lite.txt https://badblock.celenity.dev/abp/badblock_lite.txt
+badmojr-1Hosts-master-Lite-adblock.txt https://raw.githubusercontent.com/badmojr/1Hosts/master/Lite/adblock.txt
+abp-filters-anti-cv.txt https://easylist-downloads.adblockplus.org/abp-filters-anti-cv.txt
+abpindo.txt https://easylist-downloads.adblockplus.org/abpindo.txt
+abpvn.txt https://easylist-downloads.adblockplus.org/abpvn.txt
+bulgarian_list.txt https://easylist-downloads.adblockplus.org/bulgarian_list.txt
+dandelion_sprouts_nordic_filters.txt https://easylist-downloads.adblockplus.org/dandelion_sprouts_nordic_filters.txt
+easylistchina.txt https://easylist-downloads.adblockplus.org/easylistchina.txt
+easylistczechslovak.txt https://easylist-downloads.adblockplus.org/easylistczechslovak.txt
+easylistdutch.txt https://easylist-downloads.adblockplus.org/easylistdutch.txt
+easylistgermany.txt https://easylist-downloads.adblockplus.org/easylistgermany.txt
+israellist.txt https://easylist-downloads.adblockplus.org/israellist.txt
+hufilter.txt https://easylist-downloads.adblockplus.org/hufilter.txt
+easylistitaly.txt https://easylist-downloads.adblockplus.org/easylistitaly.txt
+easylistlithuania.txt https://easylist-downloads.adblockplus.org/easylistlithuania.txt
+easylistpolish.txt https://easylist-downloads.adblockplus.org/easylistpolish.txt
+easylistportuguese.txt https://easylist-downloads.adblockplus.org/easylistportuguese.txt
+easylistspanish.txt https://easylist-downloads.adblockplus.org/easylistspanish.txt
+global-filters.txt https://easylist-downloads.adblockplus.org/global-filters.txt
+indianlist.txt https://easylist-downloads.adblockplus.org/indianlist.txt
+japanese-filters.txt https://easylist-downloads.adblockplus.org/japanese-filters.txt
+koreanlist.txt https://easylist-downloads.adblockplus.org/koreanlist.txt
+latvianlist.txt https://easylist-downloads.adblockplus.org/latvianlist.txt
+liste_ar.txt https://easylist-downloads.adblockplus.org/liste_ar.txt
+liste_fr.txt https://easylist-downloads.adblockplus.org/liste_fr.txt
+rolist.txt https://easylist-downloads.adblockplus.org/rolist.txt
+ruadlist.txt https://easylist-downloads.adblockplus.org/ruadlist.txt
+turkish-filters.txt https://easylist-downloads.adblockplus.org/turkish-filters.txt
+fanboy-notifications.txt https://easylist-downloads.adblockplus.org/fanboy-notifications.txt
+easyprivacy.txt https://easylist-downloads.adblockplus.org/easyprivacy.txt
+fanboy-social.txt https://easylist-downloads.adblockplus.org/fanboy-social.txt
