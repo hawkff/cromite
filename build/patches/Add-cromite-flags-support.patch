@@ -42,7 +42,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../browser/flags/ChromeFeatureList.java      |  14 +-
  .../flags/cromite/include_all_directory.java  |   1 +
  .../java_template/CromiteCachedFlag.java.tmpl |  47 +++++
- .../settings/ChromeBaseSettingsFragment.java  |  51 +++++
+ .../settings/ChromeBaseSettingsFragment.java  |  56 ++++++
  .../strings/android_chrome_strings.grd        |   1 +
  .../Add-cromite-flags-support.grdp            |   9 +
  .../placeholder.txt                           |   1 +
@@ -113,7 +113,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  third_party/blink/public/common/features.h    |   1 +
  ui/base/ui_base_features.cc                   |   1 +
  ui/base/ui_base_features.h                    |   1 +
- 100 files changed, 939 insertions(+), 38 deletions(-)
+ 100 files changed, 944 insertions(+), 38 deletions(-)
  create mode 100644 base/android/java/src/org/chromium/base/ImmutableFlagWithDefault.java
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/include_all_directory.java
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/java_template/CromiteCachedFlag.java.tmpl
@@ -1106,7 +1106,7 @@ diff --git a/chrome/browser/settings/android/java/src/org/chromium/chrome/browse
  /**
   * Base class for settings in Chrome.
   *
-@@ -41,6 +49,49 @@ public abstract class ChromeBaseSettingsFragment extends PreferenceFragmentCompa
+@@ -41,6 +49,54 @@ public abstract class ChromeBaseSettingsFragment extends PreferenceFragmentCompa
      private Profile mProfile;
      private SettingsCustomTabLauncher mCustomTabLauncher;
      private @Nullable PreferenceUpdateObserver mPreferenceUpdateObserver;
@@ -1145,8 +1145,13 @@ diff --git a/chrome/browser/settings/android/java/src/org/chromium/chrome/browse
 +                switchPref.setOnPreferenceChangeListener(
 +                        (preference, newValue) -> {
 +                            CromiteNativeUtils.setFlagEnabled(featureName, (boolean) newValue);
-+                            if (switchPref.needRestart()) {
-+                                mRequireRestartDelegateSupplier.get().RequireRestart();
++                            // Some settings hosts provide no restart delegate.
++                            RequireRestartDelegate restartDelegate =
++                                    mRequireRestartDelegateSupplier != null
++                                            ? mRequireRestartDelegateSupplier.get()
++                                            : null;
++                            if (switchPref.needRestart() && restartDelegate != null) {
++                                restartDelegate.RequireRestart();
 +                            }
 +                            return true;
 +                        });

@@ -9,9 +9,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/android/chrome_java_resources.gni      |   2 +-
  .../android/java/res/xml/main_preferences.xml |   4 +-
  .../res/xml/privacy_preferences_cromite.xml   | 185 ++++++++++++++++++
- .../privacy/settings/PrivacySettings.java     |   6 +-
+ .../privacy/settings/PrivacySettings.java     |  23 +--
  .../Cromite-settings-ui.grdp                  |  15 ++
- 5 files changed, 207 insertions(+), 5 deletions(-)
+ 5 files changed, 209 insertions(+), 20 deletions(-)
  create mode 100644 chrome/android/java/res/xml/privacy_preferences_cromite.xml
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp
 
@@ -240,7 +240,15 @@ new file mode 100644
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
-@@ -200,7 +200,7 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -5,7 +5,6 @@
+ package org.chromium.chrome.browser.privacy.settings;
+ 
+ import static org.chromium.build.NullUtil.assumeNonNull;
+-import static org.chromium.chrome.browser.privacy.settings.UniversalOptOutSettings.shouldShowUniversalOptOutSettings;
+ import static org.chromium.components.content_settings.PrefNames.COOKIE_CONTROLS_MODE;
+ 
+ import android.content.Context;
+@@ -200,7 +199,7 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
      public void onCreatePreferencesCromite(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
          mPageTitle.set(getString(R.string.prefs_privacy_security));
  
@@ -249,7 +257,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  
          mSnackbar = Snackbar.make(
                          getActivity().getString(R.string.ui_relaunch_notice),
-@@ -273,7 +273,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -273,7 +272,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
  
          ChromeSwitchPreference passwordLeakTogglePref =
                  (ChromeSwitchPreference) findPreference(PREF_PASSWORD_LEAK_DETECTION);
@@ -260,6 +268,39 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  
          mSearchSuggestions = (ChromeSwitchPreference) findPreference(PREF_SEARCH_SUGGESTIONS);
          mSearchSuggestions.setOnPreferenceChangeListener(this);
+@@ -400,20 +401,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+             scrollToPreference(PREF_ADVANCED_PROTECTION_INFO);
+         }
+ 
+-        boolean universalOptOutSettingsVisible = shouldShowUniversalOptOutSettings(getProfile());
+-        if (!universalOptOutSettingsVisible) {
+-            getPreferenceScreen().removePreference(findPreference(PREF_UNIVERSAL_OPT_OUT));
+-        }
+-        recordUniversalOptOutSettingsVisibility(universalOptOutSettingsVisible);
+-
+         updatePreferences();
+     }
+ 
+-    private void recordUniversalOptOutSettingsVisibility(boolean universalOptOutSettingsVisible) {
+-        RecordHistogram.recordBooleanHistogram(
+-                "Privacy.UniversalOptOut.SettingsVisibility", universalOptOutSettingsVisible);
+-    }
+-
+     private static boolean isAdvancedProtectionEnabled() {
+         return AdvancedProtectionStatusManagerAndroidBridge.isUnderAdvancedProtection();
+     }
+@@ -857,9 +847,8 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+                                 frag, PREF_HTTPS_FIRST_MODE_LEGACY, textId);
+                     }
+ 
+-                    if (!shouldShowUniversalOptOutSettings(profile)) {
+-                        indexData.removeEntry(getUniqueId(PREF_UNIVERSAL_OPT_OUT));
+-                    }
++                    // The page shows the Global Privacy Control setting instead.
++                    indexData.removeEntry(getUniqueId(PREF_UNIVERSAL_OPT_OUT));
+ 
+                     if (shouldHideAdvancedProtectionInfoPref()) {
+                         indexData.removeEntry(getUniqueId(PREF_ADVANCED_PROTECTION_INFO));
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp
 new file mode 100644
 --- /dev/null

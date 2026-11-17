@@ -41,7 +41,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../autofill/AutofillManagerWrapper.java      |  5 +-
  .../components/autofill/AutofillProvider.java |  6 ++
  .../BrowserSelectionActionMenuDelegate.java   | 27 ++++++
- .../browser/content_autofill_driver.cc        | 11 +++
+ .../browser/content_autofill_driver.cc        | 17 ++++
  .../content/browser/content_autofill_driver.h | 10 +++
  .../content_autofill_driver_factory.cc        | 12 +++
  .../content/renderer/autofill_agent.cc        |  3 -
@@ -57,7 +57,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../core/browser/password_form_manager.cc     |  4 +
  .../core/browser/password_manager_client.cc   |  2 +
  .../core/browser/password_manager_client.h    |  2 +
- 42 files changed, 252 insertions(+), 131 deletions(-)
+ 42 files changed, 258 insertions(+), 131 deletions(-)
  create mode 100644 components/android_autofill/browser/java/src/org/chromium/components/autofill/BrowserSelectionActionMenuDelegate.java
 
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/AutofillOptionsLauncher.java b/chrome/android/java/src/org/chromium/chrome/browser/AutofillOptionsLauncher.java
@@ -771,21 +771,27 @@ new file mode 100644
 diff --git a/components/autofill/content/browser/content_autofill_driver.cc b/components/autofill/content/browser/content_autofill_driver.cc
 --- a/components/autofill/content/browser/content_autofill_driver.cc
 +++ b/components/autofill/content/browser/content_autofill_driver.cc
-@@ -307,6 +307,13 @@ void RouteToManager(
-         (manager.*manager_fun)(
-             WithNewVersion(std::forward<ManagerArgs>(args))...,
-             ContentAutofillDriverAttorney::autofill_manager_pass_key());
+@@ -304,6 +304,19 @@ void RouteToManager(
+   return (router.*router_fun)(
+       [&manager_fun](autofill::AutofillDriver& target, ManagerArgs... args) {
+         AutofillManager& manager = target.GetAutofillManager();
 +        raw_ptr<AutofillManager> secondary_autofill_manager =
 +            target.secondary_autofill_manager();
 +        if (secondary_autofill_manager) {
++          // By-value arguments are moved into the call that receives them,
++          // so the first manager gets copies.
++          (manager.*manager_fun)(
++              WithNewVersion(ManagerArgs(args))...,
++              ContentAutofillDriverAttorney::autofill_manager_pass_key());
 +          (secondary_autofill_manager->*manager_fun)(
 +              WithNewVersion(std::forward<ManagerArgs>(args))...,
 +              ContentAutofillDriverAttorney::autofill_manager_pass_key());
++          return;
 +        }
-       },
-       source, Lift(source, std::forward<ActualArgs>(args))...);
- }
-@@ -786,6 +793,10 @@ ContentAutofillDriver::GetAutofillAgent() {
+         (manager.*manager_fun)(
+             WithNewVersion(std::forward<ManagerArgs>(args))...,
+             ContentAutofillDriverAttorney::autofill_manager_pass_key());
+@@ -786,6 +799,10 @@ ContentAutofillDriver::GetAutofillAgent() {
    return autofill_agent_;
  }
  

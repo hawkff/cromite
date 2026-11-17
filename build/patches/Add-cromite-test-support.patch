@@ -16,7 +16,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/browser/BUILD.gn                       |   5 +
  chrome/browser/android/devtools_server.cc     |  10 +
  ...ontent_browser_client_receiver_bindings.cc |  10 +
- .../cromite/cromite_private_api_host.cc       |  74 +++++++
+ .../cromite/cromite_private_api_host.cc       |  86 ++++++++
  .../cromite/cromite_private_api_host.h        |  54 +++++
  .../browser/flags/cromite/sActAsWebView.java  |  33 +++
  .../cromite/sEnableCromiteTestSupport.java    |  33 +++
@@ -36,7 +36,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../about_flags_cc/Enable-test-support.inc    |  19 ++
  .../Enable-test-support.inc                   |   7 +
  .../Enable-test-support.inc                   |   2 +
- 26 files changed, 581 insertions(+), 7 deletions(-)
+ 26 files changed, 593 insertions(+), 7 deletions(-)
  create mode 100644 chrome/browser/cromite/cromite_private_api_host.cc
  create mode 100644 chrome/browser/cromite/cromite_private_api_host.h
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sActAsWebView.java
@@ -201,18 +201,23 @@ diff --git a/chrome/browser/cromite/cromite_private_api_host.cc b/chrome/browser
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/cromite/cromite_private_api_host.cc
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,86 @@
 +#include "chrome/browser/cromite/cromite_private_api_host.h"
 +
++#include "base/feature_list.h"
 +#include "base/json/json_writer.h"
 +
 +#include "chrome/browser/browser_process.h"
++#include "chrome/common/webui_url_constants.h"
 +#include "components/component_updater/component_updater_service.h"
 +#include "components/update_client/crx_update_item.h"
 +#include "content/public/browser/document_user_data.h"
 +#include "content/public/browser/navigation_handle.h"
 +#include "content/public/browser/render_frame_host.h"
 +#include "content/public/browser/site_instance.h"
++#include "content/public/common/content_features.h"
++#include "url/gurl.h"
++#include "url/origin.h"
 +
 +CromitePrivateApiHost::CromitePrivateApiHost(
 +    content::RenderFrameHost* rfh)
@@ -272,6 +277,13 @@ new file mode 100644
 +    mojo::PendingAssociatedReceiver<
 +        chrome::mojom::CromitePrivateApiExtension> receiver,
 +    content::RenderFrameHost* render_frame_host) {
++  // The renderer only exposes the API on chrome://version with the feature
++  // enabled. Check both here too, so that no other document can bind it.
++  if (!base::FeatureList::IsEnabled(features::kEnableCromiteTestSupport) ||
++      render_frame_host->GetLastCommittedOrigin() !=
++          url::Origin::Create(GURL(chrome::kChromeUIVersionURL))) {
++    return;
++  }
 +  CromitePrivateApiHost* api_host =
 +      CromitePrivateApiHost::GetOrCreateForCurrentDocument(render_frame_host);
 +  api_host->BindReceiver(std::move(receiver));
