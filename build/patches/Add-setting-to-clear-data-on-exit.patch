@@ -36,10 +36,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  components/favicon/core/favicon_database.h    |  3 +
  .../search_engines/template_url_service.cc    |  1 +
  content/browser/btm/btm_service_impl.cc       |  2 +-
- content/browser/storage_partition_impl.cc     |  2 +
  .../public/browser/browsing_data_remover.h    |  5 ++
  .../Add-setting-to-clear-data-on-exit.inc     |  8 ++
- 35 files changed, 379 insertions(+), 37 deletions(-)
+ 34 files changed, 377 insertions(+), 37 deletions(-)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/browsing_data/ClearBrowsingDataFragmentAtStart.java
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-setting-to-clear-data-on-exit.grdp
  create mode 100644 components/browsing_data/core/clear_browsing_data_tab.h
@@ -968,25 +967,6 @@ diff --git a/content/browser/btm/btm_service_impl.cc b/content/browser/btm/btm_s
          BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB |
              BrowsingDataRemover::ORIGIN_TYPE_PROTECTED_WEB,
          std::move(filter), clearer);
-diff --git a/content/browser/storage_partition_impl.cc b/content/browser/storage_partition_impl.cc
---- a/content/browser/storage_partition_impl.cc
-+++ b/content/browser/storage_partition_impl.cc
-@@ -19,6 +19,7 @@
- #include "base/command_line.h"
- #include "base/dcheck_is_on.h"
- #include "base/feature_list.h"
-+#include "base/files/file_util.h"
- #include "base/functional/bind.h"
- #include "base/functional/callback_helpers.h"
- #include "base/functional/concurrent_closures.h"
-@@ -1588,6 +1589,7 @@ void StoragePartitionImpl::Initialize(
-     // TODO(crbug.com/562462615): CHECK-exclusion: Convert to a CHECK once we
-     // are confident it won't be triggered.
-     DCHECK_GE(settings.size_in_bytes(), 0);
-+    base::DeletePathRecursively(code_cache_path);
-     GetGeneratedCodeCacheContext()->Initialize(code_cache_path,
-                                                settings.size_in_bytes());
-   }
 diff --git a/content/public/browser/browsing_data_remover.h b/content/public/browser/browsing_data_remover.h
 --- a/content/public/browser/browsing_data_remover.h
 +++ b/content/public/browser/browsing_data_remover.h
