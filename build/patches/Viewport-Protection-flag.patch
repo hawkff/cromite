@@ -24,7 +24,7 @@ Require: Content-settings-infrastructure.patch
  .../blink/renderer/core/events/mouse_event.h  |  19 ++-
  .../renderer/core/events/pointer_event.h      |  11 ++
  .../renderer/core/exported/web_view_impl.cc   |   2 +-
- .../renderer/core/frame/local_dom_window.cc   |  54 +++++++-
+ .../renderer/core/frame/local_dom_window.cc   |  53 +++++++-
  .../blink/renderer/core/frame/local_frame.cc  |  20 ++-
  .../blink/renderer/core/frame/local_frame.h   |   6 +-
  .../core/frame/local_frame_mojo_handler.cc    |   5 +-
@@ -36,7 +36,7 @@ Require: Content-settings-infrastructure.patch
  third_party/blink/renderer/core/page/page.cc  | 117 ++++++++++++++++++
  third_party/blink/renderer/core/page/page.h   |  10 ++
  .../renderer/core/style/computed_style.h      |   6 +
- 27 files changed, 480 insertions(+), 22 deletions(-)
+ 27 files changed, 479 insertions(+), 22 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteViewportContentSetting.java
  create mode 100644 components/browser_ui/strings/bromite_content_settings/viewport.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/viewport.inc
@@ -495,7 +495,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
    // TODO(japhet): window-open-noopener.html?_top and several tests in
    // html/browsers/windows/browsing-context-names/ appear to require that
    // the special case target names (_top, _parent, _self) ignore opener
-@@ -2662,6 +2703,15 @@ DOMWindow* LocalDOMWindow::openPictureInPictureWindow(
+@@ -2662,6 +2703,14 @@ DOMWindow* LocalDOMWindow::openPictureInPictureWindow(
    DCHECK(result.new_window);
  
    result.frame->Navigate(frame_request, WebFrameLoadType::kStandard);
@@ -506,7 +506,6 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
 +  result.frame->GetPage()->CalculateEmulatedScreenSetting(
 +    To<LocalFrame>(result.frame),
 +    /*force*/ protection_enabled);
-+  LOG(INFO) << "---protection_enabled " << protection_enabled;
 +
    LocalDOMWindow* pip_dom_window =
        To<LocalDOMWindow>(result.frame->DomWindow());
