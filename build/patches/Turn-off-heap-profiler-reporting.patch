@@ -1,0 +1,29 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:24:59 +0000
+Subject: Turn off heap profiler reporting
+
+Disable the HeapProfilerReporting feature. With it enabled, the browser
+decides at every start, with a probability of 0.25% on the Android stable
+channel, to sample heap allocations in the browser and its child processes
+and to pass periodic snapshots to the metrics service. This build never
+uploads metrics, so that work only cost CPU time and memory. Heap sampling
+started from DevTools or by tracing uses its own sessions and does not
+depend on this feature.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ components/heap_profiling/in_process/heap_profiler_parameters.cc | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/components/heap_profiling/in_process/heap_profiler_parameters.cc b/components/heap_profiling/in_process/heap_profiler_parameters.cc
+--- a/components/heap_profiling/in_process/heap_profiler_parameters.cc
++++ b/components/heap_profiling/in_process/heap_profiler_parameters.cc
+@@ -126,6 +126,7 @@ constexpr base::FeatureParam<double> kUtilityHashSetLoadFactor{
+ }  // namespace
+ 
+ BASE_FEATURE(kHeapProfilerReporting, base::FEATURE_ENABLED_BY_DEFAULT);
++SET_CROMITE_FEATURE_DISABLED(kHeapProfilerReporting);
+ BASE_FEATURE(kHeapProfilerChurnReporting, base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ const base::FeatureParam<double> kHeapChurnSubsamplingChance{
+--

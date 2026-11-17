@@ -1,0 +1,32 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:24:58 +0000
+Subject: Always show trivial subdomains in formatted URLs
+
+url_formatter no longer removes trivial subdomains such as "www." from the
+host when it formats a URL, even if the caller passes
+kFormatUrlOmitTrivialSubdomains. This covers every caller, for example the
+text of omnibox suggestions and the short origin labels that UrlFormatter
+returns on Android, not only the address bar preference that this series
+already changes. "www.example.com" and "example.com" are different hosts
+that can have different owners, so hiding the prefix can mislead. Displayed
+URLs become a few characters longer. GrapheneOS Vanadium uses the same
+default.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ components/url_formatter/url_formatter.cc | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/components/url_formatter/url_formatter.cc b/components/url_formatter/url_formatter.cc
+--- a/components/url_formatter/url_formatter.cc
++++ b/components/url_formatter/url_formatter.cc
+@@ -598,6 +598,8 @@ std::u16string FormatUrlWithAdjustments(
+     base::OffsetAdjuster::Adjustments* adjustments) {
+   DCHECK(adjustments);
+   adjustments->clear();
++  // A subdomain such as "www." is part of the host, so it is always shown.
++  format_types &= ~kFormatUrlOmitTrivialSubdomains;
+   url::Parsed parsed_temp;
+   if (!new_parsed) {
+     new_parsed = &parsed_temp;
+--
