@@ -1,0 +1,99 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 08:52:01 +0000
+Subject: Do not resolve link hosts through the system resolver
+
+When another app opened a link, or a web app was launched, the browser
+resolved the host name of the link in the background with
+InetAddress.getByName() to warm up the DNS cache before any tab existed.
+That lookup runs through the Android system resolver, outside the browser
+network stack, so it ignores the secure DNS setting and any proxy
+configured in the browser, and it reveals the host to the system resolver
+before the user's settings apply. WarmupManager no longer performs the
+lookup, for every link, including links that open in regular tabs. The
+browser resolves the host itself when it loads the page, so the first
+connection for a link from another app starts slightly later.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../chrome/browser/WarmupManager.java         | 51 ++-----------------
+ 1 file changed, 4 insertions(+), 47 deletions(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java b/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java
+@@ -41,7 +41,6 @@ import org.chromium.base.ThreadUtils;
+ import org.chromium.base.TraceEvent;
+ import org.chromium.base.library_loader.LibraryLoader;
+ import org.chromium.base.metrics.RecordHistogram;
+-import org.chromium.base.task.AsyncTask;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.R;
+@@ -68,10 +67,6 @@ import org.chromium.url.Origin;
+ 
+ import java.lang.annotation.Retention;
+ import java.lang.annotation.RetentionPolicy;
+-import java.net.InetAddress;
+-import java.net.MalformedURLException;
+-import java.net.URL;
+-import java.net.UnknownHostException;
+ import java.util.HashMap;
+ import java.util.HashSet;
+ import java.util.Map;
+@@ -523,51 +518,13 @@ public class WarmupManager {
+     }
+ 
+     /**
+-     * Launches a background DNS query for a given URL.
+-     *
+-     * @param url URL from which the domain to query is extracted.
+-     */
+-    private void prefetchDnsForUrlInBackground(final String url) {
+-        mDnsRequestsInFlight.add(url);
+-        new AsyncTask<Void>() {
+-            @Override
+-            protected Void doInBackground() {
+-                try (TraceEvent e =
+-                        TraceEvent.scoped("WarmupManager.prefetchDnsForUrlInBackground")) {
+-                    InetAddress.getByName(new URL(url).getHost());
+-                } catch (MalformedURLException e) {
+-                    // We don't do anything with the result of the request, it
+-                    // is only here to warm up the cache, thus ignoring the
+-                    // exception is fine.
+-                } catch (UnknownHostException e) {
+-                    // As above.
+-                }
+-                return null;
+-            }
+-
+-            @Override
+-            protected void onPostExecute(Void result) {
+-                mDnsRequestsInFlight.remove(url);
+-                if (mPendingPreconnectWithProfile.containsKey(url)) {
+-                    Profile profile = mPendingPreconnectWithProfile.get(url);
+-                    mPendingPreconnectWithProfile.remove(url);
+-                    maybePreconnectUrlAndSubResources(profile, url);
+-                }
+-            }
+-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+-    }
+-
+-    /** Launches a background DNS query for a given URL.
++     * Does nothing. A lookup here would go through the system resolver, outside the browser
++     * network stack, and so ignore the secure DNS setting and any proxy set in the browser.
+      *
+      * @param context The Application context.
+-     * @param url URL from which the domain to query is extracted.
++     * @param url URL of the link.
+      */
+-    public void maybePrefetchDnsForUrlInBackground(Context context, String url) {
+-        try (TraceEvent e = TraceEvent.scoped("WarmupManager.maybePrefetchDnsForUrlInBackground")) {
+-            ThreadUtils.assertOnUiThread();
+-            prefetchDnsForUrlInBackground(url);
+-        }
+-    }
++    public void maybePrefetchDnsForUrlInBackground(Context context, String url) {}
+ 
+     /**
+      * Starts asynchronous initialization of the preconnect predictor.
+--
