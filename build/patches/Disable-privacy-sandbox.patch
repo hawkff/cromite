@@ -11,8 +11,6 @@ Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  chrome/android/BUILD.gn                                   | 1 -
- chrome/browser/chrome_content_browser_client.cc           | 2 +-
- .../first_party_sets/first_party_sets_policy_service.cc   | 2 ++
  .../privacy_sandbox/privacy_sandbox_service_impl.cc       | 3 ++-
  chrome/test/BUILD.gn                                      | 2 --
  .../browser_ui/site_settings/CookieSettings.java          | 4 ++--
@@ -21,15 +19,12 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../privacy_sandbox_attestations.cc                       | 8 +++-----
  components/privacy_sandbox/privacy_sandbox_features.cc    | 2 ++
  components/privacy_sandbox/privacy_sandbox_prefs.cc       | 2 +-
- .../components/signin/base/AccountCapabilities.java       | 3 +--
- .../public/identity_manager/account_capabilities.cc       | 2 +-
- content/public/browser/content_browser_client.cc          | 2 +-
  .../common/features_cc/Disable-privacy-sandbox.inc        | 1 +
  .../content_features_cc/Disable-privacy-sandbox.inc       | 1 +
  .../public/cpp/features_cc/Disable-privacy-sandbox.inc    | 1 +
  .../blink/common/features_cc/Disable-privacy-sandbox.inc  | 1 +
  third_party/blink/common/features.cc                      | 1 +
- 19 files changed, 22 insertions(+), 24 deletions(-)
+ 14 files changed, 16 insertions(+), 19 deletions(-)
  create mode 100644 cromite_flags/content/common/features_cc/Disable-privacy-sandbox.inc
  create mode 100644 cromite_flags/content/public/common/content_features_cc/Disable-privacy-sandbox.inc
  create mode 100644 cromite_flags/services/network/public/cpp/features_cc/Disable-privacy-sandbox.inc
@@ -38,7 +33,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
 --- a/chrome/android/BUILD.gn
 +++ b/chrome/android/BUILD.gn
-@@ -1832,7 +1832,6 @@ if (_is_default_toolchain) {
+@@ -1857,7 +1857,6 @@ if (_is_default_toolchain) {
    java_group("chrome_public_non_pak_assets") {
      deps = [
        "//chrome/android/webapk/libs/runtime_library:runtime_library_assets",
@@ -46,41 +41,10 @@ diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
      ]
    }
  
-diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
---- a/chrome/browser/chrome_content_browser_client.cc
-+++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -8542,7 +8542,7 @@ bool ChromeContentBrowserClient::ShouldDisableOriginAgentClusterDefault(
- }
- 
- bool ChromeContentBrowserClient::WillProvidePublicFirstPartySets() {
--  return !is_minimal_mode_ &&
-+  return ((false)) && !is_minimal_mode_ &&
-          !base::CommandLine::ForCurrentProcess()->HasSwitch(
-              switches::kDisableComponentUpdate);
- }
-diff --git a/chrome/browser/first_party_sets/first_party_sets_policy_service.cc b/chrome/browser/first_party_sets/first_party_sets_policy_service.cc
---- a/chrome/browser/first_party_sets/first_party_sets_policy_service.cc
-+++ b/chrome/browser/first_party_sets/first_party_sets_policy_service.cc
-@@ -45,6 +45,7 @@ network::mojom::FirstPartySetsReadyEventPtr MakeReadyEvent(
- }
- 
- ServiceState GetServiceState(Profile* profile, bool pref_enabled) {
-+  if ((true)) return ServiceState::kPermanentlyDisabled;
-   if (profile->IsSystemProfile() || profile->IsGuestSession() ||
-       profile->IsOffTheRecord()) {
-     return ServiceState::kPermanentlyDisabled;
-@@ -88,6 +89,7 @@ void FirstPartySetsPolicyService::Init() {
- 
-   service_state_ = GetServiceState(
-       profile, privacy_sandbox_settings_->AreRelatedWebsiteSetsEnabled());
-+  service_state_ = ServiceState::kPermanentlyDisabled;
- 
-   if (service_state_ == ServiceState::kPermanentlyDisabled ||
-       service_state_ == ServiceState::kDisabled) {
 diff --git a/chrome/browser/privacy_sandbox/privacy_sandbox_service_impl.cc b/chrome/browser/privacy_sandbox/privacy_sandbox_service_impl.cc
 --- a/chrome/browser/privacy_sandbox/privacy_sandbox_service_impl.cc
 +++ b/chrome/browser/privacy_sandbox/privacy_sandbox_service_impl.cc
-@@ -94,7 +94,7 @@ void PrivacySandboxServiceImpl::Shutdown() {
+@@ -89,7 +89,7 @@ void PrivacySandboxServiceImpl::Shutdown() {
  void PrivacySandboxServiceImpl::SetRelatedWebsiteSetsDataAccessEnabled(
      bool enabled) {
    pref_service_->SetBoolean(prefs::kPrivacySandboxRelatedWebsiteSetsEnabled,
@@ -89,7 +53,7 @@ diff --git a/chrome/browser/privacy_sandbox/privacy_sandbox_service_impl.cc b/ch
  }
  
  bool PrivacySandboxServiceImpl::IsRelatedWebsiteSetsDataAccessEnabled() const {
-@@ -155,6 +155,7 @@ void PrivacySandboxServiceImpl::RecordFirstPartySetsStateHistogram() {
+@@ -137,6 +137,7 @@ void PrivacySandboxServiceImpl::RecordFirstPartySetsStateHistogram() {
  }
  
  void PrivacySandboxServiceImpl::LogPrivacySandboxState() {
@@ -100,7 +64,7 @@ diff --git a/chrome/browser/privacy_sandbox/privacy_sandbox_service_impl.cc b/ch
 diff --git a/chrome/test/BUILD.gn b/chrome/test/BUILD.gn
 --- a/chrome/test/BUILD.gn
 +++ b/chrome/test/BUILD.gn
-@@ -1497,8 +1497,6 @@ if (is_android) {
+@@ -862,8 +862,6 @@ if (is_android) {
        "//components/privacy_sandbox/privacy_sandbox_attestations",
        "//components/privacy_sandbox/privacy_sandbox_attestations:metrics",
        "//components/privacy_sandbox/privacy_sandbox_attestations:test_support",
@@ -219,43 +183,6 @@ diff --git a/components/privacy_sandbox/privacy_sandbox_prefs.cc b/components/pr
        user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
  }
  
-diff --git a/components/signin/public/android/java/src/org/chromium/components/signin/base/AccountCapabilities.java b/components/signin/public/android/java/src/org/chromium/components/signin/base/AccountCapabilities.java
---- a/components/signin/public/android/java/src/org/chromium/components/signin/base/AccountCapabilities.java
-+++ b/components/signin/public/android/java/src/org/chromium/components/signin/base/AccountCapabilities.java
-@@ -88,8 +88,7 @@ public class AccountCapabilities {
-      * @return canRunChromePrivacySandboxTrials capability value.
-      */
-     public @Tribool int canRunChromePrivacySandboxTrials() {
--        return getCapabilityByName(
--                AccountCapabilitiesConstants.CAN_RUN_CHROME_PRIVACY_SANDBOX_TRIALS_CAPABILITY_NAME);
-+        return Tribool.FALSE;
-     }
- 
-     /**
-diff --git a/components/signin/public/identity_manager/account_capabilities.cc b/components/signin/public/identity_manager/account_capabilities.cc
---- a/components/signin/public/identity_manager/account_capabilities.cc
-+++ b/components/signin/public/identity_manager/account_capabilities.cc
-@@ -159,7 +159,7 @@ AccountCapabilities::can_make_chrome_search_engine_choice_screen_choice()
- #if !BUILDFLAG(IS_IOS)
- signin::Tribool AccountCapabilities::can_run_chrome_privacy_sandbox_trials()
-     const {
--  return GetCapabilityByName(kCanRunChromePrivacySandboxTrialsCapabilityName);
-+  return signin::Tribool::kFalse;
- }
- #endif
- 
-diff --git a/content/public/browser/content_browser_client.cc b/content/public/browser/content_browser_client.cc
---- a/content/public/browser/content_browser_client.cc
-+++ b/content/public/browser/content_browser_client.cc
-@@ -1689,7 +1689,7 @@ bool ContentBrowserClient::ShouldPreconnectNavigation(
- }
- 
- bool ContentBrowserClient::IsFirstPartySetsEnabled() {
--  return true;
-+  return false;
- }
- 
- bool ContentBrowserClient::WillProvidePublicFirstPartySets() {
 diff --git a/cromite_flags/content/common/features_cc/Disable-privacy-sandbox.inc b/cromite_flags/content/common/features_cc/Disable-privacy-sandbox.inc
 new file mode 100644
 --- /dev/null
@@ -283,7 +210,7 @@ new file mode 100644
 diff --git a/third_party/blink/common/features.cc b/third_party/blink/common/features.cc
 --- a/third_party/blink/common/features.cc
 +++ b/third_party/blink/common/features.cc
-@@ -2482,6 +2482,7 @@ BASE_FEATURE(kXrDevice, base::FEATURE_DISABLED_BY_DEFAULT);
+@@ -2502,6 +2502,7 @@ BASE_FEATURE(kXrDevice, base::FEATURE_DISABLED_BY_DEFAULT);
  // constants for features in the section above.
  
  bool IsAllowURNsInIframeEnabled() {

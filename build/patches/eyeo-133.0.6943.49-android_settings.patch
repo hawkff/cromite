@@ -6,8 +6,8 @@ Based on Chromium 133.0.6943.49
 
 Pre-requisites: eyeo Browser Ad filtering Solution: Base Module and Android API Module
 ---
- chrome/android/BUILD.gn                       |   8 +
- .../android/java/res/xml/main_preferences.xml |   8 +
+ chrome/android/BUILD.gn                       |   7 +
+ .../android/java/res/xml/main_preferences.xml |   9 +
  chrome/browser/adblock/android/BUILD.gn       |  85 ++++++
  chrome/browser/adblock/android/README.md      |  13 +
  .../adblock/android/adblock_strings.grd       | 244 ++++++++++++++++++
@@ -237,18 +237,17 @@ Pre-requisites: eyeo Browser Ad filtering Solution: Base Module and Android API 
 diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
 --- a/chrome/android/BUILD.gn
 +++ b/chrome/android/BUILD.gn
-@@ -272,6 +272,10 @@ if (_is_default_toolchain) {
-       deps += [ "//chrome/browser:screen_capture_java_resources" ]
+@@ -270,6 +270,9 @@ if (_is_default_toolchain) {
+       ]
      }
  
 +    ### Android UI module start
 +    deps += [ "//chrome/browser/adblock/android:java_ui_resources" ]
 +    ### Android UI module end
-+
      if (enable_extensions_core) {
        deps += [ "//chrome/browser/ui/android/extensions:java_resources" ]
      }
-@@ -871,6 +875,10 @@ if (_is_default_toolchain) {
+@@ -884,6 +887,10 @@ if (_is_default_toolchain) {
        "//chrome/browser/password_entry_edit:public_java",
      ]
  
@@ -272,18 +271,19 @@ diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/j
  -->
  
  <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
-@@ -85,6 +88,11 @@ found in the LICENSE file.
-     <org.chromium.components.browser_ui.settings.ChromeBasePreference
-         android:key="autofill_options"
-         android:order="17" />
+@@ -61,6 +64,12 @@ found in the LICENSE file.
+         android:order="11"
+         android:title="@string/autofill_and_passwords_settings_title"/>
+ 
 +    <Preference
 +        android:fragment="org.chromium.chrome.browser.adblock.settings.AdblockSettingsFragment"
 +        android:key="adblock"
 +        android:order="17"
 +        android:title="@string/adblock_settings_title" />
- 
-     <PreferenceCategory
++
+     <org.chromium.components.browser_ui.settings.ChromeBasePreferenceCategory
          android:key="advanced_section"
+         android:order="18"
 diff --git a/chrome/browser/adblock/android/BUILD.gn b/chrome/browser/adblock/android/BUILD.gn
 new file mode 100644
 --- /dev/null

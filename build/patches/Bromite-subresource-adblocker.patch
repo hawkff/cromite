@@ -44,14 +44,14 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../component_updater/download_filters_task.h | 129 ++++++++
  ...ent_subresource_filter_throttle_manager.cc |  15 +
  ...tent_subresource_filter_throttle_manager.h |   2 +
- .../content/browser/ruleset_service.cc        |  45 ++-
+ .../content/browser/ruleset_service.cc        |  41 ++-
  .../content/browser/ruleset_service.h         |   8 +-
  .../unindexed_ruleset_stream_generator.cc     |   3 +
  .../core/browser/ruleset_version.h            |   4 +
- .../browser/subresource_filter_features.cc    | 118 +-------
+ .../browser/subresource_filter_features.cc    | 112 +------
  .../core/browser/verified_ruleset_dealer.cc   |   4 +
  .../core/common/indexed_ruleset.cc            |   5 +-
- 39 files changed, 1289 insertions(+), 127 deletions(-)
+ 39 files changed, 1289 insertions(+), 117 deletions(-)
  create mode 100644 chrome/android/java/res/layout/adblock_editor.xml
  create mode 100644 chrome/android/java/res/xml/adblock_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/settings/AdBlockEditor.java
@@ -66,7 +66,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
 --- a/chrome/android/BUILD.gn
 +++ b/chrome/android/BUILD.gn
-@@ -341,6 +341,7 @@ if (_is_default_toolchain) {
+@@ -337,6 +337,7 @@ if (_is_default_toolchain) {
        "//chrome/android/features/tab_ui/public:ui_java_resources",
        "//chrome/android/modules/stack_unwinder/provider:java",
        "//chrome/android/webapk/libs/client:client_java",
@@ -77,15 +77,15 @@ diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
 diff --git a/chrome/android/chrome_java_resources.gni b/chrome/android/chrome_java_resources.gni
 --- a/chrome/android/chrome_java_resources.gni
 +++ b/chrome/android/chrome_java_resources.gni
-@@ -439,6 +439,7 @@ chrome_java_resources = [
+@@ -415,6 +415,7 @@ chrome_java_resources = [
+   "java/res/layout/account_chooser_dialog_item.xml",
    "java/res/layout/account_chooser_dialog_title.xml",
    "java/res/layout/account_management_account_row.xml",
-   "java/res/layout/app_history_filter.xml",
 +  "java/res/layout/adblock_editor.xml",
    "java/res/layout/auto_pip_permission_dialog.xml",
    "java/res/layout/auto_sign_in_first_run_dialog.xml",
    "java/res/layout/autofill_ai_loading_dialog.xml",
-@@ -670,6 +671,7 @@ chrome_java_resources = [
+@@ -645,6 +646,7 @@ chrome_java_resources = [
    "java/res/xml/account_management_preferences.xml",
    "java/res/xml/ad_services_config.xml",
    "java/res/xml/appearance_preferences.xml",
@@ -96,7 +96,7 @@ diff --git a/chrome/android/chrome_java_resources.gni b/chrome/android/chrome_ja
 diff --git a/chrome/android/chrome_java_sources.gni b/chrome/android/chrome_java_sources.gni
 --- a/chrome/android/chrome_java_sources.gni
 +++ b/chrome/android/chrome_java_sources.gni
-@@ -1013,6 +1013,8 @@ chrome_java_sources = [
+@@ -1014,6 +1014,8 @@ chrome_java_sources = [
    "java/src/org/chromium/chrome/browser/permissions/PermissionBlockedDialog.java",
    "java/src/org/chromium/chrome/browser/permissions/PermissionUpdateRequester.java",
    "java/src/org/chromium/chrome/browser/photo_picker/DecoderServiceImpl.java",
@@ -180,7 +180,7 @@ new file mode 100644
 diff --git a/chrome/android/java/res/values/styles.xml b/chrome/android/java/res/values/styles.xml
 --- a/chrome/android/java/res/values/styles.xml
 +++ b/chrome/android/java/res/values/styles.xml
-@@ -339,6 +339,24 @@ found in the LICENSE file.
+@@ -342,6 +342,24 @@ found in the LICENSE file.
          </item>
      </style>
  
@@ -252,7 +252,7 @@ new file mode 100644
 diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/java/res/xml/main_preferences.xml
 --- a/chrome/android/java/res/xml/main_preferences.xml
 +++ b/chrome/android/java/res/xml/main_preferences.xml
-@@ -99,6 +99,11 @@ found in the LICENSE file.
+@@ -75,6 +75,11 @@ found in the LICENSE file.
          android:key="homepage"
          android:order="20"
          android:title="@string/options_homepage_title"/>
@@ -261,7 +261,7 @@ diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/j
 +        android:key="adblock"
 +        android:order="13"
 +        android:title="@string/prefs_adblock"/>
-     <Preference
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
          android:key="notifications"
          android:order="22"
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/AdBlockEditor.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/AdBlockEditor.java
@@ -444,7 +444,7 @@ new file mode 100644
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java
-@@ -103,6 +103,8 @@ import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
+@@ -100,6 +100,8 @@ import org.chromium.ui.modaldialog.ModalDialogManager.ModalDialogType;
  import java.lang.ref.WeakReference;
  import java.util.List;
  
@@ -467,7 +467,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/Settin
 diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources.grd
 --- a/chrome/app/generated_resources.grd
 +++ b/chrome/app/generated_resources.grd
-@@ -17514,6 +17514,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
+@@ -17984,6 +17984,16 @@ Please help our engineers fix this problem. Tell us what happened right before y
        Never show this again.
      </message>
  
@@ -487,7 +487,7 @@ diff --git a/chrome/app/generated_resources.grd b/chrome/app/generated_resources
 diff --git a/chrome/browser/after_startup_task_utils.cc b/chrome/browser/after_startup_task_utils.cc
 --- a/chrome/browser/after_startup_task_utils.cc
 +++ b/chrome/browser/after_startup_task_utils.cc
-@@ -36,6 +36,9 @@
+@@ -38,6 +38,9 @@
  #include "chrome/browser/ui/ash/login/login_display_host.h"
  #endif
  
@@ -497,7 +497,7 @@ diff --git a/chrome/browser/after_startup_task_utils.cc b/chrome/browser/after_s
  using content::BrowserThread;
  
  namespace {
-@@ -140,6 +143,8 @@ void SetBrowserStartupIsComplete(StartupIsCompleteReason reason) {
+@@ -143,6 +146,8 @@ void SetBrowserStartupIsComplete(StartupIsCompleteReason reason) {
    }
    GetAfterStartupTasks().clear();
    GetAfterStartupTasks().shrink_to_fit();
@@ -509,8 +509,8 @@ diff --git a/chrome/browser/after_startup_task_utils.cc b/chrome/browser/after_s
 diff --git a/chrome/browser/browser_process.h b/chrome/browser/browser_process.h
 --- a/chrome/browser/browser_process.h
 +++ b/chrome/browser/browser_process.h
-@@ -96,6 +96,10 @@ namespace component_updater {
- class ComponentUpdateService;
+@@ -102,6 +102,10 @@ namespace speech {
+ class SpeechRecognitionSmallExpertModelInstaller;
  }
  
 +namespace adblock_updater {
@@ -520,8 +520,8 @@ diff --git a/chrome/browser/browser_process.h b/chrome/browser/browser_process.h
  namespace gcm {
  class GCMDriver;
  }
-@@ -290,6 +294,7 @@ class BrowserProcess {
-   virtual activity_reporter::ActivityReporter* activity_reporter() = 0;
+@@ -297,6 +301,7 @@ class BrowserProcess {
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
  
    virtual component_updater::ComponentUpdateService* component_updater() = 0;
 +  virtual adblock_updater::AdBlockUpdaterService* adblock_updater() = 0;
@@ -531,7 +531,7 @@ diff --git a/chrome/browser/browser_process.h b/chrome/browser/browser_process.h
 diff --git a/chrome/browser/browser_process_impl.cc b/chrome/browser/browser_process_impl.cc
 --- a/chrome/browser/browser_process_impl.cc
 +++ b/chrome/browser/browser_process_impl.cc
-@@ -188,6 +188,8 @@
+@@ -189,6 +189,8 @@
  #include "ui/message_center/message_center.h"
  #endif
  
@@ -540,7 +540,7 @@ diff --git a/chrome/browser/browser_process_impl.cc b/chrome/browser/browser_pro
  #if BUILDFLAG(IS_ANDROID)
  #include "chrome/browser/accessibility/accessibility_prefs/android/accessibility_prefs_controller.h"
  #include "chrome/browser/flags/android/chrome_feature_list.h"
-@@ -1439,6 +1441,34 @@ BrowserProcessImpl::component_updater() {
+@@ -1529,6 +1531,34 @@ BrowserProcessImpl::component_updater() {
    return component_updater_.get();
  }
  
@@ -578,15 +578,15 @@ diff --git a/chrome/browser/browser_process_impl.cc b/chrome/browser/browser_pro
 diff --git a/chrome/browser/browser_process_impl.h b/chrome/browser/browser_process_impl.h
 --- a/chrome/browser/browser_process_impl.h
 +++ b/chrome/browser/browser_process_impl.h
-@@ -223,6 +223,7 @@ class BrowserProcessImpl : public BrowserProcess,
- 
+@@ -224,6 +224,7 @@ class BrowserProcessImpl : public BrowserProcess,
    activity_reporter::ActivityReporter* activity_reporter() override;
+ #endif  // !BUILDFLAG(IS_CHROMEOS)
    component_updater::ComponentUpdateService* component_updater() override;
 +  adblock_updater::AdBlockUpdaterService* adblock_updater() override;
  #if BUILDFLAG(IS_CHROMEOS)
    MediaFileSystemRegistry* media_file_system_registry() override;
  #endif
-@@ -452,6 +453,7 @@ class BrowserProcessImpl : public BrowserProcess,
+@@ -458,6 +459,7 @@ class BrowserProcessImpl : public BrowserProcess,
    // to concerns over integrity of data shared between profiles,
    // but some users of component updater only install per-user.
    std::unique_ptr<component_updater::ComponentUpdateService> component_updater_;
@@ -597,7 +597,7 @@ diff --git a/chrome/browser/browser_process_impl.h b/chrome/browser/browser_proc
 diff --git a/chrome/browser/chrome_browser_main.cc b/chrome/browser/chrome_browser_main.cc
 --- a/chrome/browser/chrome_browser_main.cc
 +++ b/chrome/browser/chrome_browser_main.cc
-@@ -485,6 +485,9 @@ StartupProfileInfo CreateInitialProfile(
+@@ -501,6 +501,9 @@ StartupProfileInfo CreateInitialProfile(
    // missing code in the above test.
    CHECK(profile_info.profile) << "Cannot get default profile.";
  
@@ -610,7 +610,7 @@ diff --git a/chrome/browser/chrome_browser_main.cc b/chrome/browser/chrome_brows
 diff --git a/chrome/browser/flags/BUILD.gn b/chrome/browser/flags/BUILD.gn
 --- a/chrome/browser/flags/BUILD.gn
 +++ b/chrome/browser/flags/BUILD.gn
-@@ -9,6 +9,7 @@ import("//third_party/jni_zero/jni_zero.gni")
+@@ -10,6 +10,7 @@ import("//third_party/jni_zero/jni_zero.gni")
  android_library("java") {
    sources = [ "android/java/src/org/chromium/chrome/browser/flags/CromiteNativeUtils.java" ]
    sources += [
@@ -618,7 +618,7 @@ diff --git a/chrome/browser/flags/BUILD.gn b/chrome/browser/flags/BUILD.gn
      "android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java",
      "android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureMap.java",
      "android/java/src/org/chromium/chrome/browser/flags/ChromeSessionState.java",
-@@ -49,6 +50,7 @@ java_bromite_impl("java_cromite_cached_flags") {
+@@ -62,6 +63,7 @@ java_bromite_impl("java_cromite_cached_flags") {
  generate_jni("jni_headers") {
    sources = [ "android/java/src/org/chromium/chrome/browser/flags/CromiteNativeUtils.java" ]
    sources += [
@@ -626,7 +626,7 @@ diff --git a/chrome/browser/flags/BUILD.gn b/chrome/browser/flags/BUILD.gn
      "android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureMap.java",
      "android/java/src/org/chromium/chrome/browser/flags/ChromeSessionState.java",
    ]
-@@ -62,6 +64,7 @@ static_library("flags_android") {
+@@ -75,6 +77,7 @@ static_library("flags_android") {
      "android/chrome_session_state.cc",
      "android/chrome_session_state.h",
    ]
@@ -710,7 +710,7 @@ new file mode 100755
 diff --git a/chrome/browser/net/system_network_context_manager.cc b/chrome/browser/net/system_network_context_manager.cc
 --- a/chrome/browser/net/system_network_context_manager.cc
 +++ b/chrome/browser/net/system_network_context_manager.cc
-@@ -717,6 +717,10 @@ void SystemNetworkContextManager::RegisterPrefs(PrefRegistrySimple* registry) {
+@@ -735,6 +735,10 @@ void SystemNetworkContextManager::RegisterPrefs(PrefRegistrySimple* registry) {
    DefaultDnsOverHttpsConfigSource::RegisterPrefs(registry);
    NetworkProcessLaunchWatcher::RegisterPrefs(registry);
  
@@ -724,7 +724,7 @@ diff --git a/chrome/browser/net/system_network_context_manager.cc b/chrome/brows
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -240,6 +240,20 @@ CHAR_LIMIT guidelines:
+@@ -246,6 +246,20 @@ CHAR_LIMIT guidelines:
          Delete
        </message>
  
@@ -748,7 +748,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 diff --git a/chrome/common/pref_names.h b/chrome/common/pref_names.h
 --- a/chrome/common/pref_names.h
 +++ b/chrome/common/pref_names.h
-@@ -2222,6 +2222,11 @@ static_assert(std::string_view(kAudioCaptureAllowed) ==
+@@ -2221,6 +2221,11 @@ static_assert(std::string_view(kAudioCaptureAllowed) ==
  inline constexpr char kAudioCaptureAllowedUrls[] =
      "hardware.audio_capture_allowed_urls";
  
@@ -1605,8 +1605,8 @@ diff --git a/components/subresource_filter/content/browser/content_subresource_f
 +      profile_context_(profile_context),
        web_contents_helper_(web_contents_helper) {}
  
- ContentSubresourceFilterThrottleManager::
-@@ -658,6 +662,17 @@ ContentSubresourceFilterThrottleManager::
+ ContentSubresourceFilterThrottleManager::TrackedFrame::TrackedFrame(
+@@ -681,6 +685,17 @@ ContentSubresourceFilterThrottleManager::
        throttle->NotifyPageActivationWithRuleset(EnsureRulesetHandle(),
                                                  ad_tagging_state);
      }
@@ -1627,7 +1627,7 @@ diff --git a/components/subresource_filter/content/browser/content_subresource_f
 diff --git a/components/subresource_filter/content/browser/content_subresource_filter_throttle_manager.h b/components/subresource_filter/content/browser/content_subresource_filter_throttle_manager.h
 --- a/components/subresource_filter/content/browser/content_subresource_filter_throttle_manager.h
 +++ b/components/subresource_filter/content/browser/content_subresource_filter_throttle_manager.h
-@@ -410,6 +410,8 @@ class ContentSubresourceFilterThrottleManager
+@@ -409,6 +409,8 @@ class ContentSubresourceFilterThrottleManager
  
    std::unique_ptr<ProfileInteractionManager> profile_interaction_manager_;
  
@@ -1647,21 +1647,17 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
  #include "base/metrics/histogram_functions.h"
  #include "base/numerics/safe_conversions.h"
  #include "base/rand_util.h"
-@@ -51,12 +52,7 @@ namespace {
+@@ -51,8 +52,7 @@ namespace {
  void RecordIndexAndWriteRulesetResult(
      std::string_view uma_tag,
      RulesetService::IndexAndWriteRulesetResult result) {
 -  base::UmaHistogramEnumeration(
--      base::StrCat({uma_tag, ".WriteRuleset.Result"}), result,
--      static_cast<RulesetService::IndexAndWriteRulesetResult>(
--          static_cast<int>(
--              RulesetService::IndexAndWriteRulesetResult::kMaxValue) +
--          1));
+-      base::StrCat({uma_tag, ".WriteRuleset.Result"}), result);
 +  VLOG(1) << "SubresourceFilter.WriteRuleset.Result: " << static_cast<int>(result);
  }
  
  // Implements operations on a `sentinel file`, which is used as a safeguard to
-@@ -253,11 +249,13 @@ RulesetService::RulesetService(
+@@ -249,11 +249,13 @@ RulesetService::RulesetService(
  RulesetService::~RulesetService() = default;
  
  void RulesetService::IndexAndStoreAndPublishRulesetIfNeeded(
@@ -1676,7 +1672,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
    // Trying to store a ruleset with the same version for a second time would
    // not only be futile, but would fail on Windows due to "File System
    // Tunneling" as long as the previously stored copy of the rules is still
-@@ -267,13 +265,16 @@ void RulesetService::IndexAndStoreAndPublishRulesetIfNeeded(
+@@ -263,13 +265,16 @@ void RulesetService::IndexAndStoreAndPublishRulesetIfNeeded(
    if (most_recently_indexed_version.IsCurrentFormatVersion() &&
        most_recently_indexed_version.content_version ==
            unindexed_ruleset_info.content_version) {
@@ -1693,7 +1689,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
      return;
    }
  
-@@ -293,6 +294,23 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
+@@ -289,6 +294,23 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
      const RulesetConfig& config,
      const base::FilePath& indexed_ruleset_base_dir,
      const UnindexedRulesetInfo& unindexed_ruleset_info) {
@@ -1717,7 +1713,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
    base::ScopedBlockingCall scoped_blocking_call(FROM_HERE,
                                                  base::BlockingType::MAY_BLOCK);
  
-@@ -300,6 +318,7 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
+@@ -296,6 +318,7 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
        unindexed_ruleset_info);
  
    if (!unindexed_ruleset_stream_generator.ruleset_stream()) {
@@ -1725,7 +1721,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
      RecordIndexAndWriteRulesetResult(
          config.uma_tag,
          IndexAndWriteRulesetResult::kFailedOpeningUnindexedRuleset);
-@@ -314,6 +333,7 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
+@@ -310,6 +333,7 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
            indexed_ruleset_base_dir, indexed_version);
  
    if (!base::CreateDirectory(indexed_ruleset_version_dir)) {
@@ -1733,7 +1729,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
      RecordIndexAndWriteRulesetResult(
          config.uma_tag, IndexAndWriteRulesetResult::kFailedCreatingVersionDir);
      return IndexedRulesetVersion(config.filter_tag);
-@@ -321,13 +341,11 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
+@@ -317,13 +341,11 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
  
    SentinelFile sentinel_file(indexed_ruleset_version_dir);
    if (sentinel_file.IsPresent()) {
@@ -1749,7 +1745,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
      RecordIndexAndWriteRulesetResult(
          config.uma_tag,
          IndexAndWriteRulesetResult::kFailedCreatingSentinelFile);
-@@ -342,6 +360,7 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
+@@ -338,6 +360,7 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
    RulesetIndexer indexer((*g_get_ruleset_id_func)());
    if (!(*g_index_ruleset_func)(config, &unindexed_ruleset_stream_generator,
                                 &indexer)) {
@@ -1757,7 +1753,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
      RecordIndexAndWriteRulesetResult(
          config.uma_tag,
          IndexAndWriteRulesetResult::kFailedParsingUnindexedRuleset);
-@@ -362,9 +381,12 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
+@@ -358,9 +381,12 @@ IndexedRulesetVersion RulesetService::IndexAndWriteRuleset(
                     unindexed_ruleset_info.license_path, indexer.data());
    RecordIndexAndWriteRulesetResult(config.uma_tag, result);
    if (result != IndexAndWriteRulesetResult::kSuccess) {
@@ -1770,7 +1766,7 @@ diff --git a/components/subresource_filter/content/browser/ruleset_service.cc b/
    CHECK(indexed_version.IsValid());
    return indexed_version;
  }
-@@ -493,6 +515,7 @@ void RulesetService::IndexAndStoreRuleset(
+@@ -489,6 +515,7 @@ void RulesetService::IndexAndStoreRuleset(
  void RulesetService::OnWrittenRuleset(WriteRulesetCallback result_callback,
                                        const IndexedRulesetVersion& version) {
    CHECK(!result_callback.is_null());
@@ -1840,7 +1836,7 @@ diff --git a/components/subresource_filter/core/browser/ruleset_version.h b/comp
 diff --git a/components/subresource_filter/core/browser/subresource_filter_features.cc b/components/subresource_filter/core/browser/subresource_filter_features.cc
 --- a/components/subresource_filter/core/browser/subresource_filter_features.cc
 +++ b/components/subresource_filter/core/browser/subresource_filter_features.cc
-@@ -54,75 +54,8 @@ class CommaSeparatedStrings {
+@@ -54,69 +54,8 @@ class CommaSeparatedStrings {
    const std::vector<std::string_view> pieces_;
  };
  
@@ -1884,12 +1880,6 @@ diff --git a/components/subresource_filter/core/browser/subresource_filter_featu
 -          kActivationListPhishingInterstitial)) {
 -    return ActivationList::PHISHING_INTERSTITIAL;
 -  } else if (activation_lists.CaseInsensitiveContains(
--                 kActivationListSocialEngineeringAdsInterstitial)) {
--    return ActivationList::SOCIAL_ENG_ADS_INTERSTITIAL;
--  } else if (activation_lists.CaseInsensitiveContains(
--                 kActivationListSubresourceFilter)) {
--    return ActivationList::SUBRESOURCE_FILTER;
--  } else if (activation_lists.CaseInsensitiveContains(
 -                 kActivationListBetterAds)) {
 -    return ActivationList::BETTER_ADS;
 -  }
@@ -1917,7 +1907,7 @@ diff --git a/components/subresource_filter/core/browser/subresource_filter_featu
    // If ad tagging is enabled, turn on the dryrun automatically.
    bool ad_tagging_enabled = base::FeatureList::IsEnabled(kAdTagging);
    const struct {
-@@ -130,23 +63,16 @@ std::vector<Configuration> FillEnabledPresetConfigurations(
+@@ -124,23 +63,16 @@ std::vector<Configuration> FillEnabledPresetConfigurations(
      bool enabled_by_default;
      Configuration (*factory_method)();
    } kAvailablePresetConfigurations[] = {
@@ -1943,7 +1933,7 @@ diff --git a/components/subresource_filter/core/browser/subresource_filter_featu
        enabled_configurations.push_back(available_preset.factory_method());
      }
    }
-@@ -154,48 +80,12 @@ std::vector<Configuration> FillEnabledPresetConfigurations(
+@@ -148,48 +80,12 @@ std::vector<Configuration> FillEnabledPresetConfigurations(
    return enabled_configurations;
  }
  

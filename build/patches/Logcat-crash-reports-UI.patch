@@ -9,7 +9,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../crash_upload_list_android.cc              |  19 +-
  .../crash_upload_list_android.h               |   1 +
  chrome/browser/net/chrome_network_delegate.cc |   7 +
- chrome/browser/ui/BUILD.gn                    |   1 +
+ chrome/browser/ui/webui/crashes/BUILD.gn      |   1 +
  chrome/browser/ui/webui/crashes/crashes_ui.cc | 183 ++++++++++++++++--
  .../crash/core/browser/crashes_ui_util.h      |   4 +
  .../crash/core/browser/resources/crashes.css  |  71 ++++++-
@@ -151,17 +151,17 @@ diff --git a/chrome/browser/net/chrome_network_delegate.cc b/chrome/browser/net/
    std::vector<base::FilePath> allowlist;
    std::vector<base::FilePath> all_download_dirs =
        base::android::GetAllPrivateDownloadsDirectories();
-diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
---- a/chrome/browser/ui/BUILD.gn
-+++ b/chrome/browser/ui/BUILD.gn
-@@ -840,6 +840,7 @@ static_library("ui") {
-     "//third_party/icu",
-     "//third_party/leveldatabase",
-     "//third_party/zlib",
+diff --git a/chrome/browser/ui/webui/crashes/BUILD.gn b/chrome/browser/ui/webui/crashes/BUILD.gn
+--- a/chrome/browser/ui/webui/crashes/BUILD.gn
++++ b/chrome/browser/ui/webui/crashes/BUILD.gn
+@@ -22,6 +22,7 @@ source_set("crashes") {
+     "//components/signin/public/base",
+     "//components/signin/public/identity_manager",
+     "//google_apis",
 +    "//third_party/zlib/google:zip",
-     "//ui/accessibility",
      "//ui/base",
-     "//ui/base/accelerators/global_accelerator_listener",
+     "//ui/webui",
+   ]
 diff --git a/chrome/browser/ui/webui/crashes/crashes_ui.cc b/chrome/browser/ui/webui/crashes/crashes_ui.cc
 --- a/chrome/browser/ui/webui/crashes/crashes_ui.cc
 +++ b/chrome/browser/ui/webui/crashes/crashes_ui.cc
@@ -785,7 +785,7 @@ diff --git a/components/crash_strings.grdp b/components/crash_strings.grdp
 diff --git a/components/minidump_uploader/android/java/src/org/chromium/components/minidump_uploader/CrashFileManager.java b/components/minidump_uploader/android/java/src/org/chromium/components/minidump_uploader/CrashFileManager.java
 --- a/components/minidump_uploader/android/java/src/org/chromium/components/minidump_uploader/CrashFileManager.java
 +++ b/components/minidump_uploader/android/java/src/org/chromium/components/minidump_uploader/CrashFileManager.java
-@@ -117,6 +117,8 @@ public class CrashFileManager {
+@@ -151,6 +151,8 @@ public class CrashFileManager {
  
      private static final Pattern TMP_PATTERN = Pattern.compile("\\.tmp\\z");
  
@@ -794,7 +794,7 @@ diff --git a/components/minidump_uploader/android/java/src/org/chromium/componen
      // The maximum number of non-uploaded crashes that may be kept in the crash reports directory.
      // Chosen to attempt to balance between keeping a generous number of crashes, and not using up
      // too much filesystem storage space for obsolete crash reports.
-@@ -125,7 +127,7 @@ public class CrashFileManager {
+@@ -159,7 +161,7 @@ public class CrashFileManager {
      // The maximum age, in days, considered acceptable for a crash report. Reports older than this
      // age will be removed. The constant is chosen to be quite conservative, while still allowing
      // users to eventually reclaim filesystem storage space from obsolete crash reports.
@@ -803,7 +803,7 @@ diff --git a/components/minidump_uploader/android/java/src/org/chromium/componen
  
      // The maximum number of non-uploaded crashes to copy to the crash reports directory. The
      // difference between this value and MAX_CRASH_REPORTS_TO_KEEP is that TO_KEEP is only checked
-@@ -626,6 +628,9 @@ public class CrashFileManager {
+@@ -664,6 +666,9 @@ public class CrashFileManager {
                      && !f.getName().contains(UPLOAD_FORCED_MINIDUMP_SUFFIX)) {
                  continue;
              }

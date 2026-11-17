@@ -24,7 +24,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridDialogMediator.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridDialogMediator.java
 --- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridDialogMediator.java
 +++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGridDialogMediator.java
-@@ -101,6 +101,7 @@ import org.chromium.components.collaboration.messaging.PersistentNotificationTyp
+@@ -106,6 +106,7 @@ import org.chromium.components.collaboration.messaging.PersistentNotificationTyp
  import org.chromium.components.data_sharing.DataSharingService;
  import org.chromium.components.data_sharing.GroupMember;
  import org.chromium.components.data_sharing.member_role.MemberRole;
@@ -32,7 +32,7 @@ diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser
  import org.chromium.components.tab_group_sync.EitherId.EitherGroupId;
  import org.chromium.components.tab_group_sync.LocalTabGroupId;
  import org.chromium.components.tab_group_sync.TabGroupSyncService;
-@@ -121,6 +122,9 @@ import java.util.Objects;
+@@ -126,6 +127,9 @@ import java.util.Objects;
  import java.util.Set;
  import java.util.function.Supplier;
  
@@ -42,7 +42,7 @@ diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser
  /**
   * A mediator for the TabGridDialog component, responsible for communicating with the components'
   * coordinator as well as managing the business logic for dialog show/hide.
-@@ -1010,9 +1014,15 @@ public class TabGridDialogMediator
+@@ -1076,9 +1080,15 @@ public class TabGridDialogMediator
              UrlConstantResolver urlConstantResolver =
                      UrlConstantResolverFactory.getForProfile(profile);
  
@@ -53,10 +53,10 @@ diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser
 +                url = gurl != null ? gurl.getSpec() : url;
 +            }
              TabGroupUtils.openUrlInGroup(
-                     assumeNonNull(mCurrentTabModelSupplier.get()),
+                     tabModel,
 -                    urlConstantResolver.getNtpUrl(),
 +                    url,
-                     tabsInGroup.get(tabsInGroup.size() - 1).getId(),
+                     tabGroupId,
                      TabLaunchType.FROM_TAB_GROUP_UI);
              RecordUserAction.record(
 diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGroupUiMediator.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabGroupUiMediator.java
@@ -70,7 +70,7 @@ diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser
  import org.chromium.chrome.browser.layouts.LayoutStateProvider.LayoutStateObserver;
  import org.chromium.chrome.browser.layouts.LayoutType;
  import org.chromium.chrome.browser.profiles.Profile;
-@@ -439,10 +440,15 @@ public class TabGroupUiMediator implements BackPressHandler {
+@@ -444,10 +445,15 @@ public class TabGroupUiMediator implements BackPressHandler {
                              UrlConstantResolverFactory.getForProfile(currentTabProfile);
  
                      Tab parentTabToAttach = relatedTabs.get(relatedTabs.size() - 1);
@@ -105,7 +105,7 @@ diff --git a/chrome/android/java/res/xml/homepage_preferences.xml b/chrome/andro
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabGroupContextMenuCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabGroupContextMenuCoordinator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabGroupContextMenuCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/overlays/strip/TabGroupContextMenuCoordinator.java
-@@ -94,6 +94,9 @@ import java.util.List;
+@@ -105,6 +105,9 @@ import java.util.Objects;
  import java.util.function.BiConsumer;
  import java.util.function.Supplier;
  
@@ -115,26 +115,26 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/over
  /**
   * A coordinator for the context menu on the tab strip by long-pressing on the group titles. It is
   * responsible for creating a list of menu items, setting up the menu and displaying the menu.
-@@ -268,9 +271,14 @@ public class TabGroupContextMenuCoordinator extends TabStripReorderingHelper<Tok
+@@ -313,9 +316,14 @@ public class TabGroupContextMenuCoordinator extends TabStripReorderingHelper<Tok
+             } else if (menuId == R.id.open_new_tab_in_group) {
                  UrlConstantResolver resolver =
-                         UrlConstantResolverFactory.getForProfile(
-                                 tabModelSupplier.get().getProfile());
+                         UrlConstantResolverFactory.getForProfile(tabModel.getProfile());
 +                String url = resolver.getNtpUrl();
 +                if (HomepageManager.getInstance().getPrefNTPIsHomepageEnabled()) {
-+                    GURL gurl = HomepageManager.getInstance().getHomepageGurl(tabModelSupplier.get().isIncognitoBranded());
++                    GURL gurl = HomepageManager.getInstance().getHomepageGurl(tabModel.isIncognitoBranded());
 +                    url = gurl != null ? gurl.getSpec() : url;
 +                }
                  TabGroupUtils.openUrlInGroup(
-                         tabModelSupplier.get(),
+                         tabModel,
 -                        resolver.getNtpUrl(),
 +                        url,
-                         tabId,
+                         tabGroupId,
                          TabLaunchType.FROM_TAB_GROUP_UI);
                  TabStripMenuMetricsUtils.recordGroupMenuUserAction(
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/homepage/HomepageManager.java b/chrome/android/java/src/org/chromium/chrome/browser/homepage/HomepageManager.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/homepage/HomepageManager.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/homepage/HomepageManager.java
-@@ -358,6 +358,22 @@ public class HomepageManager
+@@ -360,6 +360,22 @@ public class HomepageManager
          notifyHomepageUpdated();
      }
  
@@ -177,7 +177,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/homepage/settin
      private HomepageManager mHomepageManager;
      private RadioButtonGroupHomepagePreference mRadioButtons;
      private final SettableMonotonicObservableSupplier<String> mPageTitle =
-@@ -105,6 +108,15 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
+@@ -103,6 +106,15 @@ public class HomepageSettings extends ChromeBaseSettingsFragment {
          mRadioButtons.setOnHomepagePreferenceChangeListener(this::onRadioButtonGroupChanged);
          mRadioButtons.setupPreferenceValues(createPreferenceValuesForRadioGroup());
  
@@ -215,7 +215,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/Chrome
  import org.chromium.chrome.browser.incognito.IncognitoUtils;
  import org.chromium.chrome.browser.prefetch.settings.PreloadPagesSettingsBridge;
  import org.chromium.chrome.browser.prefetch.settings.PreloadPagesState;
-@@ -637,6 +638,13 @@ public class ChromeTabCreator implements TabCreator, NeedsTabModel, NeedsTabMode
+@@ -575,6 +576,13 @@ public class ChromeTabCreator implements TabCreator, NeedsTabModel, NeedsTabMode
       */
      public @Nullable Tab launchUrl(
              String url, @TabLaunchType int type, @Nullable Intent intent, long intentTimestamp) {
@@ -232,7 +232,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/Chrome
 diff --git a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
 --- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
 +++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
-@@ -469,6 +469,7 @@ public final class ChromePreferenceKeys {
+@@ -465,6 +465,7 @@ public final class ChromePreferenceKeys {
      public static final String HOMEPAGE_USE_CHROME_NTP = "Chrome.Homepage.UseNTP";
      public static final String HOMEPAGE_USE_DEFAULT_URI = "homepage_partner_enabled";
  
@@ -248,13 +248,13 @@ diff --git a/chrome/browser/preferences/android/java/src/org/chromium/chrome/bro
                  ChromePreferenceKeys.HOMEPAGE_ENABLED,
                  ChromePreferenceKeys.HOMEPAGE_USE_DEFAULT_URI,
 +                ChromePreferenceKeys.HOMEPAGE_NTP_IS_HOMEPAGE,
-                 ChromePreferenceKeys.INCOGNITO_SHORTCUT_ADDED,
+                 ChromePreferenceKeys.DYNAMIC_SHORTCUTS_ADDED,
                  ChromePreferenceKeys.LATEST_UNSUPPORTED_VERSION,
                  ChromePreferenceKeys.LOCALE_MANAGER_AUTO_SWITCH,
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -1338,6 +1338,9 @@ Your Google account may have other forms of browsing history like searches and a
+@@ -1438,6 +1438,9 @@ Your Google account may have other forms of browsing history like searches and a
        <message name="IDS_CLEAR_BROWSING_DATA_TAB_PERIOD_HOUR" desc="The option to delete browsing data from the last hour.">
          Last hour
        </message>
