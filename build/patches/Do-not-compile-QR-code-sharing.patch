@@ -5,19 +5,19 @@ Subject: Do not compile QR code sharing
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  chrome/android/BUILD.gn                       |  1 -
- .../chrome/browser/ChromeTabbedActivity.java  |  4 ----
+ .../chrome/browser/ChromeTabbedActivity.java  |  6 +----
  .../ChromeContextMenuPopulator.java           | 12 ----------
- .../chrome/browser/ui/RootUiCoordinator.java  |  5 ----
+ .../chrome/browser/ui/RootUiCoordinator.java  |  5 +---
  chrome/browser/prefs/browser_prefs.cc         |  2 +-
  chrome/browser/share/BUILD.gn                 |  1 -
  ...omeProvidedSharingOptionsProviderBase.java | 23 -------------------
  chrome/browser/share/android/java_sources.gni | 11 ---------
- 8 files changed, 1 insertion(+), 58 deletions(-)
+ 8 files changed, 3 insertions(+), 58 deletions(-)
 
 diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
 --- a/chrome/android/BUILD.gn
 +++ b/chrome/android/BUILD.gn
-@@ -2983,7 +2983,6 @@ if (_is_default_toolchain) {
+@@ -2730,7 +2730,6 @@ if (_is_default_toolchain) {
        "../browser/share/android/java/src/org/chromium/chrome/browser/share/link_to_text/LinkToTextBridge.java",
        "../browser/share/android/java/src/org/chromium/chrome/browser/share/long_screenshots/bitmap_generation/LongScreenshotsTabService.java",
        "../browser/share/android/java/src/org/chromium/chrome/browser/share/long_screenshots/bitmap_generation/LongScreenshotsTabServiceFactory.java",
@@ -28,28 +28,30 @@ diff --git a/chrome/android/BUILD.gn b/chrome/android/BUILD.gn
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -252,7 +252,6 @@ import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
+@@ -259,7 +259,6 @@ import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
  import org.chromium.chrome.browser.setup_list.SetupListModuleUtils;
  import org.chromium.chrome.browser.share.ShareDelegate;
  import org.chromium.chrome.browser.share.ShareHelper;
 -import org.chromium.chrome.browser.share.qrcode.QrCodeCoordinator;
+ import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfAndroidBridge;
+ import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfBackPressHandler;
  import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfGestureDetector;
- import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfMetricsRecorder;
- import org.chromium.chrome.browser.signin.SigninAndHistorySyncActivityLauncherImpl;
-@@ -4287,9 +4286,6 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4565,10 +4564,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
              return false;
          } else if (id == R.id.qr_code_menu_id) {
              assert currentTab != null;
+-            var windowAndroid = assertNonNull(getWindowAndroid());
 -            QrCodeCoordinator qrCodeCoordinator =
--                    new QrCodeCoordinator(this, currentTab.getUrl().getSpec(), getWindowAndroid());
+-                    new QrCodeCoordinator(this, currentTab.getUrl().getSpec(), windowAndroid);
 -            qrCodeCoordinator.show();
++
              RecordUserAction.record("MobileMenuQRCode");
              return true;
          } else if (id == R.id.name_window_menu_id) {
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java b/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java
-@@ -78,7 +78,6 @@ import org.chromium.chrome.browser.share.ShareDelegate.ShareOrigin;
+@@ -81,7 +81,6 @@ import org.chromium.chrome.browser.share.ShareDelegate.ShareOrigin;
  import org.chromium.chrome.browser.share.ShareHelper;
  import org.chromium.chrome.browser.share.ShareUtils;
  import org.chromium.chrome.browser.share.link_to_text.LinkToTextHelper;
@@ -57,7 +59,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/Chr
  import org.chromium.chrome.browser.share.send_tab_to_self.SendTabToSelfAndroidBridge;
  import org.chromium.chrome.browser.tab.Tab;
  import org.chromium.chrome.browser.tab.TabContextMenuItemDelegate;
-@@ -1261,17 +1260,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
+@@ -1242,17 +1241,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
              if (tab != null) {
                  TranslateBridge.translateTabWhenReady(tab);
              }
@@ -78,7 +80,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/Chr
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ui/RootUiCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/ui/RootUiCoordinator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ui/RootUiCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ui/RootUiCoordinator.java
-@@ -152,7 +152,6 @@ import org.chromium.chrome.browser.recent_tabs.RestoreTabsFeatureHelper;
+@@ -153,7 +153,6 @@ import org.chromium.chrome.browser.recent_tabs.RestoreTabsFeatureHelper;
  import org.chromium.chrome.browser.searchwidget.SearchActivityUtils;
  import org.chromium.chrome.browser.share.ShareDelegate;
  import org.chromium.chrome.browser.share.ShareDelegate.ShareOrigin;
@@ -86,21 +88,21 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ui/RootUiCoordi
  import org.chromium.chrome.browser.share.scroll_capture.ScrollCaptureManager;
  import org.chromium.chrome.browser.signin.SigninAndHistorySyncActivityLauncherImpl;
  import org.chromium.chrome.browser.signin.WebSigninRedirectCoordinator;
-@@ -924,10 +923,6 @@ public class RootUiCoordinator
+@@ -935,9 +934,7 @@ public class RootUiCoordinator
      }
  
      public void onAttachFragment(Fragment fragment) {
--        if (fragment instanceof QrCodeDialog) {
--            QrCodeDialog qrCodeDialog = (QrCodeDialog) fragment;
+-        if (fragment instanceof QrCodeDialog qrCodeDialog) {
 -            qrCodeDialog.setWindowAndroid(mWindowAndroid);
 -        }
++
      }
  
      /**
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
-@@ -1726,7 +1726,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
+@@ -2022,7 +2022,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
    registry->RegisterBooleanPref(prefs::kChromeForTestingAllowed, true);
  #endif
  
@@ -112,7 +114,7 @@ diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browse
 diff --git a/chrome/browser/share/BUILD.gn b/chrome/browser/share/BUILD.gn
 --- a/chrome/browser/share/BUILD.gn
 +++ b/chrome/browser/share/BUILD.gn
-@@ -67,7 +67,6 @@ source_set("impl") {
+@@ -62,7 +62,6 @@ source_set("impl") {
        "default_ranking_android.cc",
        "editor_screenshot_task.cc",
        "link_to_text_bridge.cc",

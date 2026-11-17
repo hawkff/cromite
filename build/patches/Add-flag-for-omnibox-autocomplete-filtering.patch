@@ -7,12 +7,12 @@ and internal chrome:// pages will be used for the autocomplete results.
 
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
- .../browser/autocomplete_controller.cc        | 17 ++++++++++
+ .../browser/autocomplete_controller.cc        | 19 +++++++++++
  .../omnibox/browser/history_url_provider.cc   |  3 ++
  components/omnibox/browser/search_provider.cc |  4 +++
  components/url_formatter/url_fixer.cc         |  3 ++
  ...lag-for-omnibox-autocomplete-filtering.inc | 32 +++++++++++++++++++
- 5 files changed, 59 insertions(+)
+ 5 files changed, 61 insertions(+)
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Add-flag-for-omnibox-autocomplete-filtering.inc
 
 diff --git a/components/omnibox/browser/autocomplete_controller.cc b/components/omnibox/browser/autocomplete_controller.cc
@@ -26,7 +26,7 @@ diff --git a/components/omnibox/browser/autocomplete_controller.cc b/components/
  #include "base/feature_list.h"
  #include "base/format_macros.h"
  #include "base/functional/bind.h"
-@@ -549,6 +550,22 @@ AutocompleteController::AutocompleteController(
+@@ -555,6 +556,24 @@ AutocompleteController::AutocompleteController(
            provider_client_->GetOmniboxTriggeredFeatureService()),
        steady_state_omnibox_position_(OEP::UNKNOWN_POSITION),
        config_(config) {
@@ -35,16 +35,18 @@ diff --git a/components/omnibox/browser/autocomplete_controller.cc b/components/
 +    const std::string flag_value =
 +        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
 +            "omnibox-autocomplete-filtering");
-+    config_.provider_types &=
-+        AutocompleteProvider::TYPE_KEYWORD |
-+        AutocompleteProvider::TYPE_SEARCH |
-+        AutocompleteProvider::TYPE_HISTORY_URL |
-+        AutocompleteProvider::TYPE_BOOKMARK |
-+        AutocompleteProvider::TYPE_BUILTIN;
++    config_.provider_types &= static_cast<int>(
++        AutocompleteProvider::Type::kKeyword |
++        AutocompleteProvider::Type::kSearch |
++        AutocompleteProvider::Type::kHistoryUrl |
++        AutocompleteProvider::Type::kBookmark |
++        AutocompleteProvider::Type::kBuiltin);
 +    if (!flag_value.contains("bookmarks"))
-+      config_.provider_types &= ~AutocompleteProvider::TYPE_BOOKMARK;
++      config_.provider_types &=
++          ~static_cast<int>(AutocompleteProvider::Type::kBookmark);
 +    if (!flag_value.contains("chrome"))
-+      config_.provider_types &= ~AutocompleteProvider::TYPE_BUILTIN;
++      config_.provider_types &=
++          ~static_cast<int>(AutocompleteProvider::Type::kBuiltin);
 +  }
    config_.provider_types &= ~OmniboxFieldTrial::GetDisabledProviderTypes();
  
@@ -73,7 +75,7 @@ diff --git a/components/omnibox/browser/search_provider.cc b/components/omnibox/
  #include "base/functional/callback.h"
  #include "base/i18n/break_iterator.h"
  #include "base/i18n/case_conversion.h"
-@@ -700,6 +701,9 @@ void SearchProvider::Run(bool query_is_private) {
+@@ -681,6 +682,9 @@ void SearchProvider::Run(bool query_is_private) {
  }
  
  void SearchProvider::DoHistoryQuery(bool minimal_changes) {
@@ -94,7 +96,7 @@ diff --git a/components/url_formatter/url_fixer.cc b/components/url_formatter/ur
  #include "base/files/file_path.h"
  #include "base/files/file_util.h"
  #include "base/i18n/char_iterator.h"
-@@ -635,6 +636,8 @@ GURL FixupURLInternal(const std::string& text,
+@@ -636,6 +637,8 @@ GURL FixupURLInternal(const std::string& text,
                   desired_tld, &url);
      }
      if (chrome_url && !parts.host.is_valid()) {

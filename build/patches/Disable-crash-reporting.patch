@@ -4,15 +4,15 @@ Subject: Disable crash reporting
 
 ---
  chrome/browser/chrome_content_browser_client.cc          | 9 ---------
- content/browser/renderer_host/render_frame_host_impl.cc  | 1 +
+ content/browser/renderer_host/render_frame_host_impl.cc  | 2 +-
  content/browser/web_contents/web_contents_impl.cc        | 2 +-
  .../controller/javascript_call_stack_collector.cc        | 2 +-
- 4 files changed, 3 insertions(+), 11 deletions(-)
+ 4 files changed, 3 insertions(+), 12 deletions(-)
 
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -2904,15 +2904,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
+@@ -3112,15 +3112,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
          base::NumberToString(pid));
    }
  #endif
@@ -31,18 +31,23 @@ diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/ch
 diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
 --- a/content/browser/renderer_host/render_frame_host_impl.cc
 +++ b/content/browser/renderer_host/render_frame_host_impl.cc
-@@ -17186,6 +17186,7 @@ void RenderFrameHostImpl::OnSameDocumentCommitProcessed(
+@@ -17435,11 +17435,11 @@ void RenderFrameHostImpl::OnSameDocumentCommitProcessed(
+ 
  void RenderFrameHostImpl::MaybeGenerateCrashReport(
-     base::TerminationStatus status,
-     int exit_code) {
+     const ChildProcessTerminationInfo& info) {
 +  if ((true)) return;
+   if (has_reported_crash_) {
+     return;
+   }
+   has_reported_crash_ = true;
+-
    if (!last_committed_url_.SchemeIsHTTPOrHTTPS()) {
      return;
    }
 diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
 --- a/content/browser/web_contents/web_contents_impl.cc
 +++ b/content/browser/web_contents/web_contents_impl.cc
-@@ -11208,7 +11208,7 @@ void WebContentsImpl::RendererUnresponsive(
+@@ -11446,7 +11446,7 @@ void WebContentsImpl::RendererUnresponsive(
    base::UmaHistogramEnumeration(
        "ReportingAndNEL.UnresponsiveRenderer.CrashReportOutcome", outcome);
  
@@ -54,7 +59,7 @@ diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser
 diff --git a/third_party/blink/renderer/controller/javascript_call_stack_collector.cc b/third_party/blink/renderer/controller/javascript_call_stack_collector.cc
 --- a/third_party/blink/renderer/controller/javascript_call_stack_collector.cc
 +++ b/third_party/blink/renderer/controller/javascript_call_stack_collector.cc
-@@ -98,7 +98,7 @@ void GenerateJavaScriptCallStack(v8::Isolate* isolate, void* data) {
+@@ -97,7 +97,7 @@ void GenerateJavaScriptCallStack(v8::Isolate* isolate, void* data) {
      return;
    }
    ExecutionContext* execution_context = ToExecutionContext(script_state);

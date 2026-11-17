@@ -13,9 +13,8 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  chrome/android/chrome_java_sources.gni        |   2 +
  .../java/res/xml/about_chrome_preferences.xml |   5 +
  .../about_settings/AboutChromeSettings.java   |  28 +-
+ .../init/ProcessInitializationHandler.java    |   3 +
  .../omaha/CromiteUpdateStatusProvider.java    |  42 +++
- .../chrome/browser/omaha/OmahaBase.java       |   7 +-
- .../browser/omaha/UpdateMenuItemHelper.java   |  89 +++++-
  .../inline/BromiteInlineUpdateController.java | 285 ++++++++++++++++++
  chrome/browser/BUILD.gn                       |   2 +
  chrome/browser/endpoint_fetcher/BUILD.gn      |  32 ++
@@ -28,14 +27,17 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../flags/android/chrome_feature_list.cc      |   1 +
  .../browser/flags/ChromeFeatureList.java      |   1 +
  chrome/browser/omaha/android/BUILD.gn         |   3 +
+ .../chrome/browser/omaha/OmahaBase.java       |   7 +-
  .../chrome/browser/omaha/OmahaPrefUtils.java  |  52 +++-
  .../chrome/browser/omaha/UpdateConfigs.java   |  27 +-
- .../browser/omaha/UpdateStatusProvider.java   | 168 +++++++----
+ .../browser/omaha/UpdateMenuItemHelper.java   |  82 ++++-
+ .../browser/omaha/UpdateStatusProvider.java   | 178 ++++++++---
  .../browser/omaha/VersionNumberGetter.java    |   4 +-
  .../omaha/inline/InlineUpdateController.java  |  57 ++++
  .../safety_hub/SafetyHubFetchService.java     |   5 -
  .../strings/android_chrome_strings.grd        |  23 +-
  .../ui/lens/lens_overlay_query_controller.cc  |   2 +-
+ .../upstream_message_client.cc                |   3 +-
  components/commerce/core/account_checker.cc   |   2 +-
  .../subscriptions_server_proxy.cc             |   2 +-
  .../internal/composebox_query_controller.cc   |   2 +-
@@ -45,9 +47,10 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../endpoint_fetcher/endpoint_fetcher.h       |  28 +-
  components/manta/base_provider.cc             |   4 +-
  .../notebooks_network_service_impl.cc         |   2 +-
+ .../site_token_provider.cc                    |   3 +-
  .../Bromite-auto-updater.inc                  |   3 +
  .../Bromite-auto-updater.inc                  |   1 +
- 39 files changed, 1149 insertions(+), 103 deletions(-)
+ 42 files changed, 1165 insertions(+), 99 deletions(-)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/omaha/CromiteUpdateStatusProvider.java
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java
  create mode 100644 chrome/browser/endpoint_fetcher/BUILD.gn
@@ -64,7 +67,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/build/android/java/templates/BuildConfig.template b/build/android/java/templates/BuildConfig.template
 --- a/build/android/java/templates/BuildConfig.template
 +++ b/build/android/java/templates/BuildConfig.template
-@@ -83,6 +83,8 @@ public class BuildConfig {
+@@ -76,6 +76,8 @@ public class BuildConfig {
      public static boolean CRONET_FOR_AOSP_BUILD;
  #endif
  
@@ -76,7 +79,7 @@ diff --git a/build/android/java/templates/BuildConfig.template b/build/android/j
 diff --git a/build/config/android/rules.gni b/build/config/android/rules.gni
 --- a/build/config/android/rules.gni
 +++ b/build/config/android/rules.gni
-@@ -1990,6 +1990,9 @@ if (!is_robolectric && enable_java_templates) {
+@@ -2061,6 +2061,9 @@ if (!is_robolectric && enable_java_templates) {
        sources = [ "//build/android/java/templates/BuildConfig.template" ]
        defines = []
  
@@ -89,15 +92,15 @@ diff --git a/build/config/android/rules.gni b/build/config/android/rules.gni
 diff --git a/chrome/android/chrome_java_sources.gni b/chrome/android/chrome_java_sources.gni
 --- a/chrome/android/chrome_java_sources.gni
 +++ b/chrome/android/chrome_java_sources.gni
-@@ -941,6 +941,8 @@ chrome_java_sources = [
-   "java/src/org/chromium/chrome/browser/omaha/OmahaBase.java",
-   "java/src/org/chromium/chrome/browser/omaha/OmahaDelegate.java",
-   "java/src/org/chromium/chrome/browser/omaha/OmahaDelegateBase.java",
+@@ -947,6 +947,8 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/offlinepages/indicator/OfflineIndicatorInProductHelpController.java",
+   "java/src/org/chromium/chrome/browser/offlinepages/indicator/OfflineIndicatorMetricsDelegate.java",
+   "java/src/org/chromium/chrome/browser/offlinepages/measurements/OfflineMeasurementsBackgroundTask.java",
 +  "java/src/org/chromium/chrome/browser/omaha/CromiteUpdateStatusProvider.java",
 +  "java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java",
-   "java/src/org/chromium/chrome/browser/omaha/OmahaService.java",
-   "java/src/org/chromium/chrome/browser/omaha/RequestData.java",
-   "java/src/org/chromium/chrome/browser/omaha/RequestGenerator.java",
+   "java/src/org/chromium/chrome/browser/page_info/ChromePageInfo.java",
+   "java/src/org/chromium/chrome/browser/page_info/ChromePageInfoControllerDelegate.java",
+   "java/src/org/chromium/chrome/browser/page_info/PageInfoAboutThisSiteController.java",
 diff --git a/chrome/android/java/res/xml/about_chrome_preferences.xml b/chrome/android/java/res/xml/about_chrome_preferences.xml
 --- a/chrome/android/java/res/xml/about_chrome_preferences.xml
 +++ b/chrome/android/java/res/xml/about_chrome_preferences.xml
@@ -175,6 +178,26 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/about_settings/
      @Override
      public @SettingsFragment.AnimationType int getAnimationType() {
          return SettingsFragment.AnimationType.PROPERTY;
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/init/ProcessInitializationHandler.java b/chrome/android/java/src/org/chromium/chrome/browser/init/ProcessInitializationHandler.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/init/ProcessInitializationHandler.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/init/ProcessInitializationHandler.java
+@@ -81,6 +81,8 @@ import org.chromium.chrome.browser.notifications.NotificationUmaTracker;
+ import org.chromium.chrome.browser.notifications.TrampolineActivityTracker;
+ import org.chromium.chrome.browser.notifications.channels.ChannelsUpdater;
+ import org.chromium.chrome.browser.offlinepages.measurements.OfflineMeasurementsBackgroundTask;
++import org.chromium.chrome.browser.omaha.CromiteUpdateStatusProvider;
++import org.chromium.chrome.browser.omaha.UpdateStatusProvider;
+ import org.chromium.chrome.browser.optimization_guide.OptimizationGuideBridge;
+ import org.chromium.chrome.browser.optimization_guide.OptimizationGuideBridgeFactory;
+ import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
+@@ -229,6 +231,7 @@ public class ProcessInitializationHandler {
+         ChromeCachedFlags.getInstance().setFullListOfFlags();
+         setProcessStateSummaryForAnrs();
+         ColorProviderBridgeFactory.setInstance(new ColorProviderBridgeImpl());
++        UpdateStatusProvider.setInstanceSupplier(CromiteUpdateStatusProvider::getInstance);
+ 
+         PostTask.setShutdownPostTaskPreNativeThreadPoolEnabled(
+                 ChromeFeatureList.sShutdownPreNativeThreadPoolAfterStartup.isEnabled());
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/omaha/CromiteUpdateStatusProvider.java b/chrome/android/java/src/org/chromium/chrome/browser/omaha/CromiteUpdateStatusProvider.java
 new file mode 100644
 --- /dev/null
@@ -222,178 +245,6 @@ new file mode 100644
 +        mInlineController.setEnabled(hasActiveActivity);
 +    }
 +}
-diff --git a/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java b/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
---- a/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
-+++ b/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
-@@ -149,7 +149,8 @@ public class OmahaBase {
-     }
- 
-     static boolean isDisabled() {
--        return sDisabledForTesting;
-+        // do not enable version control via Omaha Update Server
-+        return true;
-     }
- 
-     /**
-@@ -593,6 +594,10 @@ public class OmahaBase {
-     /** Sends the request to the server and returns the response. */
-     static String sendRequestToServer(HttpURLConnection urlConnection, String request)
-             throws RequestFailureException {
-+        if ((true)) {
-+            throw new RequestFailureException("Requests to Omaha server are forbidden.",
-+                        RequestFailureException.ERROR_CONNECTIVITY);
-+        }
-         try {
-             OutputStream out = new BufferedOutputStream(urlConnection.getOutputStream());
-             OutputStreamWriter writer = new OutputStreamWriter(out);
-diff --git a/chrome/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java b/chrome/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java
---- a/chrome/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java
-+++ b/chrome/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java
-@@ -9,6 +9,7 @@ import android.content.ActivityNotFoundException;
- import android.content.res.Resources;
- import android.text.TextUtils;
- import android.view.Choreographer;
-+import androidx.annotation.StringRes;
- 
- import org.chromium.base.ApkInfo;
- import org.chromium.base.Callback;
-@@ -23,6 +24,7 @@ import org.chromium.build.annotations.Nullable;
- import org.chromium.chrome.R;
- import org.chromium.chrome.browser.omaha.UpdateStatusProvider.UpdateState;
- import org.chromium.chrome.browser.omaha.UpdateStatusProvider.UpdateStatus;
-+import org.chromium.chrome.browser.omaha.CromiteUpdateStatusProvider;
- import org.chromium.chrome.browser.preferences.Pref;
- import org.chromium.chrome.browser.profiles.Profile;
- import org.chromium.chrome.browser.profiles.ProfileKeyedMap;
-@@ -115,7 +117,7 @@ public class UpdateMenuItemHelper {
-             return;
-         }
- 
--        UpdateStatusProvider.getInstance().addObserver(mUpdateCallback);
-+        CromiteUpdateStatusProvider.getInstance().addObserver(mUpdateCallback);
-     }
- 
-     /** Unregisters {@code observer} from menu state changes. */
-@@ -140,14 +142,27 @@ public class UpdateMenuItemHelper {
-                 if (TextUtils.isEmpty(mStatus.updateUrl)) return;
- 
-                 try {
--                    UpdateStatusProvider.getInstance()
-+                    CromiteUpdateStatusProvider.getInstance()
-                             .startIntentUpdate(activity, /* newTask= */ false);
-                 } catch (ActivityNotFoundException e) {
-                     Log.e(TAG, "Failed to launch Activity for: %s", mStatus.updateUrl);
-                 }
-                 break;
-+            case UpdateState.VULNERABLE_VERSION:
-+            // Intentional fall through.
-+            case UpdateState.INLINE_UPDATE_AVAILABLE:
-+                CromiteUpdateStatusProvider.getInstance().startInlineUpdate(activity);
-+                break;
-+            case UpdateState.INLINE_UPDATE_READY:
-+                CromiteUpdateStatusProvider.getInstance().finishInlineUpdate();
-+                break;
-+            case UpdateState.INLINE_UPDATE_FAILED:
-+                CromiteUpdateStatusProvider.getInstance().retryInlineUpdate(activity);
-+                break;
-             case UpdateState.UNSUPPORTED_OS_VERSION:
-                 // Intentional fall through.
-+            case UpdateState.INLINE_UPDATE_DOWNLOADING:
-+            // Intentional fall through.
-             default:
-                 return;
-         }
-@@ -183,7 +198,7 @@ public class UpdateMenuItemHelper {
-         if (mStatus == null) return;
-         if (mStatus.updateState != UpdateState.UNSUPPORTED_OS_VERSION) return;
- 
--        UpdateStatusProvider.getInstance().updateLatestUnsupportedVersion();
-+        CromiteUpdateStatusProvider.getInstance().updateLatestUnsupportedVersion();
-     }
- 
-     private void handleStateChanged() {
-@@ -196,7 +211,7 @@ public class UpdateMenuItemHelper {
- 
-         mMenuUiState = new MenuUiState();
-         switch (mStatus.updateState) {
--            case UpdateState.UPDATE_AVAILABLE:
-+            case UpdateState.UPDATE_AVAILABLE: // this is not used in Bromite
-                 // The badge is hidden if the update menu item has been clicked until there is an
-                 // even newer version of Chrome available.
-                 showBadge |=
-@@ -254,6 +269,72 @@ public class UpdateMenuItemHelper {
-                 mMenuUiState.itemState.icon = R.drawable.ic_error_24dp_filled;
-                 mMenuUiState.itemState.enabled = false;
-                 break;
-+            case UpdateState.VULNERABLE_VERSION:
-+            // Intentional fall through.
-+            case UpdateState.INLINE_UPDATE_AVAILABLE:
-+                // The badge is hidden if the update menu item has been clicked until there is an
-+                // even newer version of Chrome available.
-+                @StringRes int defaultUpdateSummary = R.string.menu_update_summary_default;
-+                if (mStatus.updateState == UpdateState.VULNERABLE_VERSION) {
-+                    // always show badge in case of vulnerable version
-+                    showBadge = true;
-+                    mMenuUiState.buttonState = new MenuButtonState();
-+                    mMenuUiState.buttonState.menuContentDescription = R.string.accessibility_toolbar_btn_menu_update;
-+                    mMenuUiState.buttonState.darkBadgeIcon =
-+                            R.drawable.ic_error_grey800_24dp_filled;
-+                    mMenuUiState.buttonState.lightBadgeIcon = R.drawable.ic_error_white_24dp_filled;
-+                    mMenuUiState.buttonState.adaptiveBadgeIcon = R.drawable.ic_error_24dp_filled;
-+                    defaultUpdateSummary = R.string.menu_update_summary_vulnerable;
-+                } else {
-+                    showBadge |= !TextUtils.equals(
-+                        getPrefService().getString(
-+                                Pref.LATEST_VERSION_WHEN_CLICKED_UPDATE_MENU_ITEM),
-+                        mStatus.latestUnsupportedVersion);
-+                    if (showBadge) {
-+                        mMenuUiState.buttonState = new MenuButtonState();
-+                        mMenuUiState.buttonState.menuContentDescription = R.string.accessibility_toolbar_btn_menu_update;
-+                        mMenuUiState.buttonState.darkBadgeIcon = R.drawable.badge_update_dark;
-+                        mMenuUiState.buttonState.lightBadgeIcon = R.drawable.badge_update_light;
-+                        mMenuUiState.buttonState.adaptiveBadgeIcon = R.drawable.badge_update;
-+                    }
-+                }
-+
-+                mMenuUiState.itemState = new MenuItemState();
-+                mMenuUiState.itemState.title = R.string.menu_update;
-+                mMenuUiState.itemState.titleColorId = R.color.default_text_color_blue_dark;
-+                mMenuUiState.itemState.summary = UpdateConfigs.getCustomSummary();
-+                if (TextUtils.isEmpty(mMenuUiState.itemState.summary)) {
-+                    mMenuUiState.itemState.summary =
-+                            resources.getString(defaultUpdateSummary);
-+                }
-+                mMenuUiState.itemState.icon = R.drawable.ic_history_24dp;
-+                mMenuUiState.itemState.iconTintId = R.color.default_icon_color_blue_light;
-+                mMenuUiState.itemState.enabled = true;
-+                break;
-+            case UpdateState.INLINE_UPDATE_DOWNLOADING:
-+                mMenuUiState.itemState = new MenuItemState();
-+                mMenuUiState.itemState.title = R.string.menu_inline_update_downloading;
-+                mMenuUiState.itemState.titleColorId = R.color.default_text_color_secondary_dark;
-+                break;
-+            case UpdateState.INLINE_UPDATE_READY:
-+                mMenuUiState.itemState = new MenuItemState();
-+                mMenuUiState.itemState.title = R.string.menu_inline_update_ready;
-+                mMenuUiState.itemState.titleColorId = R.color.default_text_color_blue_dark;
-+                mMenuUiState.itemState.summary =
-+                        resources.getString(R.string.menu_inline_update_ready_summary);
-+                mMenuUiState.itemState.icon = R.drawable.chrome_logo_blue;
-+                mMenuUiState.itemState.iconTintId = R.color.default_icon_color_blue_light;
-+                mMenuUiState.itemState.enabled = true;
-+                break;
-+            case UpdateState.INLINE_UPDATE_FAILED:
-+                mMenuUiState.itemState = new MenuItemState();
-+                mMenuUiState.itemState.title = R.string.menu_inline_update_failed;
-+                mMenuUiState.itemState.titleColorId = R.color.default_text_color_blue_dark;
-+                mMenuUiState.itemState.summary = resources.getString(R.string.try_again);
-+                mMenuUiState.itemState.icon = R.drawable.ic_history_24dp;
-+                mMenuUiState.itemState.iconTintId = R.color.default_icon_color_blue_light;
-+                mMenuUiState.itemState.enabled = true;
-+                break;
-             case UpdateState.NONE:
-                 // Intentional fall through.
-             default:
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java b/chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java
 new file mode 100644
 --- /dev/null
@@ -687,7 +538,7 @@ new file mode 100644
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -1645,6 +1645,7 @@ source_set("core") {
+@@ -1485,6 +1485,7 @@ source_set("core") {
        "commerce/android/price_tracking_utils_android.cc",
        "commerce/android/shopping_service_factory_android.cc",
        "composeplate/android/composeplate_utils.cc",
@@ -695,14 +546,14 @@ diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
        "icon_loader_android.cc",
        "incognito/android/incognito_utils_android.cc",
        "memory_details_android.cc",
-@@ -1663,6 +1664,7 @@ source_set("core") {
-       "//chrome/browser/commerce",
+@@ -1504,6 +1505,7 @@ source_set("core") {
        "//chrome/browser/commerce/android:shopping_service_jni",
        "//chrome/browser/composeplate/android:jni_headers",
-+      "//chrome/browser/endpoint_fetcher:jni_headers",
        "//chrome/browser/dev_ui",
-       "//chrome/browser/facilitated_payments",
++      "//chrome/browser/endpoint_fetcher:jni_headers",
        "//chrome/browser/feed",
+       "//chrome/browser/finds/core",
+       "//chrome/browser/flags:flags_android",
 diff --git a/chrome/browser/endpoint_fetcher/BUILD.gn b/chrome/browser/endpoint_fetcher/BUILD.gn
 new file mode 100644
 --- /dev/null
@@ -1010,29 +861,29 @@ new file mode 100644
 diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
 --- a/chrome/browser/flags/android/chrome_feature_list.cc
 +++ b/chrome/browser/flags/android/chrome_feature_list.cc
-@@ -404,6 +404,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
+@@ -451,6 +451,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
      &kInlinePdfV2,
      &kInlinePdfV2Download,
      &kInlinePdfV2Incognito,
 +    &kInlineUpdateFlow,
+     &kInterruptiveIphCooldownGroup,
      &kKeyboardEscBackNavigation,
-     &kLaunchCauseScreenOffFix,
      &kLensOnQuickActionSearchWidget,
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 --- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 +++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
-@@ -602,6 +602,7 @@ public abstract class ChromeFeatureList {
+@@ -661,6 +661,7 @@ public abstract class ChromeFeatureList {
      public static final String INLINE_PDF_V2 = "InlinePdfV2";
      public static final String INLINE_PDF_V2_DOWNLOAD = "InlinePdfV2Download";
      public static final String INLINE_PDF_V2_INCOGNITO = "InlinePdfV2Incognito";
 +    public static final String INLINE_UPDATE_FLOW = "InlineUpdateFlow";
+     public static final String INTERRUPTIVE_IPH_COOLDOWN_GROUP = "InterruptiveIphCooldownGroup";
+     public static final String IN_APP_UPDATE_FLOW = "InAppUpdateFlow";
      public static final String IN_APP_WINDOW_MANAGER_DEPRECATION = "InAppWindowManagerDeprecation";
-     public static final String KEYBOARD_ESC_BACK_NAVIGATION = "KeyboardEscBackNavigation";
-     public static final String LAUNCH_CAUSE_SCREEN_OFF_FIX = "LaunchCauseScreenOffFix";
 diff --git a/chrome/browser/omaha/android/BUILD.gn b/chrome/browser/omaha/android/BUILD.gn
 --- a/chrome/browser/omaha/android/BUILD.gn
 +++ b/chrome/browser/omaha/android/BUILD.gn
-@@ -19,6 +19,9 @@ android_library("java") {
+@@ -31,6 +31,9 @@ android_library("java") {
      "java/src/org/chromium/chrome/browser/omaha/metrics/TrackingProvider.java",
      "java/src/org/chromium/chrome/browser/omaha/metrics/UpdateSuccessMetrics.java",
    ]
@@ -1042,6 +893,30 @@ diff --git a/chrome/browser/omaha/android/BUILD.gn b/chrome/browser/omaha/androi
    deps = [
      ":update_proto_java",
      "//base:base_java",
+diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
+--- a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
++++ b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
+@@ -149,7 +149,8 @@ public class OmahaBase {
+     }
+ 
+     static boolean isDisabled() {
+-        return sDisabledForTesting;
++        // do not enable version control via Omaha Update Server
++        return true;
+     }
+ 
+     /**
+@@ -609,6 +610,10 @@ public class OmahaBase {
+     /** Sends the request to the server and returns the response. */
+     static String sendRequestToServer(HttpURLConnection urlConnection, String request)
+             throws RequestFailureException {
++        if ((true)) {
++            throw new RequestFailureException("Requests to Omaha server are forbidden.",
++                        RequestFailureException.ERROR_CONNECTIVITY);
++        }
+         try {
+             OutputStream out = new BufferedOutputStream(urlConnection.getOutputStream());
+             OutputStreamWriter writer = new OutputStreamWriter(out);
 diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaPrefUtils.java b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaPrefUtils.java
 --- a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaPrefUtils.java
 +++ b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaPrefUtils.java
@@ -1179,6 +1054,120 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
 +        return UpdateFlowConfiguration.NEVER_SHOW;
 +    }
  }
+diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java
+--- a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java
++++ b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateMenuItemHelper.java
+@@ -9,6 +9,7 @@ import android.content.ActivityNotFoundException;
+ import android.content.res.Resources;
+ import android.text.TextUtils;
+ import android.view.Choreographer;
++import androidx.annotation.StringRes;
+ 
+ import org.chromium.base.ApkInfo;
+ import org.chromium.base.Callback;
+@@ -175,7 +176,20 @@ public class UpdateMenuItemHelper {
+                     Log.e(TAG, "Failed to launch Activity for: %s", updateUrl);
+                 }
+                 break;
++            case UpdateState.VULNERABLE_VERSION:
++            // Intentional fall through.
++            case UpdateState.INLINE_UPDATE_AVAILABLE:
++                UpdateStatusProvider.getInstance().startInlineUpdate(activity);
++                break;
++            case UpdateState.INLINE_UPDATE_READY:
++                UpdateStatusProvider.getInstance().finishInlineUpdate();
++                break;
++            case UpdateState.INLINE_UPDATE_FAILED:
++                UpdateStatusProvider.getInstance().retryInlineUpdate(activity);
++                break;
+             case UpdateState.UNSUPPORTED_OS_VERSION:
++                // Intentional fall through.
++            case UpdateState.INLINE_UPDATE_DOWNLOADING:
+             // Intentional fall through.
+             default:
+                 return;
+@@ -221,7 +235,7 @@ public class UpdateMenuItemHelper {
+ 
+         mMenuUiState = new MenuUiState();
+         switch (mStatus.updateState) {
+-            case UpdateState.UPDATE_AVAILABLE:
++            case UpdateState.UPDATE_AVAILABLE: // this is not used in Bromite
+                 // The badge is hidden if the update menu item has been clicked until there is an
+                 // even newer version of Chrome available.
+                 showBadge |=
+@@ -279,6 +293,72 @@ public class UpdateMenuItemHelper {
+                 mMenuUiState.itemState.icon = R.drawable.ic_error_24dp_filled;
+                 mMenuUiState.itemState.enabled = false;
+                 break;
++            case UpdateState.VULNERABLE_VERSION:
++            // Intentional fall through.
++            case UpdateState.INLINE_UPDATE_AVAILABLE:
++                // The badge is hidden if the update menu item has been clicked until there is an
++                // even newer version of Chrome available.
++                @StringRes int defaultUpdateSummary = R.string.menu_update_summary_default;
++                if (mStatus.updateState == UpdateState.VULNERABLE_VERSION) {
++                    // always show badge in case of vulnerable version
++                    showBadge = true;
++                    mMenuUiState.buttonState = new MenuButtonState();
++                    mMenuUiState.buttonState.menuContentDescription = R.string.accessibility_toolbar_btn_menu_update;
++                    mMenuUiState.buttonState.darkBadgeIcon =
++                            R.drawable.ic_error_grey800_24dp_filled;
++                    mMenuUiState.buttonState.lightBadgeIcon = R.drawable.ic_error_white_24dp_filled;
++                    mMenuUiState.buttonState.adaptiveBadgeIcon = R.drawable.ic_error_24dp_filled;
++                    defaultUpdateSummary = R.string.menu_update_summary_vulnerable;
++                } else {
++                    showBadge |= !TextUtils.equals(
++                        getPrefService().getString(
++                                Pref.LATEST_VERSION_WHEN_CLICKED_UPDATE_MENU_ITEM),
++                        mStatus.latestUnsupportedVersion);
++                    if (showBadge) {
++                        mMenuUiState.buttonState = new MenuButtonState();
++                        mMenuUiState.buttonState.menuContentDescription = R.string.accessibility_toolbar_btn_menu_update;
++                        mMenuUiState.buttonState.darkBadgeIcon = R.drawable.badge_update_dark;
++                        mMenuUiState.buttonState.lightBadgeIcon = R.drawable.badge_update_light;
++                        mMenuUiState.buttonState.adaptiveBadgeIcon = R.drawable.badge_update;
++                    }
++                }
++
++                mMenuUiState.itemState = new MenuItemState();
++                mMenuUiState.itemState.title = R.string.menu_update;
++                mMenuUiState.itemState.titleColorId = R.color.default_text_color_blue_dark;
++                mMenuUiState.itemState.summary = UpdateConfigs.getCustomSummary();
++                if (TextUtils.isEmpty(mMenuUiState.itemState.summary)) {
++                    mMenuUiState.itemState.summary =
++                            resources.getString(defaultUpdateSummary);
++                }
++                mMenuUiState.itemState.icon = R.drawable.ic_history_24dp;
++                mMenuUiState.itemState.iconTintId = R.color.default_icon_color_blue_light;
++                mMenuUiState.itemState.enabled = true;
++                break;
++            case UpdateState.INLINE_UPDATE_DOWNLOADING:
++                mMenuUiState.itemState = new MenuItemState();
++                mMenuUiState.itemState.title = R.string.menu_inline_update_downloading;
++                mMenuUiState.itemState.titleColorId = R.color.default_text_color_secondary_dark;
++                break;
++            case UpdateState.INLINE_UPDATE_READY:
++                mMenuUiState.itemState = new MenuItemState();
++                mMenuUiState.itemState.title = R.string.menu_inline_update_ready;
++                mMenuUiState.itemState.titleColorId = R.color.default_text_color_blue_dark;
++                mMenuUiState.itemState.summary =
++                        resources.getString(R.string.menu_inline_update_ready_summary);
++                mMenuUiState.itemState.icon = R.drawable.chrome_logo_blue;
++                mMenuUiState.itemState.iconTintId = R.color.default_icon_color_blue_light;
++                mMenuUiState.itemState.enabled = true;
++                break;
++            case UpdateState.INLINE_UPDATE_FAILED:
++                mMenuUiState.itemState = new MenuItemState();
++                mMenuUiState.itemState.title = R.string.menu_inline_update_failed;
++                mMenuUiState.itemState.titleColorId = R.color.default_text_color_blue_dark;
++                mMenuUiState.itemState.summary = resources.getString(R.string.try_again);
++                mMenuUiState.itemState.icon = R.drawable.ic_history_24dp;
++                mMenuUiState.itemState.iconTintId = R.color.default_icon_color_blue_light;
++                mMenuUiState.itemState.enabled = true;
++                break;
+             case UpdateState.NONE:
+             // Intentional fall through.
+             default:
 diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateStatusProvider.java b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateStatusProvider.java
 --- a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateStatusProvider.java
 +++ b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/UpdateStatusProvider.java
@@ -1212,19 +1201,20 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
  import org.chromium.chrome.browser.omaha.metrics.UpdateSuccessMetrics;
  import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
  import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
-@@ -40,6 +44,11 @@ import java.io.File;
+@@ -39,6 +43,12 @@ import org.chromium.components.browser_ui.util.ConversionUtils;
+ import java.io.File;
  import java.lang.annotation.Retention;
  import java.lang.annotation.RetentionPolicy;
- 
++import java.util.function.Supplier;
++
 +import org.chromium.base.Log;
 +import android.content.SharedPreferences;
 +import android.os.Build;
 +import org.chromium.build.BuildConfig;
-+
+ 
  /**
   * Provides the current update state for Chrome.  This update state is asynchronously determined and
-  * can change as Chrome runs.
-@@ -47,24 +56,26 @@ import java.lang.annotation.RetentionPolicy;
+@@ -47,24 +57,26 @@ import java.lang.annotation.RetentionPolicy;
   * For manually testing this functionality, see {@link UpdateConfigs}.
   */
  @NullMarked
@@ -1259,7 +1249,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
      }
  
      /** A set of properties that represent the current update state for Chrome. */
-@@ -98,6 +109,12 @@ public class UpdateStatusProvider {
+@@ -98,6 +110,12 @@ public class UpdateStatusProvider {
           */
          private boolean mIsSimulated;
  
@@ -1272,7 +1262,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
          public UpdateStatus() {}
  
          UpdateStatus(UpdateStatus other) {
-@@ -106,11 +123,13 @@ public class UpdateStatusProvider {
+@@ -106,11 +124,13 @@ public class UpdateStatusProvider {
              latestVersion = other.latestVersion;
              latestUnsupportedVersion = other.latestUnsupportedVersion;
              mIsSimulated = other.mIsSimulated;
@@ -1286,19 +1276,29 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
      private final UpdateQuery mOmahaQuery;
      private final UpdateSuccessMetrics mMetrics;
      private @Nullable UpdateStatus mStatus;
-@@ -118,11 +137,6 @@ public class UpdateStatusProvider {
+@@ -118,9 +138,19 @@ public class UpdateStatusProvider {
      /** Whether or not we've recorded the initial update status yet. */
      private boolean mRecordedInitialStatus;
  
 -    /** @return Returns a singleton of {@link UpdateStatusProvider}. */
--    public static UpdateStatusProvider getInstance() {
++    private static @Nullable Supplier<UpdateStatusProvider> sInstanceSupplier;
++
++    /**
++     * Registers the supplier of the provider implementation, which lives outside this library.
++     * Called once at startup.
++     */
++    public static void setInstanceSupplier(Supplier<UpdateStatusProvider> supplier) {
++        sInstanceSupplier = supplier;
++    }
++
++    /** @return Returns the singleton {@link UpdateStatusProvider} registered at startup. */
+     public static UpdateStatusProvider getInstance() {
 -        return LazyHolder.INSTANCE;
--    }
--
++        return assumeNonNull(sInstanceSupplier).get();
+     }
+ 
      /**
-      * Adds {@code observer} to notify about update state changes.  It is safe to call this multiple
-      * times with the same {@code observer}.  This method will always notify {@code observer} of the
-@@ -178,6 +192,30 @@ public class UpdateStatusProvider {
+@@ -178,6 +208,30 @@ public class UpdateStatusProvider {
          pingObservers();
      }
  
@@ -1329,7 +1329,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
      /**
       * Starts the intent update process, if possible
       * @param context An {@link Context} that will be used to fire off the update intent.
-@@ -185,12 +223,11 @@ public class UpdateStatusProvider {
+@@ -185,12 +239,11 @@ public class UpdateStatusProvider {
       * @return        Whether or not the update intent was sent and had a valid handler.
       */
      public boolean startIntentUpdate(Context context, boolean newTask) {
@@ -1343,7 +1343,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
              Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(mStatus.updateUrl));
              // Ensure that the app vs browser disambiguation dialog is not shown.
              intent.addFlags(Intent.FLAG_ACTIVITY_REQUIRE_NON_BROWSER);
-@@ -203,9 +240,15 @@ public class UpdateStatusProvider {
+@@ -203,9 +256,15 @@ public class UpdateStatusProvider {
          return true;
      }
  
@@ -1361,7 +1361,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
      }
  
      @RequiresNonNull("mStatus")
-@@ -214,35 +257,52 @@ public class UpdateStatusProvider {
+@@ -214,35 +273,52 @@ public class UpdateStatusProvider {
      }
  
      private void resolveStatus() {
@@ -1423,7 +1423,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
              mCallback = resultReceiver;
          }
  
-@@ -254,7 +314,7 @@ public class UpdateStatusProvider {
+@@ -254,7 +330,7 @@ public class UpdateStatusProvider {
          protected UpdateStatus doInBackground() {
              UpdateStatus testStatus = getTestStatus();
              if (testStatus != null) return testStatus;
@@ -1432,7 +1432,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
          }
  
          @Override
-@@ -272,6 +332,8 @@ public class UpdateStatusProvider {
+@@ -272,6 +348,8 @@ public class UpdateStatusProvider {
              status.mIsSimulated = true;
              status.updateState = forcedUpdateState;
  
@@ -1441,7 +1441,7 @@ diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/o
              // Push custom configurations for certain update states.
              switch (forcedUpdateState) {
                  case UpdateState.UPDATE_AVAILABLE:
-@@ -289,31 +351,33 @@ public class UpdateStatusProvider {
+@@ -289,31 +367,33 @@ public class UpdateStatusProvider {
              return status;
          }
  
@@ -1599,7 +1599,7 @@ diff --git a/chrome/browser/safety_hub/android/java/src/org/chromium/chrome/brow
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -2343,6 +2343,12 @@ Your Google account may have other forms of browsing history like searches and a
+@@ -2406,6 +2406,12 @@ Your Google account may have other forms of browsing history like searches and a
        <message name="IDS_DEPRECATION_WARNING" desc="Warning about Chrome updates no longer being supported">
          Chrome updates are no longer supported for this version of Android
        </message>
@@ -1612,7 +1612,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
  
        <!-- Account management UI strings. -->
        <message name="IDS_ACCOUNT_MANAGEMENT_TITLE" desc="Header title for the account management screen. [CHAR_LIMIT=32]">
-@@ -4409,7 +4415,10 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
+@@ -4455,7 +4461,10 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
  
        <!-- Main menu items -->
        <message name="IDS_MENU_UPDATE" desc="Menu item for updating chrome. [CHAR_LIMIT=24]">
@@ -1624,9 +1624,9 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
        </message>
        <message name="IDS_MENU_UPDATE_SUMMARY_DEFAULT" desc="Summary string for update menu item explaining that a newer version of Chrome is available. [CHAR_LIMIT=30]">
          Newer version is available
-@@ -4420,6 +4429,18 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
-       <message name="IDS_MENU_UPDATE_UNSUPPORTED_SUMMARY_DEFAULT" desc="Summary string for update menu item explaining that the Android version on the device is unsupported. [CHAR_LIMIT=30]">
-         Android version is unsupported
+@@ -4479,6 +4488,18 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
+       <message name="IDS_IN_APP_UPDATE_RESTART_ACTION" desc="Action button text on snackbar to restart Chrome and apply the update. [CHAR_LIMIT=15]">
+         Restart
        </message>
 +      <message name="IDS_MENU_INLINE_UPDATE_DOWNLOADING" desc="Menu item for when Chrome is in the process of updating. [CHAR_LIMIT=24]">
 +        Downloading…
@@ -1646,7 +1646,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 diff --git a/chrome/browser/ui/lens/lens_overlay_query_controller.cc b/chrome/browser/ui/lens/lens_overlay_query_controller.cc
 --- a/chrome/browser/ui/lens/lens_overlay_query_controller.cc
 +++ b/chrome/browser/ui/lens/lens_overlay_query_controller.cc
-@@ -714,7 +714,7 @@ LensOverlayQueryController::CreateEndpointFetcher(
+@@ -741,7 +741,7 @@ LensOverlayQueryController::CreateEndpointFetcher(
            .SetTimeout(timeout)
            .SetUrl(fetch_url)
            .SetUploadProgressCallback(std::move(upload_progress_callback))
@@ -1655,12 +1655,25 @@ diff --git a/chrome/browser/ui/lens/lens_overlay_query_controller.cc b/chrome/br
  }
  
  void LensOverlayQueryController::SendLatencyGen204IfEnabled(
+diff --git a/components/browser_actuator/internal/transport/upstream_message_client/upstream_message_client.cc b/components/browser_actuator/internal/transport/upstream_message_client/upstream_message_client.cc
+--- a/components/browser_actuator/internal/transport/upstream_message_client/upstream_message_client.cc
++++ b/components/browser_actuator/internal/transport/upstream_message_client/upstream_message_client.cc
+@@ -98,7 +98,8 @@ ActuatorUpstreamMessage UpstreamMessageClient::SendUpstreamMessage(
+       .SetConsentLevel(signin::ConsentLevel::kSignin);
+ 
+   auto fetcher = std::make_unique<endpoint_fetcher::EndpointFetcher>(
+-      url_loader_factory_, identity_manager_, params_builder.Build());
++      url_loader_factory_, identity_manager_, params_builder.Build(),
++      traffic_annotation_);
+ 
+   auto* fetcher_ptr = fetcher.get();
+   pending_requests_.emplace(fetcher_ptr, std::move(fetcher));
 diff --git a/components/commerce/core/account_checker.cc b/components/commerce/core/account_checker.cc
 --- a/components/commerce/core/account_checker.cc
 +++ b/components/commerce/core/account_checker.cc
-@@ -326,7 +326,7 @@ std::unique_ptr<EndpointFetcher> AccountChecker::CreateEndpointFetcher(
+@@ -324,7 +324,7 @@ std::unique_ptr<EndpointFetcher> AccountChecker::CreateEndpointFetcher(
+       .SetTimeout(timeout)
        .SetPostData(post_data);
-   MaybeUseAlternateShoppingServer(request_params);
    return std::make_unique<EndpointFetcher>(
 -      url_loader_factory_, identity_manager_, request_params.Build());
 +      url_loader_factory_, identity_manager_, request_params.Build(), annotation_tag);
@@ -1670,9 +1683,9 @@ diff --git a/components/commerce/core/account_checker.cc b/components/commerce/c
 diff --git a/components/commerce/core/subscriptions/subscriptions_server_proxy.cc b/components/commerce/core/subscriptions/subscriptions_server_proxy.cc
 --- a/components/commerce/core/subscriptions/subscriptions_server_proxy.cc
 +++ b/components/commerce/core/subscriptions/subscriptions_server_proxy.cc
-@@ -302,7 +302,7 @@ SubscriptionsServerProxy::CreateEndpointFetcher(
+@@ -300,7 +300,7 @@ SubscriptionsServerProxy::CreateEndpointFetcher(
+       .SetTimeout(base::Milliseconds(kTimeoutMs.Get()))
        .SetPostData(post_data);
-   MaybeUseAlternateShoppingServer(request_params);
    return std::make_unique<EndpointFetcher>(
 -      url_loader_factory_, identity_manager_, request_params.Build());
 +      url_loader_factory_, identity_manager_, request_params.Build(), annotation_tag);
@@ -1682,7 +1695,7 @@ diff --git a/components/commerce/core/subscriptions/subscriptions_server_proxy.c
 diff --git a/components/contextual_search/internal/composebox_query_controller.cc b/components/contextual_search/internal/composebox_query_controller.cc
 --- a/components/contextual_search/internal/composebox_query_controller.cc
 +++ b/components/contextual_search/internal/composebox_query_controller.cc
-@@ -1450,7 +1450,7 @@ ComposeboxQueryController::CreateEndpointFetcher(
+@@ -1640,7 +1640,7 @@ ComposeboxQueryController::CreateEndpointFetcher(
            .SetTimeout(timeout)
            .SetUploadProgressCallback(std::move(upload_progress_callback))
            .SetUrl(fetch_url)
@@ -1694,7 +1707,7 @@ diff --git a/components/contextual_search/internal/composebox_query_controller.c
 diff --git a/components/data_sharing/internal/data_sharing_network_loader_impl.cc b/components/data_sharing/internal/data_sharing_network_loader_impl.cc
 --- a/components/data_sharing/internal/data_sharing_network_loader_impl.cc
 +++ b/components/data_sharing/internal/data_sharing_network_loader_impl.cc
-@@ -63,7 +63,7 @@ DataSharingNetworkLoaderImpl::CreateEndpointFetcher(
+@@ -376,7 +376,7 @@ DataSharingNetworkLoaderImpl::CreateEndpointFetcher(
            .SetUrl(url)
            .SetOAuthConsumerId(signin::OAuthConsumerId::kDataSharingAndroid)
            .SetPostData(post_data)
@@ -1862,7 +1875,7 @@ diff --git a/components/endpoint_fetcher/endpoint_fetcher.cc b/components/endpoi
    network::SimpleURLLoader::BodyAsStringCallback body_as_string_callback =
        base::BindOnce(&EndpointFetcher::OnResponseFetched,
                       weak_ptr_factory_.GetWeakPtr(),
-@@ -334,21 +391,6 @@ void EndpointFetcher::OnResponseFetched(
+@@ -335,21 +392,6 @@ void EndpointFetcher::OnResponseFetched(
    std::move(endpoint_fetcher_callback).Run(std::move(response));
  }
  
@@ -1884,7 +1897,7 @@ diff --git a/components/endpoint_fetcher/endpoint_fetcher.cc b/components/endpoi
  int EndpointFetcher::GetMaxRetries() const {
    return request_params_.max_retries.value_or(kNumRetries);
  }
-@@ -366,4 +408,39 @@ std::string EndpointFetcher::GetUrlForTesting() {
+@@ -367,4 +409,39 @@ std::string EndpointFetcher::GetUrlForTesting() {
    return request_params_.url().spec();
  }
  
@@ -1954,7 +1967,7 @@ diff --git a/components/endpoint_fetcher/endpoint_fetcher.h b/components/endpoin
    int http_status_code{-1};
    std::optional<FetchErrorType> error_type;
    scoped_refptr<net::HttpResponseHeaders> headers;
-@@ -300,7 +306,16 @@ class EndpointFetcher {
+@@ -305,7 +311,16 @@ class EndpointFetcher {
    EndpointFetcher(
        const scoped_refptr<network::SharedURLLoaderFactory>& url_loader_factory,
        signin::IdentityManager* identity_manager,
@@ -1972,7 +1985,7 @@ diff --git a/components/endpoint_fetcher/endpoint_fetcher.h b/components/endpoin
  
    EndpointFetcher(const EndpointFetcher& endpoint_fetcher) = delete;
    EndpointFetcher& operator=(const EndpointFetcher& endpoint_fetcher) = delete;
-@@ -333,11 +348,17 @@ class EndpointFetcher {
+@@ -338,11 +353,17 @@ class EndpointFetcher {
  
    void OnResponseFetched(EndpointFetcherCallback callback,
                           std::optional<std::string> response_body);
@@ -1990,7 +2003,7 @@ diff --git a/components/endpoint_fetcher/endpoint_fetcher.h b/components/endpoin
  
    // Members set in constructor
    const scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
-@@ -348,6 +369,8 @@ class EndpointFetcher {
+@@ -353,6 +374,8 @@ class EndpointFetcher {
    // SingleClientSharedTabGroupVersioningSyncTest.ShouldShowVersioningMessagesAfterRestart/kSyncTransportOnly
    const raw_ptr<signin::IdentityManager, DanglingUntriaged> identity_manager_;
  
@@ -1999,7 +2012,7 @@ diff --git a/components/endpoint_fetcher/endpoint_fetcher.h b/components/endpoin
    // The complete definition of the specific network request to be performed.
    // Contains authentication details and response handling preferences.
    const RequestParams request_params_;
-@@ -357,6 +380,9 @@ class EndpointFetcher {
+@@ -362,6 +385,9 @@ class EndpointFetcher {
        access_token_fetcher_;
    std::unique_ptr<network::SimpleURLLoader> simple_url_loader_;
  
@@ -2033,7 +2046,7 @@ diff --git a/components/manta/base_provider.cc b/components/manta/base_provider.
 diff --git a/components/notebooks/internal/notebooks_network_service_impl.cc b/components/notebooks/internal/notebooks_network_service_impl.cc
 --- a/components/notebooks/internal/notebooks_network_service_impl.cc
 +++ b/components/notebooks/internal/notebooks_network_service_impl.cc
-@@ -235,7 +235,7 @@ NotebooksNetworkServiceImpl::CreateEndpointFetcher(
+@@ -129,7 +129,7 @@ NotebooksNetworkServiceImpl::CreateEndpointFetcher(
            .SetUrl(url)
            .SetOAuthConsumerId(signin::OAuthConsumerId::kNotebooksService)
            .SetPostData(post_data)
@@ -2042,6 +2055,19 @@ diff --git a/components/notebooks/internal/notebooks_network_service_impl.cc b/c
  }
  
  GURL NotebooksNetworkServiceImpl::ConstructServiceURL(std::string_view path) {
+diff --git a/components/site_token_provider/site_token_provider.cc b/components/site_token_provider/site_token_provider.cc
+--- a/components/site_token_provider/site_token_provider.cc
++++ b/components/site_token_provider/site_token_provider.cc
+@@ -134,7 +134,8 @@ class SiteTokenProviderImpl : public SiteTokenProvider {
+         .SetConsentLevel(signin::ConsentLevel::kSignin);
+ 
+     endpoint_fetcher_ = std::make_unique<endpoint_fetcher::EndpointFetcher>(
+-        url_loader_factory_, identity_manager_, builder.Build());
++        url_loader_factory_, identity_manager_, builder.Build(),
++        kTrafficAnnotation);
+ 
+     endpoint_fetcher_->Fetch(
+         base::BindOnce(&SiteTokenProviderImpl::OnFetchComplete,
 diff --git a/cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Bromite-auto-updater.inc b/cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Bromite-auto-updater.inc
 new file mode 100644
 --- /dev/null

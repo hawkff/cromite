@@ -6,7 +6,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  chrome/browser/net/chrome_report_sender.cc       |  1 +
  content/browser/connection_allowlist_utils.cc    |  2 ++
- .../declarative_performance_observer.cc          |  6 ++++++
+ .../declarative_performance_observer.cc          |  8 ++++++++
  .../browser/devtools/protocol/network_handler.cc |  2 ++
  .../cross_origin_embedder_policy_reporter.cc     |  7 +++++--
  .../browser/network/reporting_service_proxy.cc   |  3 +++
@@ -28,7 +28,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../renderer/core/frame/reporting_context.cc     | 10 ++++++++++
  .../renderer/core/frame/reporting_context.h      |  7 +++++--
  .../renderer/core/frame/reporting_observer.cc    |  4 +---
- 24 files changed, 73 insertions(+), 26 deletions(-)
+ 24 files changed, 75 insertions(+), 26 deletions(-)
  create mode 100644 cromite_flags/services/network/public/cpp/features_cc/Allow-building-without-enable_reporting.inc
 
 diff --git a/chrome/browser/net/chrome_report_sender.cc b/chrome/browser/net/chrome_report_sender.cc
@@ -75,7 +75,19 @@ diff --git a/content/browser/declarative_performance_observer/declarative_perfor
  }  // namespace
  
  DeclarativePerformanceObserver::DeclarativePerformanceObserver(
-@@ -241,6 +243,7 @@ void DeclarativePerformanceObserver::SetStoragePartitionForTesting(  // IN-TEST
+@@ -252,6 +254,7 @@ StoragePartition* DeclarativePerformanceObserver::GetStoragePartition() const {
+ 
+ void DeclarativePerformanceObserver::QueueAndSendReport(const GURL& url,
+                                                         base::DictValue body) {
++#if BUILDFLAG(ENABLE_REPORTING)
+   StoragePartition* storage_partition = GetStoragePartition();
+   if (!storage_partition) {
+     return;
+@@ -266,9 +269,11 @@ void DeclarativePerformanceObserver::QueueAndSendReport(const GURL& url,
+   // reports, BackForwardCache entry, or session end) are delivered as soon as
+   // they are queued rather than waiting for the periodic Reporting API timer.
+   network_context->SendReportsForSource(reporting_source_);
++#endif
  }
  
  void DeclarativePerformanceObserver::FlushMetrics() {
@@ -83,24 +95,24 @@ diff --git a/content/browser/declarative_performance_observer/declarative_perfor
    if (buffered_entries_.empty()) {
      return;
    }
-@@ -261,6 +264,7 @@ void DeclarativePerformanceObserver::FlushMetrics() {
-         committed_url_, reporting_source_, network_anonymization_key_,
-         std::move(body));
-   }
+@@ -279,6 +284,7 @@ void DeclarativePerformanceObserver::FlushMetrics() {
+   current_buffer_bytes_ = 0;
+ 
+   QueueAndSendReport(committed_url_, std::move(body));
 +#endif
  }
  
  void DeclarativePerformanceObserver::AppendSessionEndEntry() {
-@@ -495,6 +499,7 @@ void DeclarativePerformanceObserver::OnEarlyFailureReportsTaken(
-   if (!storage_partition) {
-     return;
-   }
+@@ -506,6 +512,7 @@ void DeclarativePerformanceObserver::RecordEarlyNavigationFailure(
+ 
+ void DeclarativePerformanceObserver::OnEarlyFailureReportsTaken(
+     base::ListValue reports) {
 +#if BUILDFLAG(ENABLE_REPORTING)
    for (auto& val : reports) {
      if (val.is_dict()) {
        base::DictValue entry = std::move(val).TakeDict();
-@@ -513,6 +518,7 @@ void DeclarativePerformanceObserver::OnEarlyFailureReportsTaken(
-           std::move(report_body));
+@@ -525,6 +532,7 @@ void DeclarativePerformanceObserver::OnEarlyFailureReportsTaken(
+       QueueAndSendReport(failed_url, std::move(report_body));
      }
    }
 +#endif
@@ -110,7 +122,7 @@ diff --git a/content/browser/declarative_performance_observer/declarative_perfor
 diff --git a/content/browser/devtools/protocol/network_handler.cc b/content/browser/devtools/protocol/network_handler.cc
 --- a/content/browser/devtools/protocol/network_handler.cc
 +++ b/content/browser/devtools/protocol/network_handler.cc
-@@ -1481,6 +1481,7 @@ String BuildReportStatus(const net::ReportingReport::Status status) {
+@@ -1488,6 +1488,7 @@ String BuildReportStatus(const net::ReportingReport::Status status) {
    }
  }
  
@@ -118,7 +130,7 @@ diff --git a/content/browser/devtools/protocol/network_handler.cc b/content/brow
  std::vector<GURL> ComputeReportingURLs(RenderFrameHostImpl* frame_host) {
    std::vector<GURL> urls;
    frame_host->ForEachRenderFrameHostImplWithAction(
-@@ -1494,6 +1495,7 @@ std::vector<GURL> ComputeReportingURLs(RenderFrameHostImpl* frame_host) {
+@@ -1501,6 +1502,7 @@ std::vector<GURL> ComputeReportingURLs(RenderFrameHostImpl* frame_host) {
        });
    return urls;
  }
@@ -193,7 +205,7 @@ diff --git a/content/browser/network/reporting_service_proxy.cc b/content/browse
 diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
 --- a/content/browser/renderer_host/render_frame_host_impl.cc
 +++ b/content/browser/renderer_host/render_frame_host_impl.cc
-@@ -17257,12 +17257,6 @@ void RenderFrameHostImpl::MaybeGenerateCrashReport(
+@@ -17602,12 +17602,6 @@ void RenderFrameHostImpl::MaybeGenerateCrashReport(
        }
      }
    }
@@ -329,7 +341,7 @@ diff --git a/content/browser/web_package/signed_exchange_reporter.cc b/content/b
 diff --git a/content/public/common/content_switch_dependent_feature_overrides.cc b/content/public/common/content_switch_dependent_feature_overrides.cc
 --- a/content/public/common/content_switch_dependent_feature_overrides.cc
 +++ b/content/public/common/content_switch_dependent_feature_overrides.cc
-@@ -9,6 +9,7 @@
+@@ -8,6 +8,7 @@
  #include "content/public/common/content_features.h"
  #include "content/public/common/content_switches.h"
  #include "net/base/features.h"
@@ -347,7 +359,7 @@ new file mode 100644
 diff --git a/net/reporting/reporting_header_parser.cc b/net/reporting/reporting_header_parser.cc
 --- a/net/reporting/reporting_header_parser.cc
 +++ b/net/reporting/reporting_header_parser.cc
-@@ -345,6 +345,7 @@ void ReportingHeaderParser::ProcessParsedReportingEndpointsHeader(
+@@ -328,6 +328,7 @@ void ReportingHeaderParser::ProcessParsedReportingEndpointsHeader(
      const NetworkAnonymizationKey& network_anonymization_key,
      const url::Origin& origin,
      base::flat_map<std::string, std::string> header) {
@@ -358,7 +370,7 @@ diff --git a/net/reporting/reporting_header_parser.cc b/net/reporting/reporting_
 diff --git a/net/reporting/reporting_service.cc b/net/reporting/reporting_service.cc
 --- a/net/reporting/reporting_service.cc
 +++ b/net/reporting/reporting_service.cc
-@@ -235,6 +235,12 @@ class ReportingServiceImpl : public ReportingService {
+@@ -247,6 +247,12 @@ class ReportingServiceImpl : public ReportingService {
        int depth,
        base::TimeTicks queued_ticks,
        ReportingTargetType target_type) {
@@ -374,7 +386,7 @@ diff --git a/net/reporting/reporting_service.cc b/net/reporting/reporting_servic
 diff --git a/services/network/network_context.h b/services/network/network_context.h
 --- a/services/network/network_context.h
 +++ b/services/network/network_context.h
-@@ -541,14 +541,14 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
+@@ -551,14 +551,14 @@ class COMPONENT_EXPORT(NETWORK_SERVICE) NetworkContext
        const GURL& url,
        const std::optional<base::UnguessableToken>& reporting_source,
        const net::NetworkAnonymizationKey& network_anonymization_key,
@@ -395,7 +407,7 @@ diff --git a/services/network/network_context.h b/services/network/network_conte
 diff --git a/services/network/public/cpp/parsed_headers.cc b/services/network/public/cpp/parsed_headers.cc
 --- a/services/network/public/cpp/parsed_headers.cc
 +++ b/services/network/public/cpp/parsed_headers.cc
-@@ -139,6 +139,7 @@ mojom::ParsedHeadersPtr PopulateParsedHeaders(
+@@ -137,6 +137,7 @@ mojom::ParsedHeadersPtr PopulateParsedHeaders(
    }
  
  #if BUILDFLAG(ENABLE_REPORTING)
@@ -406,18 +418,18 @@ diff --git a/services/network/public/cpp/parsed_headers.cc b/services/network/pu
 diff --git a/services/network/public/mojom/BUILD.gn b/services/network/public/mojom/BUILD.gn
 --- a/services/network/public/mojom/BUILD.gn
 +++ b/services/network/public/mojom/BUILD.gn
-@@ -2007,7 +2007,6 @@ mojom("mojom") {
-     export_define_blink = "BLINK_PLATFORM_IMPLEMENTATION=1"
-     export_header_blink = "third_party/blink/public/platform/web_common.h"
-     if (enable_reporting) {
--      enabled_features += [ "enable_reporting" ]
-     }
+@@ -2049,7 +2049,6 @@ mojom("mojom") {
    }
  
+   if (enable_reporting) {
+-    enabled_features += [ "enable_reporting" ]
+   }
+ 
+   if (is_linux) {
 diff --git a/services/network/public/mojom/network_context.mojom b/services/network/public/mojom/network_context.mojom
 --- a/services/network/public/mojom/network_context.mojom
 +++ b/services/network/public/mojom/network_context.mojom
-@@ -1338,6 +1338,7 @@ interface NetworkContext {
+@@ -1417,6 +1417,7 @@ interface NetworkContext {
    // provided `network_anonymization_key`.
    //
    // Spec: https://w3c.github.io/reporting/#concept-reports
@@ -425,7 +437,7 @@ diff --git a/services/network/public/mojom/network_context.mojom b/services/netw
    QueueReport(string type,
                string group,
                url.mojom.Url url,
-@@ -1345,6 +1346,7 @@ interface NetworkContext {
+@@ -1424,6 +1425,7 @@ interface NetworkContext {
                NetworkAnonymizationKey network_anonymization_key,
                mojo_base.mojom.DictionaryValue body);
  
@@ -433,7 +445,7 @@ diff --git a/services/network/public/mojom/network_context.mojom b/services/netw
    QueueEnterpriseReport(string type,
                          string group,
                          url.mojom.Url url,
-@@ -1355,6 +1357,7 @@ interface NetworkContext {
+@@ -1434,6 +1436,7 @@ interface NetworkContext {
    // Note that this queued report will never be delivered if no reporting
    // endpoint matching is registered for with the provided
    // `network_anonymization_key`.
@@ -452,15 +464,15 @@ diff --git a/third_party/blink/renderer/core/frame/csp/content_security_policy.c
  #include "base/debug/dump_without_crashing.h"
  #include "base/feature_list.h"
  #include "base/metrics/histogram_functions.h"
-@@ -1434,6 +1435,7 @@ void ContentSecurityPolicy::ReportViolation(
-       ShouldBypassContentSecurityPolicy(KURL(violation_data->sourceFile()))) {
+@@ -1422,6 +1423,7 @@ void ContentSecurityPolicy::ReportViolation(
+       !ShouldBypassContentSecurityPolicy(relevant_delegate->Url())) {
      return;
    }
 +#if BUILDFLAG(ENABLE_REPORTING)
    PostViolationReport(violation_data, context_frame, report_endpoints,
                        use_reporting_api);
  
-@@ -1441,6 +1443,7 @@ void ContentSecurityPolicy::ReportViolation(
+@@ -1429,6 +1431,7 @@ void ContentSecurityPolicy::ReportViolation(
    // `context_frame` (i.e. we're not processing 'frame-ancestors').
    if (delegate_ && !context_frame)
      delegate_->DispatchViolationEvent(*violation_data, element);
@@ -471,15 +483,15 @@ diff --git a/third_party/blink/renderer/core/frame/csp/content_security_policy.c
 diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/blink/renderer/core/frame/local_frame.cc
 --- a/third_party/blink/renderer/core/frame/local_frame.cc
 +++ b/third_party/blink/renderer/core/frame/local_frame.cc
-@@ -51,6 +51,7 @@
- #include "build/build_config.h"
+@@ -52,6 +52,7 @@
+ #include "mojo/public/cpp/base/big_buffer.h"
  #include "mojo/public/cpp/bindings/self_owned_receiver.h"
  #include "mojo/public/cpp/system/message_pipe.h"
 +#include "net/net_buildflags.h"
  #include "services/network/public/cpp/features.h"
  #include "services/network/public/mojom/content_security_policy.mojom-blink.h"
  #include "services/network/public/mojom/source_location.mojom-blink.h"
-@@ -2995,9 +2996,11 @@ DocumentResourceCoordinator* LocalFrame::GetDocumentResourceCoordinator() {
+@@ -3032,9 +3033,11 @@ DocumentResourceCoordinator* LocalFrame::GetDocumentResourceCoordinator() {
    return CHECK_DEREF(GetDocument()).GetResourceCoordinator();
  }
  
@@ -502,7 +514,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.h b/third_party/b
  #include "net/storage_access_api/status.h"
  #include "services/metrics/public/cpp/ukm_source_id.h"
  #include "services/network/public/mojom/fetch_api.mojom-blink-forward.h"
-@@ -690,7 +691,9 @@ class CORE_EXPORT LocalFrame final
+@@ -697,7 +698,9 @@ class CORE_EXPORT LocalFrame final
      return client_hints_preferences_;
    }
  

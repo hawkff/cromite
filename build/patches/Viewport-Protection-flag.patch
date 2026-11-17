@@ -34,9 +34,9 @@ Require: Content-settings-infrastructure.patch
  .../core/frame/web_remote_frame_impl.cc       |   3 +-
  .../blink/renderer/core/input/touch.cc        |  17 ++-
  third_party/blink/renderer/core/page/page.cc  | 117 ++++++++++++++++++
- third_party/blink/renderer/core/page/page.h   |  11 ++
+ third_party/blink/renderer/core/page/page.h   |  10 ++
  .../renderer/core/style/computed_style.h      |   6 +
- 27 files changed, 481 insertions(+), 22 deletions(-)
+ 27 files changed, 480 insertions(+), 22 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteViewportContentSetting.java
  create mode 100644 components/browser_ui/strings/bromite_content_settings/viewport.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/viewport.inc
@@ -212,7 +212,7 @@ new file mode 100644
 diff --git a/components/guest_view/browser/guest_view_base.cc b/components/guest_view/browser/guest_view_base.cc
 --- a/components/guest_view/browser/guest_view_base.cc
 +++ b/components/guest_view/browser/guest_view_base.cc
-@@ -697,6 +697,14 @@ void GuestViewBase::AttachToOuterWebContentsFrame(
+@@ -698,6 +698,14 @@ void GuestViewBase::AttachToOuterWebContentsFrame(
      std::move(attachment_callback).Run();
    }
  
@@ -270,12 +270,12 @@ diff --git a/third_party/blink/public/common/widget/device_emulation_params.h b/
    // Emulated screen size. Typically full / physical size of the device screen
    // in DIP. Empty size means using default value: original one for kDesktop
    // screen position, equal to |view_size| for kMobile.
-@@ -82,7 +85,8 @@ inline bool operator==(const DeviceEmulationParams& a,
-          a.viewport_scale == b.viewport_scale &&
-          a.viewport_segments == b.viewport_segments &&
-          a.device_posture == b.device_posture &&
--         a.force_android_overlay_scrollbar == b.force_android_overlay_scrollbar;
-+         a.force_android_overlay_scrollbar == b.force_android_overlay_scrollbar &&
+@@ -91,7 +94,8 @@ inline bool operator==(const DeviceEmulationParams& a,
+          a.force_android_overlay_scrollbar ==
+              b.force_android_overlay_scrollbar &&
+          a.force_viewport_meta == b.force_viewport_meta &&
+-         a.force_text_size_adjust == b.force_text_size_adjust;
++         a.force_text_size_adjust == b.force_text_size_adjust &&
 +         a.force_mobile_calc == b.force_mobile_calc;
  }
  
@@ -283,7 +283,7 @@ diff --git a/third_party/blink/public/common/widget/device_emulation_params.h b/
 diff --git a/third_party/blink/renderer/core/css/css_properties.json5 b/third_party/blink/renderer/core/css/css_properties.json5
 --- a/third_party/blink/renderer/core/css/css_properties.json5
 +++ b/third_party/blink/renderer/core/css/css_properties.json5
-@@ -4753,6 +4753,7 @@
+@@ -4793,6 +4793,7 @@
      },
      {
        name: "opacity",
@@ -291,7 +291,7 @@ diff --git a/third_party/blink/renderer/core/css/css_properties.json5 b/third_pa
        property_methods: ["CSSValueFromComputedStyleInternal"],
        parse_helper: "ConsumeAlphaValue",
        interpolable: true,
-@@ -4761,7 +4762,6 @@
+@@ -4802,7 +4803,6 @@
        field_template: "primitive",
        default_value: "1.0",
        type_name: "float",
@@ -321,7 +321,7 @@ diff --git a/third_party/blink/renderer/core/css/media_values.cc b/third_party/b
 diff --git a/third_party/blink/renderer/core/css/resolver/style_resolver.cc b/third_party/blink/renderer/core/css/resolver/style_resolver.cc
 --- a/third_party/blink/renderer/core/css/resolver/style_resolver.cc
 +++ b/third_party/blink/renderer/core/css/resolver/style_resolver.cc
-@@ -2391,7 +2391,12 @@ ComputedStyleBuilder StyleResolver::InitialStyleBuilderForElement() const {
+@@ -2615,7 +2615,12 @@ ComputedStyleBuilder StyleResolver::InitialStyleBuilderForElement() const {
    ComputedStyleBuilder builder = CreateComputedStyleBuilder();
    builder.SetRtlOrdering(GetDocument().VisuallyOrdered() ? EOrder::kVisual
                                                           : EOrder::kLogical);
@@ -346,7 +346,7 @@ diff --git a/third_party/blink/renderer/core/events/mouse_event.h b/third_party/
  #include "third_party/blink/renderer/platform/wtf/casting.h"
  #include "ui/base/mojom/menu_source_type.mojom-blink.h"
  
-@@ -146,8 +147,22 @@ class CORE_EXPORT MouseEvent : public UIEventWithKeyState {
+@@ -148,8 +149,22 @@ class CORE_EXPORT MouseEvent : public UIEventWithKeyState {
  
    // Note that these values are adjusted to counter the effects of zoom, so that
    // values exposed via DOM APIs are invariant under zooming.
@@ -407,7 +407,7 @@ diff --git a/third_party/blink/renderer/core/events/pointer_event.h b/third_part
 diff --git a/third_party/blink/renderer/core/exported/web_view_impl.cc b/third_party/blink/renderer/core/exported/web_view_impl.cc
 --- a/third_party/blink/renderer/core/exported/web_view_impl.cc
 +++ b/third_party/blink/renderer/core/exported/web_view_impl.cc
-@@ -1120,7 +1120,7 @@ WebPagePopupImpl* WebViewImpl::OpenPagePopup(PagePopupClient* client) {
+@@ -1122,7 +1122,7 @@ WebPagePopupImpl* WebViewImpl::OpenPagePopup(PagePopupClient* client) {
    page_popup_ = WebPagePopupImpl::Create(
        std::move(popup_widget_host), std::move(widget_host),
        std::move(widget_receiver), this, agent_group_scheduler,
@@ -419,7 +419,7 @@ diff --git a/third_party/blink/renderer/core/exported/web_view_impl.cc b/third_p
 diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_party/blink/renderer/core/frame/local_dom_window.cc
 --- a/third_party/blink/renderer/core/frame/local_dom_window.cc
 +++ b/third_party/blink/renderer/core/frame/local_dom_window.cc
-@@ -1677,6 +1677,13 @@ int LocalDOMWindow::outerHeight() const {
+@@ -1705,6 +1705,13 @@ int LocalDOMWindow::outerHeight() const {
      return innerHeight();
    }
  
@@ -433,7 +433,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
    Page* page = frame->GetPage();
    if (!page) {
      return 0;
-@@ -1709,6 +1716,13 @@ int LocalDOMWindow::outerWidth() const {
+@@ -1737,6 +1744,13 @@ int LocalDOMWindow::outerWidth() const {
      return innerWidth();
    }
  
@@ -447,7 +447,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
    Page* page = frame->GetPage();
    if (!page) {
      return 0;
-@@ -1932,11 +1946,20 @@ CSSStyleDeclaration* LocalDOMWindow::getComputedStyle(
+@@ -1960,11 +1974,20 @@ CSSStyleDeclaration* LocalDOMWindow::getComputedStyle(
  }
  
  double LocalDOMWindow::devicePixelRatio() const {
@@ -470,7 +470,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
  }
  
  ScriptPromise<ScrollResult> LocalDOMWindow::scrollBy(ScriptState* script_state,
-@@ -2574,6 +2597,24 @@ DOMWindow* LocalDOMWindow::open(v8::Isolate* isolate,
+@@ -2608,6 +2631,24 @@ DOMWindow* LocalDOMWindow::open(v8::Isolate* isolate,
      result.frame->Navigate(frame_request, WebFrameLoadType::kStandard);
    }
  
@@ -495,7 +495,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
    // TODO(japhet): window-open-noopener.html?_top and several tests in
    // html/browsers/windows/browsing-context-names/ appear to require that
    // the special case target names (_top, _parent, _self) ignore opener
-@@ -2628,6 +2669,15 @@ DOMWindow* LocalDOMWindow::openPictureInPictureWindow(
+@@ -2662,6 +2703,15 @@ DOMWindow* LocalDOMWindow::openPictureInPictureWindow(
    DCHECK(result.new_window);
  
    result.frame->Navigate(frame_request, WebFrameLoadType::kStandard);
@@ -514,7 +514,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_dom_window.cc b/third_p
 diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/blink/renderer/core/frame/local_frame.cc
 --- a/third_party/blink/renderer/core/frame/local_frame.cc
 +++ b/third_party/blink/renderer/core/frame/local_frame.cc
-@@ -1745,6 +1745,10 @@ void LocalFrame::RestoreScrollOffsets() {
+@@ -1749,6 +1749,10 @@ void LocalFrame::RestoreScrollOffsets() {
    saved_scroll_offsets_ = nullptr;
  }
  
@@ -525,7 +525,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/
  void LocalFrame::SetLayoutZoomFactor(float factor) {
    SetZoomFactors(factor, text_zoom_factor_, css_zoom_factor_);
  }
-@@ -1931,13 +1935,16 @@ mojom::blink::DevicePostureType LocalFrame::GetDevicePosture() {
+@@ -1935,13 +1939,16 @@ mojom::blink::DevicePostureType LocalFrame::GetDevicePosture() {
    return mojo_handler_->GetDevicePosture();
  }
  
@@ -546,7 +546,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/
    return ratio;
  }
  
-@@ -3634,6 +3641,11 @@ void LocalFrame::SetScaleFactor(float scale_factor) {
+@@ -3671,6 +3678,11 @@ void LocalFrame::SetScaleFactor(float scale_factor) {
    DCHECK(!GetDocument() || !GetDocument()->Printing());
    DCHECK(IsMainFrame());
  
@@ -561,7 +561,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/
 diff --git a/third_party/blink/renderer/core/frame/local_frame.h b/third_party/blink/renderer/core/frame/local_frame.h
 --- a/third_party/blink/renderer/core/frame/local_frame.h
 +++ b/third_party/blink/renderer/core/frame/local_frame.h
-@@ -446,7 +446,8 @@ class CORE_EXPORT LocalFrame final
+@@ -447,7 +447,8 @@ class CORE_EXPORT LocalFrame final
    void SetInViewSourceMode(bool = true);
  
    void SetLayoutZoomFactor(float);
@@ -571,7 +571,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.h b/third_party/b
    void SetTextZoomFactor(float);
    float TextZoomFactor() const { return text_zoom_factor_; }
    void SetCssZoomFactor(float);
-@@ -455,7 +456,7 @@ class CORE_EXPORT LocalFrame final
+@@ -456,7 +457,7 @@ class CORE_EXPORT LocalFrame final
                        float text_zoom_factor,
                        float css_zoom_factor);
  
@@ -580,7 +580,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.h b/third_party/b
  
    // Informs the local root's document and its local descendant subtree that a
    // media query value changed.
-@@ -1137,6 +1138,7 @@ class CORE_EXPORT LocalFrame final
+@@ -1151,6 +1152,7 @@ class CORE_EXPORT LocalFrame final
    unsigned did_run_detach_impl_ : 1 = false;
  
    float layout_zoom_factor_;
@@ -591,7 +591,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.h b/third_party/b
 diff --git a/third_party/blink/renderer/core/frame/local_frame_mojo_handler.cc b/third_party/blink/renderer/core/frame/local_frame_mojo_handler.cc
 --- a/third_party/blink/renderer/core/frame/local_frame_mojo_handler.cc
 +++ b/third_party/blink/renderer/core/frame/local_frame_mojo_handler.cc
-@@ -577,7 +577,10 @@ void LocalFrameMojoHandler::NotifyVirtualKeyboardOverlayRect(
+@@ -605,7 +605,10 @@ void LocalFrameMojoHandler::NotifyVirtualKeyboardOverlayRect(
    const float window_to_viewport_factor =
        page->GetChromeClient().WindowToViewportScalar(&local_frame_root, 1.0f);
    const float zoom_factor = local_frame_root.LayoutZoomFactor();
@@ -701,7 +701,7 @@ diff --git a/third_party/blink/renderer/core/frame/screen_metrics_emulator.h b/t
 diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc b/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
 --- a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
 +++ b/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc
-@@ -2128,6 +2128,15 @@ void WebFrameWidgetImpl::ApplyVisualPropertiesSizing(
+@@ -2142,6 +2142,15 @@ void WebFrameWidgetImpl::ApplyVisualPropertiesSizing(
  
      if (DeviceEmulator() && widget_base_ && !widget_base_->WillBeDestroyed()) {
        DeviceEmulator()->UpdateVisualProperties(visual_properties);
@@ -720,7 +720,7 @@ diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.cc b/th
 diff --git a/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc b/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc
 --- a/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc
 +++ b/third_party/blink/renderer/core/frame/web_remote_frame_impl.cc
-@@ -361,7 +361,8 @@ void WebRemoteFrameImpl::InitializeFrameVisualProperties(
+@@ -359,7 +359,8 @@ void WebRemoteFrameImpl::InitializeFrameVisualProperties(
    visual_properties.page_scale_factor = ancestor_widget->PageScaleInMainFrame();
    visual_properties.is_pinch_gesture_active =
        ancestor_widget->PinchGestureActiveInMainFrame();
@@ -774,7 +774,7 @@ diff --git a/third_party/blink/renderer/core/input/touch.cc b/third_party/blink/
 diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/renderer/core/page/page.cc
 --- a/third_party/blink/renderer/core/page/page.cc
 +++ b/third_party/blink/renderer/core/page/page.cc
-@@ -108,6 +108,13 @@
+@@ -107,6 +107,13 @@
  #include "ui/color/color_provider_utils.h"
  #include "ui/gfx/geometry/insets_conversions.h"
  
@@ -788,7 +788,7 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
  namespace blink {
  
  namespace {
-@@ -1265,7 +1272,117 @@ void Page::UpdateAcceleratedCompositingSettings() {
+@@ -1270,7 +1277,117 @@ void Page::UpdateAcceleratedCompositingSettings() {
    }
  }
  
@@ -909,7 +909,7 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
 diff --git a/third_party/blink/renderer/core/page/page.h b/third_party/blink/renderer/core/page/page.h
 --- a/third_party/blink/renderer/core/page/page.h
 +++ b/third_party/blink/renderer/core/page/page.h
-@@ -529,6 +529,11 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
+@@ -534,6 +534,11 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
    // related pages will include the new page instead of the old page, etc.
    void TakePropertiesForLocalMainFrameSwap(Page* old_page);
  
@@ -921,23 +921,22 @@ diff --git a/third_party/blink/renderer/core/page/page.h b/third_party/blink/ren
    void NotifyRelatedPagesFinalized(bool has_other_related_pages) {
      related_pages_mutation_from_previous_page_finalized_ = true;
      has_other_related_pages_during_commit_ = has_other_related_pages;
-@@ -730,6 +735,12 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
-   // browser side FrameTree has the FrameTree::Type of kFencedFrame.
-   bool is_fenced_frame_tree_ = false;
+@@ -732,6 +737,11 @@ class CORE_EXPORT Page final : public GarbageCollected<Page>,
+   // If true, pauses JavaScript execution until the page is activated.
+   bool should_pause_javascript_execution_on_prerender_ = false;
  
 +  bool is_screen_emulated_ = false;
 +  bool disable_screen_emulated_ = false;
 +  double override_window_scale_factor_ = 0;
 +  double override_zoom_factor_ = 0;
 +  double override_device_pixel_ratio_ = 0;
-+
    // This tracks the mode that the fenced frame is set to.
    blink::FencedFrame::DeprecatedFencedFrameMode fenced_frame_mode_ =
        blink::FencedFrame::DeprecatedFencedFrameMode::kDefault;
 diff --git a/third_party/blink/renderer/core/style/computed_style.h b/third_party/blink/renderer/core/style/computed_style.h
 --- a/third_party/blink/renderer/core/style/computed_style.h
 +++ b/third_party/blink/renderer/core/style/computed_style.h
-@@ -2065,6 +2065,12 @@ class ComputedStyle final : public ComputedStyleBase {
+@@ -2093,6 +2093,12 @@ class ComputedStyle final : public ComputedStyleBase {
             IsRunningTranslateAnimationOnCompositor();
    }
  

@@ -6,6 +6,7 @@ Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 Require: Content-settings-infrastructure.patch
 ---
+ .../browser_ui/site_settings/android/BUILD.gn |   5 +
  .../res/drawable-hdpi/permission_images.png   | Bin 0 -> 257 bytes
  .../res/drawable-mdpi/permission_images.png   | Bin 0 -> 186 bytes
  .../res/drawable-xhdpi/permission_images.png  | Bin 0 -> 316 bytes
@@ -27,7 +28,7 @@ Require: Content-settings-infrastructure.patch
  .../platform/loader/fetch/fetch_context.h     |   2 +-
  .../platform/loader/fetch/resource_fetcher.cc |  17 +++-
  .../platform/loader/fetch/resource_fetcher.h  |   2 +
- 21 files changed, 180 insertions(+), 37 deletions(-)
+ 22 files changed, 185 insertions(+), 37 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-hdpi/permission_images.png
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-mdpi/permission_images.png
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-xhdpi/permission_images.png
@@ -37,6 +38,37 @@ Require: Content-settings-infrastructure.patch
  create mode 100644 components/browser_ui/strings/bromite_content_settings/images.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/images.inc
 
+diff --git a/components/browser_ui/site_settings/android/BUILD.gn b/components/browser_ui/site_settings/android/BUILD.gn
+--- a/components/browser_ui/site_settings/android/BUILD.gn
++++ b/components/browser_ui/site_settings/android/BUILD.gn
+@@ -234,22 +234,27 @@ robolectric_library("junit") {
+ 
+ android_resources("java_resources") {
+   sources = [
++    "java/res/drawable-hdpi/permission_images.png",
+     "java/res/drawable-hdpi/permission_popups.png",
+     "java/res/drawable-hdpi/settings_autoplay.png",
+     "java/res/drawable-hdpi/settings_sensors.png",
+     "java/res/drawable-hdpi/web_asset.png",
++    "java/res/drawable-mdpi/permission_images.png",
+     "java/res/drawable-mdpi/permission_popups.png",
+     "java/res/drawable-mdpi/settings_autoplay.png",
+     "java/res/drawable-mdpi/settings_sensors.png",
+     "java/res/drawable-mdpi/web_asset.png",
++    "java/res/drawable-xhdpi/permission_images.png",
+     "java/res/drawable-xhdpi/permission_popups.png",
+     "java/res/drawable-xhdpi/settings_autoplay.png",
+     "java/res/drawable-xhdpi/settings_sensors.png",
+     "java/res/drawable-xhdpi/web_asset.png",
++    "java/res/drawable-xxhdpi/permission_images.png",
+     "java/res/drawable-xxhdpi/permission_popups.png",
+     "java/res/drawable-xxhdpi/settings_autoplay.png",
+     "java/res/drawable-xxhdpi/settings_sensors.png",
+     "java/res/drawable-xxhdpi/web_asset.png",
++    "java/res/drawable-xxxhdpi/permission_images.png",
+     "java/res/drawable-xxxhdpi/permission_popups.png",
+     "java/res/drawable-xxxhdpi/settings_autoplay.png",
+     "java/res/drawable-xxxhdpi/settings_sensors.png",
 diff --git a/components/browser_ui/site_settings/android/java/res/drawable-hdpi/permission_images.png b/components/browser_ui/site_settings/android/java/res/drawable-hdpi/permission_images.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..cafee5acf2299e534676a15fb029192e066551c9
@@ -324,7 +356,7 @@ diff --git a/third_party/blink/public/platform/web_content_settings_client.h b/t
 diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/blink/renderer/core/frame/local_frame.cc
 --- a/third_party/blink/renderer/core/frame/local_frame.cc
 +++ b/third_party/blink/renderer/core/frame/local_frame.cc
-@@ -4412,19 +4412,6 @@ bool LocalFrame::IsSameOrigin() {
+@@ -4456,19 +4456,6 @@ bool LocalFrame::IsSameOrigin() {
    return security_origin->IsSameOriginWith(top_security_origin);
  }
  
@@ -347,7 +379,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/
 diff --git a/third_party/blink/renderer/core/frame/local_frame.h b/third_party/blink/renderer/core/frame/local_frame.h
 --- a/third_party/blink/renderer/core/frame/local_frame.h
 +++ b/third_party/blink/renderer/core/frame/local_frame.h
-@@ -969,12 +969,6 @@ class CORE_EXPORT LocalFrame final
+@@ -981,12 +981,6 @@ class CORE_EXPORT LocalFrame final
      return *v8_local_compile_hints_producer_;
    }
  
@@ -382,7 +414,7 @@ diff --git a/third_party/blink/renderer/core/html/image_document.cc b/third_part
 diff --git a/third_party/blink/renderer/core/loader/frame_fetch_context.cc b/third_party/blink/renderer/core/loader/frame_fetch_context.cc
 --- a/third_party/blink/renderer/core/loader/frame_fetch_context.cc
 +++ b/third_party/blink/renderer/core/loader/frame_fetch_context.cc
-@@ -316,6 +316,7 @@ ResourceFetcher* FrameFetchContext::CreateFetcherForCommittedDocument(
+@@ -314,6 +314,7 @@ ResourceFetcher* FrameFetchContext::CreateFetcherForCommittedDocument(
    fetcher->SetResourceLoadObserver(
        MakeGarbageCollected<ResourceLoadObserverForFrame>(
            loader, document, fetcher->GetProperties()));
@@ -390,7 +422,7 @@ diff --git a/third_party/blink/renderer/core/loader/frame_fetch_context.cc b/thi
    fetcher->SetAutoLoadImages(
        frame->GetSettings()->GetLoadsImagesAutomatically());
    fetcher->SetEarlyHintsPreloadedResources(
-@@ -519,16 +520,13 @@ void FrameFetchContext::AddResourceTiming(
+@@ -517,16 +518,13 @@ void FrameFetchContext::AddResourceTiming(
        ->AddResourceTiming(std::move(info), initiator_type);
  }
  
@@ -427,7 +459,7 @@ diff --git a/third_party/blink/renderer/core/loader/frame_fetch_context.h b/thir
 diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/renderer/core/page/page.cc
 --- a/third_party/blink/renderer/core/page/page.cc
 +++ b/third_party/blink/renderer/core/page/page.cc
-@@ -1039,9 +1039,8 @@ void Page::SettingsChanged(ChangeType change_type) {
+@@ -1029,9 +1029,8 @@ void Page::SettingsChanged(ChangeType change_type) {
        for (Frame* frame = MainFrame(); frame;
             frame = frame->Tree().TraverseNext()) {
          if (auto* local_frame = DynamicTo<LocalFrame>(frame)) {
@@ -454,7 +486,7 @@ diff --git a/third_party/blink/renderer/platform/loader/fetch/fetch_context.h b/
 diff --git a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.cc b/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.cc
 --- a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.cc
 +++ b/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.cc
-@@ -835,6 +835,7 @@ ResourceFetcher::ResourceFetcher(const ResourceFetcherInit& init)
+@@ -836,6 +836,7 @@ ResourceFetcher::ResourceFetcher(const ResourceFetcherInit& init)
        blob_registry_remote_(init.context_lifecycle_notifier),
        context_lifecycle_notifier_(init.context_lifecycle_notifier),
        auto_load_images_(true),
@@ -462,7 +494,7 @@ diff --git a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.c
        allow_stale_resources_(false),
        image_fetched_(false) {
    InstanceCounters::IncrementCounter(InstanceCounters::kResourceFetcherCounter);
-@@ -2060,7 +2061,7 @@ bool ResourceFetcher::IsImageResourceDisallowedToBeReused(
+@@ -2086,7 +2087,7 @@ bool ResourceFetcher::IsImageResourceDisallowedToBeReused(
      return false;
    }
  
@@ -471,7 +503,7 @@ diff --git a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.c
  }
  
  ResourceFetcher::RevalidationPolicy
-@@ -2313,8 +2314,20 @@ void ResourceFetcher::SetAutoLoadImages(bool enable) {
+@@ -2339,8 +2340,20 @@ void ResourceFetcher::SetAutoLoadImages(bool enable) {
    ReloadImagesIfNotDeferred();
  }
  
@@ -496,7 +528,7 @@ diff --git a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.c
 diff --git a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h b/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h
 --- a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h
 +++ b/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h
-@@ -233,6 +233,7 @@ class PLATFORM_EXPORT ResourceFetcher
+@@ -235,6 +235,7 @@ class PLATFORM_EXPORT ResourceFetcher
    bool StartLoad(Resource*, bool is_potentially_unused_preload = false);
  
    void SetAutoLoadImages(bool);
@@ -504,7 +536,7 @@ diff --git a/third_party/blink/renderer/platform/loader/fetch/resource_fetcher.h
  
    FetchContext& Context() const;
    void ClearContext();
-@@ -751,6 +752,7 @@ class PLATFORM_EXPORT ResourceFetcher
+@@ -759,6 +760,7 @@ class PLATFORM_EXPORT ResourceFetcher
    bool is_in_request_resource_ = false;
  
    bool auto_load_images_ : 1;

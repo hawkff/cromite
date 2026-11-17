@@ -4,44 +4,95 @@ Subject: Remove blocklisted URLs upon bookmark creation
 
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
- .../chrome/browser/bookmarks/TabBookmarker.java   | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ .../chrome/browser/app/ChromeActivity.java         | 11 ++++++++++-
+ .../chrome/browser/bookmarks/TabBookmarker.java    | 14 +++++++++++++-
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
+@@ -202,6 +202,7 @@ import org.chromium.chrome.browser.share.ShareDelegateImpl;
+ import org.chromium.chrome.browser.share.ShareDelegateSupplier;
+ import org.chromium.chrome.browser.signin.SigninAndHistorySyncActivityLauncherImpl;
+ import org.chromium.chrome.browser.stylus_handwriting.StylusWritingCoordinator;
++import org.chromium.chrome.browser.suggestions.SuggestionsDependencyFactory;
+ import org.chromium.chrome.browser.tab.RequestDesktopUtils;
+ import org.chromium.chrome.browser.tab.Tab;
+ import org.chromium.chrome.browser.tab.TabDestroyStatus;
+@@ -827,7 +828,15 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
+                                 return PriceDropNotificationManagerFactory.create(profile);
+                             },
+                             mRootUiCoordinator::getBookmarkBarVisibility,
+-                            OfflinePageUtils::saveBookmarkOffline);
++                            OfflinePageUtils::saveBookmarkOffline,
++                            url -> {
++                                var mostVisitedSites =
++                                        SuggestionsDependencyFactory.getInstance()
++                                                .createMostVisitedSites(
++                                                        ProfileManager.getLastUsedRegularProfile());
++                                mostVisitedSites.removeBlocklistedUrl(url);
++                                mostVisitedSites.destroy();
++                            });
+             mTabBookmarkerSupplier.set(tabBookmarker);
+             if (!isCustomTab()) {
+                 mStartupSigninStateCheckController =
 diff --git a/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/TabBookmarker.java b/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/TabBookmarker.java
 --- a/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/TabBookmarker.java
 +++ b/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/TabBookmarker.java
-@@ -26,6 +26,12 @@ import java.util.List;
+@@ -25,8 +25,11 @@ import java.util.Collections;
+ import java.util.List;
  import java.util.Objects;
+ import java.util.function.BiConsumer;
++import java.util.function.Consumer;
  import java.util.function.Supplier;
  
-+import org.chromium.chrome.browser.profiles.Profile;
-+import org.chromium.chrome.browser.profiles.ProfileManager;
-+import org.chromium.chrome.browser.suggestions.SuggestionsDependencyFactory;
-+import org.chromium.chrome.browser.suggestions.mostvisited.MostVisitedSites;
 +import org.chromium.url.GURL;
 +
  /**
   * Helper class for managing the UI flow for bookmarking the active tab and kicking off the backend.
   * Shows a snackbar if a new bookmark was added. If the bookmark already exists, kicks off edit
-@@ -40,6 +46,7 @@ public class TabBookmarker {
-     private final BookmarkManagerOpener mBookmarkManagerOpener;
+@@ -42,6 +45,7 @@ public class TabBookmarker {
      private final Supplier<PriceDropNotificationManager> mPriceDropNotificationManagerSupplier;
      private final Supplier<Boolean> mBookmarkBarVisibilitySupplier;
-+    private MostVisitedSites mMostVisitedSites;
+     private final BiConsumer<BookmarkId, Tab> mSaveBookmarkOfflineCallback;
++    private final Consumer<GURL> mRemoveBlocklistedUrlCallback;
  
      /**
       * Constructor.
-@@ -138,6 +145,14 @@ public class TabBookmarker {
+@@ -56,6 +60,7 @@ public class TabBookmarker {
+      *     which manages price drop notifications.
+      * @param bookmarkBarVisibilitySupplier Supplies the visibility of the bookmarks bar.
+      * @param saveBookmarkOfflineCallback Callback to save a newly added bookmark offline.
++     * @param removeBlocklistedUrlCallback Removes a URL from the most visited sites blocklist.
+      */
+     public TabBookmarker(
+             Activity activity,
+@@ -65,7 +70,8 @@ public class TabBookmarker {
+             BookmarkManagerOpener bookmarkManagerOpener,
+             Supplier<PriceDropNotificationManager> priceDropNotificationManagerSupplier,
+             Supplier<Boolean> bookmarkBarVisibilitySupplier,
+-            BiConsumer<BookmarkId, Tab> saveBookmarkOfflineCallback) {
++            BiConsumer<BookmarkId, Tab> saveBookmarkOfflineCallback,
++            Consumer<GURL> removeBlocklistedUrlCallback) {
+         mActivity = activity;
+         mBookmarkModelSupplier = bookmarkModelSupplier;
+         mBottomSheetControllerSupplier = bottomSheetControllerSupplier;
+@@ -74,6 +80,7 @@ public class TabBookmarker {
+         mPriceDropNotificationManagerSupplier = priceDropNotificationManagerSupplier;
+         mBookmarkBarVisibilitySupplier = bookmarkBarVisibilitySupplier;
+         mSaveBookmarkOfflineCallback = saveBookmarkOfflineCallback;
++        mRemoveBlocklistedUrlCallback = removeBlocklistedUrlCallback;
+     }
+ 
+     /**
+@@ -144,6 +151,11 @@ public class TabBookmarker {
              return;
          }
  
-+	    // remove blocklisted URL from most visited sites
-+	    if (mMostVisitedSites == null) {
-+            mMostVisitedSites =
-+                SuggestionsDependencyFactory.getInstance().createMostVisitedSites(ProfileManager.getLastUsedRegularProfile());
++        // remove blocklisted URL from most visited sites
++        for (Tab tabToBookmark : tabsToBookmark) {
++            mRemoveBlocklistedUrlCallback.accept(tabToBookmark.getOriginalUrl());
 +        }
-+        for (Tab tabToBookmark : tabsToBookmark)
-+            mMostVisitedSites.removeBlocklistedUrl(tabToBookmark.getOriginalUrl());
 +
          // Defense in depth against the UI being erroneously enabled.
          final BookmarkModel bookmarkModel = mBookmarkModelSupplier.get();

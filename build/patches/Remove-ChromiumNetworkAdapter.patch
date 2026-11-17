@@ -7,19 +7,19 @@ without asking the native code
 
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
- .../webview_shell/WebViewBrowserFragment.java | 57 -----------------
+ .../webview_shell/WebViewBrowserFragment.java | 57 ------------------
  .../browser/feedback/ConnectivityChecker.java | 36 +----------
- .../ConnectivityDetector.java                 | 63 -------------------
+ .../ConnectivityDetector.java                 | 60 -------------------
  .../chrome/browser/omaha/OmahaBase.java       |  3 +-
  .../util/HttpURLConnectionFactoryImpl.java    |  7 +--
  .../firstrun/VariationsSeedFetcher.java       | 26 +-------
  .../chromium/net/ChromiumNetworkAdapter.java  | 13 ----
- 7 files changed, 4 insertions(+), 201 deletions(-)
+ 7 files changed, 4 insertions(+), 198 deletions(-)
 
 diff --git a/android_webview/tools/system_webview_shell/apk/src/org/chromium/webview_shell/WebViewBrowserFragment.java b/android_webview/tools/system_webview_shell/apk/src/org/chromium/webview_shell/WebViewBrowserFragment.java
 --- a/android_webview/tools/system_webview_shell/apk/src/org/chromium/webview_shell/WebViewBrowserFragment.java
 +++ b/android_webview/tools/system_webview_shell/apk/src/org/chromium/webview_shell/WebViewBrowserFragment.java
-@@ -241,63 +241,6 @@ public class WebViewBrowserFragment extends Fragment {
+@@ -240,63 +240,6 @@ public class WebViewBrowserFragment extends Fragment {
          /** Downloading file in background thread */
          @Override
          protected String doInBackground() {
@@ -132,16 +132,13 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/feedback/Connec
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java b/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java
-@@ -401,69 +401,6 @@ public class ConnectivityDetector implements NetworkChangeNotifier.ConnectionTyp
+@@ -385,66 +385,6 @@ public class ConnectivityDetector implements NetworkChangeNotifier.ConnectionTyp
          new AsyncTask<Integer>() {
              @Override
              protected Integer doInBackground() {
 -                HttpURLConnection urlConnection = null;
 -                try {
--                    RecordHistogram.recordCount1MHistogram(
--                            "ConnectivityDetector.SentHttpProbe." + mClientName, 1);
 -                    Log.i(TAG, "Sending HTTP Probe now to url:" + urlString);
--
 -                    URL url = new URL(urlString);
 -                    urlConnection =
 -                            (HttpURLConnection)
@@ -202,10 +199,10 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/net/connectivit
                  // The result returned from a well-known URL doesn't match the expected result,
                  // probably due to that the traffic is intercepted by the captive portal.
                  return ProbeResult.NOT_VALIDATED;
-diff --git a/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java b/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
---- a/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
-+++ b/chrome/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
-@@ -470,8 +470,7 @@ public class OmahaBase {
+diff --git a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
+--- a/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
++++ b/chrome/browser/omaha/android/java/src/org/chromium/chrome/browser/omaha/OmahaBase.java
+@@ -486,8 +486,7 @@ public class OmahaBase {
                          """);
          try {
              URL url = new URL(assumeNonNull(getRequestGenerator()).getServerUrl());
@@ -234,7 +231,7 @@ diff --git a/components/minidump_uploader/android/java/src/org/chromium/componen
 diff --git a/components/variations/android/java/src/org/chromium/components/variations/firstrun/VariationsSeedFetcher.java b/components/variations/android/java/src/org/chromium/components/variations/firstrun/VariationsSeedFetcher.java
 --- a/components/variations/android/java/src/org/chromium/components/variations/firstrun/VariationsSeedFetcher.java
 +++ b/components/variations/android/java/src/org/chromium/components/variations/firstrun/VariationsSeedFetcher.java
-@@ -194,14 +194,6 @@ public class VariationsSeedFetcher {
+@@ -198,14 +198,6 @@ public class VariationsSeedFetcher {
          ResettersForTesting.register(() -> sInstance = oldValue);
      }
  
@@ -249,7 +246,7 @@ diff --git a/components/variations/android/java/src/org/chromium/components/vari
      @VisibleForTesting
      protected List<String> getAvailableInstanceManipulations() {
          List<String> compressions = new ArrayList<String>();
-@@ -571,24 +563,8 @@ public class VariationsSeedFetcher {
+@@ -594,24 +586,8 @@ public class VariationsSeedFetcher {
          HttpURLConnection connection = null;
          try {
              long startTimeMillis = SystemClock.elapsedRealtime();

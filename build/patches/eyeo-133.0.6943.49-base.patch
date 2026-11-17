@@ -4,7 +4,7 @@ Subject: eyeo Browser Ad filtering Solution: Base Module
 
 Based on Chromium 133.0.6943.49
 ---
- DEPS                                          |   11 +
+ DEPS                                          |   10 +
  LICENSE                                       |   15 +
  README.md                                     |   12 +
  base/threading/thread_restrictions.h          |    9 +
@@ -233,18 +233,18 @@ Based on Chromium 133.0.6943.49
  components/adblock/core/schema/schema_hash.h  |   30 +
  components/adblock/core/session_stats.h       |   42 +
  components/adblock/core/sitekey_storage.h     |   53 +
- .../adblock/core/sitekey_storage_impl.cc      |  164 ++
+ .../adblock/core/sitekey_storage_impl.cc      |  166 ++
  .../adblock/core/sitekey_storage_impl.h       |   59 +
  components/adblock/core/subscription/BUILD.gn |  186 +++
  .../core/subscription/conversion_executors.h  |   50 +
- .../core/subscription/domain_splitter.cc      |   74 +
+ .../core/subscription/domain_splitter.cc      |   76 +
  .../core/subscription/domain_splitter.h       |   56 +
  .../filtering_configuration_maintainer.h      |   55 +
  ...filtering_configuration_maintainer_impl.cc |  516 ++++++
  .../filtering_configuration_maintainer_impl.h |  124 ++
  .../subscription/installed_subscription.cc    |   46 +
  .../subscription/installed_subscription.h     |  147 ++
- .../installed_subscription_impl.cc            |  638 ++++++++
+ .../installed_subscription_impl.cc            |  640 ++++++++
  .../installed_subscription_impl.h             |  147 ++
  .../core/subscription/pattern_matcher.cc      |  277 ++++
  .../core/subscription/pattern_matcher.h       |   35 +
@@ -365,7 +365,7 @@ Based on Chromium 133.0.6943.49
  tools/eyeo/update_git_grafts.py               |  138 ++
  tools/gritsettings/resource_ids.spec          |   12 +
  .../histograms/metadata/extensions/enums.xml  |    8 +-
- 361 files changed, 48832 insertions(+), 9 deletions(-)
+ 361 files changed, 48837 insertions(+), 9 deletions(-)
  create mode 100644 components/adblock/BUILD.gn
  create mode 100644 components/adblock/CHANGELOG.md
  create mode 100644 components/adblock/LICENSE
@@ -700,7 +700,7 @@ Based on Chromium 133.0.6943.49
 diff --git a/DEPS b/DEPS
 --- a/DEPS
 +++ b/DEPS
-@@ -320,6 +320,7 @@ vars = {
+@@ -313,6 +313,7 @@ vars = {
    'download_libvpx_testdata': False,
  
    'android_git': 'https://android.googlesource.com',
@@ -708,20 +708,19 @@ diff --git a/DEPS b/DEPS
    'aomedia_git': 'https://aomedia.googlesource.com',
    'boringssl_git': 'https://boringssl.googlesource.com',
    'chrome_git': 'https://chrome-internal.googlesource.com',
-@@ -550,6 +551,12 @@ vars = {
+@@ -565,6 +566,11 @@ vars = {
    # the commit queue can handle CLs rolling clusterfuzz-data
    # and whatever else without interference from each other.
-   'clusterfuzz_data_revision':'85d23a9833c8194f6e1fe49235570e892aba87c8',
+   'clusterfuzz_data_revision':'db1fa22b3f283ddc2cbe9263651ba48fa5625d8e',
 +
 +  # Three lines of non-changing comments so that
 +  # the commit queue can handle CLs rolling feed
 +  # and whatever else without interference from each other.
 +  'eyeo_snippets_revision': 'v2.0.0',
-+
    # Three lines of non-changing comments so that
    # the commit queue can handle CLs rolling agents-internal
    # and whatever else without interference from each other.
-@@ -1742,6 +1749,10 @@ deps = {
+@@ -1790,6 +1796,10 @@ deps = {
      'condition': 'checkout_android and checkout_src_internal',
    },
  
@@ -730,7 +729,7 @@ diff --git a/DEPS b/DEPS
 +  },
 +
    'src/docs/website': {
-     'url': Var('chromium_git') + '/website.git' + '@' + 'ebebad7d52ad3d28f5a21a75561e9bc2b496e472',
+     'url': Var('chromium_git') + '/website.git' + '@' + '47ee94275c3b0ad9a38c6724bd11eefba4b616ba',
    },
 diff --git a/LICENSE b/LICENSE
 --- a/LICENSE
@@ -757,8 +756,8 @@ diff --git a/LICENSE b/LICENSE
 diff --git a/README.md b/README.md
 --- a/README.md
 +++ b/README.md
-@@ -19,3 +19,15 @@ Android WebView, Ash). Even if these products have multiple executables, the
- code should be in subdirectories of the product.
+@@ -21,3 +21,15 @@ code should be in subdirectories of the product.
+ 
  
  If you found a bug, please file it at https://crbug.com/new.
 +
@@ -820,7 +819,7 @@ diff --git a/base/trace_event/builtin_categories.h b/base/trace_event/builtin_ca
 diff --git a/components/BUILD.gn b/components/BUILD.gn
 --- a/components/BUILD.gn
 +++ b/components/BUILD.gn
-@@ -1168,6 +1168,7 @@ if (use_blink) {
+@@ -1170,6 +1170,7 @@ if (use_blink) {
      deps = [
        "//base",
        "//base/test:test_support",
@@ -5198,29 +5197,29 @@ new file mode 100644
 +namespace {
 +const char* WindowOpenDispositionToString(WindowOpenDisposition value) {
 +  switch (value) {
-+    case WindowOpenDisposition::UNKNOWN:
++    case WindowOpenDisposition::kUnknown:
 +      return "UNKNOWN";
-+    case WindowOpenDisposition::CURRENT_TAB:
++    case WindowOpenDisposition::kCurrentTab:
 +      return "CURRENT_TAB";
-+    case WindowOpenDisposition::SINGLETON_TAB:
++    case WindowOpenDisposition::kSingletonTab:
 +      return "SINGLETON_TAB";
-+    case WindowOpenDisposition::NEW_FOREGROUND_TAB:
++    case WindowOpenDisposition::kNewForegroundTab:
 +      return "NEW_FOREGROUND_TAB";
-+    case WindowOpenDisposition::NEW_BACKGROUND_TAB:
++    case WindowOpenDisposition::kNewBackgroundTab:
 +      return "NEW_BACKGROUND_TAB";
-+    case WindowOpenDisposition::NEW_POPUP:
++    case WindowOpenDisposition::kNewPopup:
 +      return "NEW_POPUP";
-+    case WindowOpenDisposition::NEW_WINDOW:
++    case WindowOpenDisposition::kNewWindow:
 +      return "NEW_WINDOW";
-+    case WindowOpenDisposition::SAVE_TO_DISK:
++    case WindowOpenDisposition::kSaveToDisk:
 +      return "SAVE_TO_DISK";
-+    case WindowOpenDisposition::OFF_THE_RECORD:
++    case WindowOpenDisposition::kOffTheRecord:
 +      return "OFF_THE_RECORD";
-+    case WindowOpenDisposition::IGNORE_ACTION:
++    case WindowOpenDisposition::kIgnoreAction:
 +      return "IGNORE_ACTION";
-+    case WindowOpenDisposition::SWITCH_TO_TAB:
++    case WindowOpenDisposition::kSwitchToTab:
 +      return "SWITCH_TO_TAB";
-+    case WindowOpenDisposition::NEW_PICTURE_IN_PICTURE:
++    case WindowOpenDisposition::kNewPictureInPicture:
 +      return "NEW_PICTURE_IN_PICTURE";
 +    default:
 +      return "";
@@ -5289,9 +5288,9 @@ new file mode 100644
 +  VLOG(1) << "[eyeo] DidOpenRequestedURL: URL=" << url
 +          << ", disposition=" << WindowOpenDispositionToString(disposition)
 +          << ", renderer_initiated=" << renderer_initiated;
-+  if (disposition == WindowOpenDisposition::NEW_FOREGROUND_TAB ||
-+      disposition == WindowOpenDisposition::NEW_POPUP) {
-+    // WindowOpenDisposition::NEW_WINDOW is excluded as it is set when user
++  if (disposition == WindowOpenDisposition::kNewForegroundTab ||
++      disposition == WindowOpenDisposition::kNewPopup) {
++    // WindowOpenDisposition::kNewWindow is excluded as it is set when user
 +    // opens a link in a new window from context menu.
 +    // We use content::WebContentsUserData instead of content::DocumentUserData
 +    // because the latter is reset when there is a client side redirection.
@@ -32910,7 +32909,7 @@ diff --git a/components/adblock/core/sitekey_storage_impl.cc b/components/adbloc
 new file mode 100644
 --- /dev/null
 +++ b/components/adblock/core/sitekey_storage_impl.cc
-@@ -0,0 +1,164 @@
+@@ -0,0 +1,166 @@
 +/*
 + * This file is part of eyeo Chromium SDK,
 + * Copyright (C) 2006-present eyeo GmbH
@@ -32937,7 +32936,8 @@ new file mode 100644
 +#include "base/trace_event/trace_event.h"
 +#include "components/adblock/core/common/adblock_constants.h"
 +#include "crypto/openssl_util.h"
-+#include "crypto/signature_verifier.h"
++#include "crypto/keypair.h"
++#include "crypto/sign.h"
 +#include "net/http/http_response_headers.h"
 +
 +namespace adblock {
@@ -33062,12 +33062,13 @@ new file mode 100644
 +    return false;
 +  }
 +
-+  crypto::SignatureVerifier verifier;
-+  if (verifier.VerifyInit(crypto::SignatureVerifier::RSA_PKCS1_SHA1,
-+                          base::as_bytes(base::span(signature)),
-+                          base::as_bytes(base::span(public_key)))) {
-+    verifier.VerifyUpdate(base::as_bytes(base::span(data)));
-+    return verifier.VerifyFinal();
++  std::optional<crypto::keypair::PublicKey> key =
++      crypto::keypair::PublicKey::FromSubjectPublicKeyInfo(
++          base::as_bytes(base::span(public_key)));
++  if (key) {
++    return crypto::sign::Verify(crypto::sign::RSA_PKCS1_SHA1, *key,
++                                base::as_bytes(base::span(data)),
++                                base::as_bytes(base::span(signature)));
 +  }
 +
 +  DLOG(WARNING) << "[eyeo] Verifier initialization failed";
@@ -33389,7 +33390,7 @@ diff --git a/components/adblock/core/subscription/domain_splitter.cc b/component
 new file mode 100644
 --- /dev/null
 +++ b/components/adblock/core/subscription/domain_splitter.cc
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,76 @@
 +
 +/*
 + * This file is part of eyeo Chromium SDK,
@@ -33421,13 +33422,15 @@ new file mode 100644
 +  // If the domain has a public registry, for "example info.domain.co.uk", we
 +  // prepare to also iterate over the domain without the registry, i.e.
 +  // "info.domain." in order to match wildcard filters.
-+  const size_t registry_length =
-+      net::registry_controlled_domains::GetCanonicalHostRegistryLength(
++  const std::optional<std::string_view> registry =
++      net::registry_controlled_domains::GetCanonicalHostRegistry(
 +          domain,
 +          net::registry_controlled_domains::UnknownRegistryFilter::
 +              EXCLUDE_UNKNOWN_REGISTRIES,
 +          net::registry_controlled_domains::PrivateRegistryFilter::
 +              EXCLUDE_PRIVATE_REGISTRIES);
++  const size_t registry_length =
++      registry ? registry->size() : std::string::npos;
 +  if (registry_length != 0) {
 +    domain_sans_registry_copy_ =
 +        domain.substr(0, domain.size() - registry_length);
@@ -34442,7 +34445,7 @@ diff --git a/components/adblock/core/subscription/installed_subscription_impl.cc
 new file mode 100644
 --- /dev/null
 +++ b/components/adblock/core/subscription/installed_subscription_impl.cc
-@@ -0,0 +1,638 @@
+@@ -0,0 +1,640 @@
 +/*
 + * This file is part of eyeo Chromium SDK,
 + * Copyright (C) 2006-present eyeo GmbH
@@ -34505,13 +34508,15 @@ new file mode 100644
 +    // Trailing dot indicates a wildcard match for any TLD.
 +    // Remove the registry from |document_domain| in order for it to also end
 +    // in a dot (e.g. "example.com" becomes "example.").
-+    const size_t registry_length =
-+        net::registry_controlled_domains::GetCanonicalHostRegistryLength(
++    const std::optional<std::string_view> registry =
++        net::registry_controlled_domains::GetCanonicalHostRegistry(
 +            document_domain,
 +            net::registry_controlled_domains::UnknownRegistryFilter::
 +                EXCLUDE_UNKNOWN_REGISTRIES,
 +            net::registry_controlled_domains::PrivateRegistryFilter::
 +                EXCLUDE_PRIVATE_REGISTRIES);
++    const size_t registry_length =
++        registry ? registry->size() : std::string::npos;
 +    // Remove the registry from document_domain:
 +    document_domain.remove_suffix(registry_length);
 +  }
@@ -50212,15 +50217,15 @@ new file mode 100644
 diff --git a/content/browser/loader/navigation_url_loader_impl.cc b/content/browser/loader/navigation_url_loader_impl.cc
 --- a/content/browser/loader/navigation_url_loader_impl.cc
 +++ b/content/browser/loader/navigation_url_loader_impl.cc
-@@ -1593,7 +1593,7 @@ void NavigationURLLoaderImpl::OnReceiveRedirect(
-   if (url_.SchemeIsBlob()) {
-     // Loading a blob URL never produces a redirect.
-     error = net::ERR_UNSAFE_REDIRECT;
--  } else if (!bypass_redirect_checks &&
-+  } else if (!bypass_redirect_checks && !redirect_info.bypass_redirect_checks &&
-              !IsSafeRedirectTarget(url_, redirect_info.new_url)) {
-     error = net::ERR_UNSAFE_REDIRECT;
-   } else if (--redirect_limit_ == 0) {
+@@ -1626,7 +1626,7 @@ void NavigationURLLoaderImpl::OnReceiveRedirect(
+       bypass_redirect_checks = bypass_redirect_checks_;
+     }
+ 
+-    if (!bypass_redirect_checks &&
++    if (!bypass_redirect_checks && !redirect_info.bypass_redirect_checks &&
+         !IsSafeRedirectTarget(url_, redirect_info.new_url)) {
+       error = net::ERR_UNSAFE_REDIRECT;
+     } else if (--redirect_limit_ == 0) {
 diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/browser/renderer_host/render_frame_host_impl.cc
 --- a/content/browser/renderer_host/render_frame_host_impl.cc
 +++ b/content/browser/renderer_host/render_frame_host_impl.cc
@@ -50235,7 +50240,7 @@ diff --git a/content/browser/renderer_host/render_frame_host_impl.cc b/content/b
  
  #include "content/browser/renderer_host/render_frame_host_impl.h"
  
-@@ -3889,6 +3893,12 @@ void RenderFrameHostImpl::ExecuteJavaScriptMethod(
+@@ -3993,6 +3997,12 @@ void RenderFrameHostImpl::ExecuteJavaScriptMethod(
        std::move(callback));
  }
  
@@ -50262,7 +50267,7 @@ diff --git a/content/browser/renderer_host/render_frame_host_impl.h b/content/br
  
  #ifndef CONTENT_BROWSER_RENDERER_HOST_RENDER_FRAME_HOST_IMPL_H_
  #define CONTENT_BROWSER_RENDERER_HOST_RENDER_FRAME_HOST_IMPL_H_
-@@ -532,6 +536,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
+@@ -527,6 +531,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
                                 const std::u16string& method_name,
                                 base::ListValue arguments,
                                 JavaScriptResultCallback callback) override;
@@ -50285,7 +50290,7 @@ diff --git a/content/public/browser/render_frame_host.h b/content/public/browser
  
  #ifndef CONTENT_PUBLIC_BROWSER_RENDER_FRAME_HOST_H_
  #define CONTENT_PUBLIC_BROWSER_RENDER_FRAME_HOST_H_
-@@ -586,6 +590,9 @@ class CONTENT_EXPORT RenderFrameHost : public IPC::Listener {
+@@ -601,6 +605,9 @@ class CONTENT_EXPORT RenderFrameHost : public IPC::Listener {
    virtual void AddMessageToConsole(blink::mojom::ConsoleMessageLevel level,
                                     const std::string& message) = 0;
  
@@ -50334,7 +50339,7 @@ diff --git a/content/public/test/fake_local_frame.cc b/content/public/test/fake_
  
  #include "content/public/test/fake_local_frame.h"
  
-@@ -103,6 +107,9 @@ void FakeLocalFrame::RequestVideoFrameAtWithBoundsHint(
+@@ -106,6 +110,9 @@ void FakeLocalFrame::RequestVideoFrameAtWithBoundsHint(
  void FakeLocalFrame::PluginActionAt(const gfx::Point& location,
                                      blink::mojom::PluginActionType action) {}
  
@@ -50358,7 +50363,7 @@ diff --git a/content/public/test/fake_local_frame.h b/content/public/test/fake_l
  
  #ifndef CONTENT_PUBLIC_TEST_FAKE_LOCAL_FRAME_H_
  #define CONTENT_PUBLIC_TEST_FAKE_LOCAL_FRAME_H_
-@@ -87,6 +91,7 @@ class FakeLocalFrame : public blink::mojom::LocalFrame {
+@@ -89,6 +93,7 @@ class FakeLocalFrame : public blink::mojom::LocalFrame {
        RequestVideoFrameAtWithBoundsHintCallback callback) override;
    void PluginActionAt(const gfx::Point& location,
                        blink::mojom::PluginActionType action) override;
@@ -50415,7 +50420,7 @@ diff --git a/content/shell/BUILD.gn b/content/shell/BUILD.gn
      "//components/variations/service",
      "//components/web_cache/renderer",
      "//content:content_resources",
-@@ -441,6 +452,7 @@ static_library("content_shell_lib") {
+@@ -442,6 +453,7 @@ static_library("content_shell_lib") {
        "//mojo/public/java/system:test_support",
        "//ui/android",
      ]
@@ -50423,7 +50428,7 @@ diff --git a/content/shell/BUILD.gn b/content/shell/BUILD.gn
    }
  
    if (shell_use_toolkit_views) {
-@@ -531,6 +543,8 @@ repack("pak") {
+@@ -532,6 +544,8 @@ repack("pak") {
  
    sources = [
      "$root_gen_dir/base/tracing/protos/tracing_proto_resources.pak",
@@ -50432,7 +50437,7 @@ diff --git a/content/shell/BUILD.gn b/content/shell/BUILD.gn
      "$root_gen_dir/components/ukm_resources.pak",
      "$root_gen_dir/content/browser/resources/media/media_internals_resources.pak",
      "$root_gen_dir/content/browser/webrtc/resources/webrtc_internals_resources.pak",
-@@ -562,6 +576,8 @@ repack("pak") {
+@@ -563,6 +577,8 @@ repack("pak") {
    deps = [
      ":resources",
      "//base/tracing/protos:chrome_track_event_resources",
@@ -50668,7 +50673,7 @@ new file mode 100644
 diff --git a/content/shell/browser/shell.cc b/content/shell/browser/shell.cc
 --- a/content/shell/browser/shell.cc
 +++ b/content/shell/browser/shell.cc
-@@ -21,6 +21,8 @@
+@@ -22,6 +22,8 @@
  #include "base/strings/string_util.h"
  #include "base/strings/utf_string_conversions.h"
  #include "build/build_config.h"
@@ -50677,7 +50682,7 @@ diff --git a/content/shell/browser/shell.cc b/content/shell/browser/shell.cc
  #include "components/custom_handlers/protocol_handler.h"
  #include "components/custom_handlers/protocol_handler_registry.h"
  #include "components/custom_handlers/simple_protocol_handler_registry_factory.h"
-@@ -41,6 +43,7 @@
+@@ -42,6 +44,7 @@
  #include "content/public/browser/web_contents.h"
  #include "content/public/common/content_switches.h"
  #include "content/shell/app/resource.h"
@@ -50685,7 +50690,7 @@ diff --git a/content/shell/browser/shell.cc b/content/shell/browser/shell.cc
  #include "content/shell/browser/shell_content_browser_client.h"
  #include "content/shell/browser/shell_devtools_frontend.h"
  #include "content/shell/browser/shell_javascript_dialog_manager.h"
-@@ -87,6 +90,12 @@ Shell::Shell(std::unique_ptr<WebContents> web_contents,
+@@ -88,6 +91,12 @@ Shell::Shell(std::unique_ptr<WebContents> web_contents,
  
    windows_.push_back(this);
  
@@ -50751,7 +50756,7 @@ diff --git a/content/shell/browser/shell_browser_main_parts.cc b/content/shell/b
  #include "components/performance_manager/embedder/graph_features.h"
  #include "components/performance_manager/embedder/performance_manager_lifetime.h"
  #include "content/public/browser/browser_thread.h"
-@@ -30,6 +35,7 @@
+@@ -29,6 +34,7 @@
  #include "content/public/common/result_codes.h"
  #include "content/public/common/url_constants.h"
  #include "content/shell/android/shell_descriptors.h"
@@ -50759,7 +50764,7 @@ diff --git a/content/shell/browser/shell_browser_main_parts.cc b/content/shell/b
  #include "content/shell/browser/shell.h"
  #include "content/shell/browser/shell_browser_context.h"
  #include "content/shell/browser/shell_devtools_manager_delegate.h"
-@@ -138,7 +144,7 @@ int ShellBrowserMainParts::PreEarlyInitialization() {
+@@ -137,7 +143,7 @@ int ShellBrowserMainParts::PreEarlyInitialization() {
  }
  
  void ShellBrowserMainParts::InitializeBrowserContexts() {
@@ -50791,7 +50796,7 @@ diff --git a/extensions/browser/api/web_request/web_request_proxying_url_loader_
  #include "extensions/browser/api/web_request/web_request_proxying_url_loader_factory.h"
  
  #include <memory>
-@@ -484,7 +488,7 @@ void WebRequestProxyingURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
+@@ -514,7 +518,7 @@ void WebRequestProxyingURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
      AuthorizeBypassRedirectChecks();
    }
  
@@ -50861,7 +50866,7 @@ diff --git a/third_party/blink/public/mojom/frame/frame.mojom b/third_party/blin
  
  module blink.mojom;
  
-@@ -1004,6 +1008,10 @@ interface LocalFrame {
+@@ -970,6 +974,10 @@ interface LocalFrame {
    PluginActionAt(
        gfx.mojom.Point location, blink.mojom.PluginActionType action);
  
@@ -50886,7 +50891,7 @@ diff --git a/third_party/blink/public/web/web_document.h b/third_party/blink/pub
  #ifndef THIRD_PARTY_BLINK_PUBLIC_WEB_WEB_DOCUMENT_H_
  #define THIRD_PARTY_BLINK_PUBLIC_WEB_WEB_DOCUMENT_H_
  
-@@ -161,6 +165,14 @@ class BLINK_EXPORT WebDocument : public WebNode {
+@@ -155,6 +159,14 @@ class BLINK_EXPORT WebDocument : public WebNode {
        WebCssOrigin = WebCssOrigin::kAuthor,
        BackForwardCacheAware = BackForwardCacheAware::kAllow);
  
@@ -50915,7 +50920,7 @@ diff --git a/third_party/blink/renderer/core/dom/events/event_target.cc b/third_
  #include "third_party/blink/renderer/core/dom/events/event_target.h"
  
  #include <memory>
-@@ -854,7 +858,10 @@ bool EventTarget::dispatchEventForBindings(Event* event,
+@@ -871,7 +875,10 @@ bool EventTarget::dispatchEventForBindings(Event* event,
    if (!GetExecutionContext())
      return false;
  
@@ -50930,7 +50935,7 @@ diff --git a/third_party/blink/renderer/core/dom/events/event_target.cc b/third_
 diff --git a/third_party/blink/renderer/core/exported/web_document.cc b/third_party/blink/renderer/core/exported/web_document.cc
 --- a/third_party/blink/renderer/core/exported/web_document.cc
 +++ b/third_party/blink/renderer/core/exported/web_document.cc
-@@ -307,6 +307,56 @@ WebStyleSheetKey WebDocument::InsertStyleSheet(
+@@ -301,6 +301,56 @@ WebStyleSheetKey WebDocument::InsertStyleSheet(
    return injection_key;
  }
  
@@ -51001,7 +51006,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame_mojo_handler.cc b
  
  #include "third_party/blink/renderer/core/frame/local_frame_mojo_handler.h"
  
-@@ -358,6 +362,14 @@ LocalFrameMojoHandler::LocalFrameMojoHandler(blink::LocalFrame& frame)
+@@ -373,6 +377,14 @@ LocalFrameMojoHandler::LocalFrameMojoHandler(blink::LocalFrame& frame)
                      WrapWeakPersistent(this)));
  }
  
@@ -51030,7 +51035,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame_mojo_handler.h b/
  
  #ifndef THIRD_PARTY_BLINK_RENDERER_CORE_FRAME_LOCAL_FRAME_MOJO_HANDLER_H_
  #define THIRD_PARTY_BLINK_RENDERER_CORE_FRAME_LOCAL_FRAME_MOJO_HANDLER_H_
-@@ -111,6 +115,7 @@ class LocalFrameMojoHandler
+@@ -113,6 +117,7 @@ class LocalFrameMojoHandler
    void AddMessageToConsole(mojom::blink::ConsoleMessageLevel level,
                             const String& message,
                             bool discard_duplicates) final;
@@ -51041,7 +51046,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame_mojo_handler.h b/
 diff --git a/third_party/blink/renderer/core/html/html_element.cc b/third_party/blink/renderer/core/html/html_element.cc
 --- a/third_party/blink/renderer/core/html/html_element.cc
 +++ b/third_party/blink/renderer/core/html/html_element.cc
-@@ -3625,7 +3625,13 @@ void HTMLElement::setSpellcheck(bool enable) {
+@@ -3793,7 +3793,13 @@ void HTMLElement::setSpellcheck(bool enable) {
  }
  
  void HTMLElement::click() {
@@ -51720,7 +51725,7 @@ diff --git a/tools/gritsettings/resource_ids.spec b/tools/gritsettings/resource_
  # This file is used to assign starting resource ids for resources and strings
  # used by Chromium.  This is done to ensure that resource ids are unique
  # across all the grd files.  If you are adding a new grd file, please add
-@@ -1412,6 +1416,14 @@
+@@ -1423,6 +1427,14 @@
    "components/user_scripts/browser/resources/browser_resources.grd": {
      "includes": [7625],
    },
@@ -51749,7 +51754,7 @@ diff --git a/tools/metrics/histograms/metadata/extensions/enums.xml b/tools/metr
  -->
  
  <!--
-@@ -219,7 +223,7 @@ Called by update_extension_histograms.py.-->
+@@ -221,7 +225,7 @@ Called by update_extension_histograms.py.-->
    <int value="19" label="APP_WINDOW_ON_MAXIMIZED"/>
    <int value="20" label="APP_WINDOW_ON_MINIMIZED"/>
    <int value="21" label="APP_WINDOW_ON_RESTORED"/>
@@ -51758,10 +51763,10 @@ diff --git a/tools/metrics/histograms/metadata/extensions/enums.xml b/tools/metr
    <int value="23" label="DELETED_AUDIO_MODEM_ON_TRANSMIT_FAIL"/>
    <int value="24" label="DELETED_AUDIO_ON_DEVICE_CHANGED"/>
    <int value="25" label="AUDIO_ON_DEVICES_CHANGED"/>
-@@ -3322,6 +3326,8 @@ Called by update_extension_permission.py.-->
-   <int value="271" label="kBluetoothLowEnergy"/>
-   <int value="272" label="kBluetoothPeripheral"/>
+@@ -3353,6 +3357,8 @@ Called by update_extension_permission.py.-->
    <int value="273" label="kPublicSuffix"/>
+   <int value="274" label="kEnterpriseWebrtc"/>
+   <int value="275" label="kMimeTypesHandlerPdf"/>
 +  <int value="999" label="kAdblockPrivate"/>
 +  <int value="1000" label="kEyeoFilteringPrivate"/>
  </enum>

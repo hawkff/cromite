@@ -6,6 +6,7 @@ Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 Require: Content-settings-infrastructure.patch
 ---
+ .../browser_ui/site_settings/android/BUILD.gn |   5 +
  .../res/drawable-hdpi/settings_autoplay.png   | Bin 0 -> 456 bytes
  .../res/drawable-mdpi/settings_autoplay.png   | Bin 0 -> 296 bytes
  .../res/drawable-xhdpi/settings_autoplay.png  | Bin 0 -> 551 bytes
@@ -17,7 +18,7 @@ Require: Content-settings-infrastructure.patch
  .../core/browser/content_settings_registry.cc |   2 +-
  .../core/html/media/autoplay_policy.cc        |  14 +++
  .../core/html/media/autoplay_policy.h         |   4 +
- 11 files changed, 145 insertions(+), 1 deletion(-)
+ 12 files changed, 150 insertions(+), 1 deletion(-)
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-hdpi/settings_autoplay.png
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-mdpi/settings_autoplay.png
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-xhdpi/settings_autoplay.png
@@ -27,6 +28,33 @@ Require: Content-settings-infrastructure.patch
  create mode 100644 components/browser_ui/strings/bromite_content_settings/autoplay.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/autoplay.inc
 
+diff --git a/components/browser_ui/site_settings/android/BUILD.gn b/components/browser_ui/site_settings/android/BUILD.gn
+--- a/components/browser_ui/site_settings/android/BUILD.gn
++++ b/components/browser_ui/site_settings/android/BUILD.gn
+@@ -235,18 +235,23 @@ robolectric_library("junit") {
+ android_resources("java_resources") {
+   sources = [
+     "java/res/drawable-hdpi/permission_popups.png",
++    "java/res/drawable-hdpi/settings_autoplay.png",
+     "java/res/drawable-hdpi/settings_sensors.png",
+     "java/res/drawable-hdpi/web_asset.png",
+     "java/res/drawable-mdpi/permission_popups.png",
++    "java/res/drawable-mdpi/settings_autoplay.png",
+     "java/res/drawable-mdpi/settings_sensors.png",
+     "java/res/drawable-mdpi/web_asset.png",
+     "java/res/drawable-xhdpi/permission_popups.png",
++    "java/res/drawable-xhdpi/settings_autoplay.png",
+     "java/res/drawable-xhdpi/settings_sensors.png",
+     "java/res/drawable-xhdpi/web_asset.png",
+     "java/res/drawable-xxhdpi/permission_popups.png",
++    "java/res/drawable-xxhdpi/settings_autoplay.png",
+     "java/res/drawable-xxhdpi/settings_sensors.png",
+     "java/res/drawable-xxhdpi/web_asset.png",
+     "java/res/drawable-xxxhdpi/permission_popups.png",
++    "java/res/drawable-xxxhdpi/settings_autoplay.png",
+     "java/res/drawable-xxxhdpi/settings_sensors.png",
+     "java/res/drawable-xxxhdpi/web_asset.png",
+     "java/res/drawable/ic_account_attention.xml",
 diff --git a/components/browser_ui/site_settings/android/java/res/drawable-hdpi/settings_autoplay.png b/components/browser_ui/site_settings/android/java/res/drawable-hdpi/settings_autoplay.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..a8a9265f14cd8445ad1f55845099e60dc3c4edf1
@@ -299,7 +327,7 @@ diff --git a/third_party/blink/renderer/core/html/media/autoplay_policy.cc b/thi
  #include "third_party/blink/public/platform/web_media_player.h"
  #include "third_party/blink/public/web/web_local_frame.h"
  #include "third_party/blink/public/web/web_local_frame_client.h"
-@@ -348,6 +349,8 @@ void AutoplayPolicy::TryUnlockingUserGesture() {
+@@ -337,6 +338,8 @@ void AutoplayPolicy::TryUnlockingUserGesture() {
  }
  
  bool AutoplayPolicy::IsGestureNeededForPlayback() const {
@@ -308,7 +336,7 @@ diff --git a/third_party/blink/renderer/core/html/media/autoplay_policy.cc b/thi
    if (!IsLockedPendingUserGesture())
      return false;
  
-@@ -451,6 +454,17 @@ void AutoplayPolicy::MaybeSetAutoplayInitiated() {
+@@ -440,6 +443,17 @@ void AutoplayPolicy::MaybeSetAutoplayInitiated() {
    }
  }
  

@@ -21,7 +21,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.json
 --- a/chrome/browser/flag-metadata.json
 +++ b/chrome/browser/flag-metadata.json
-@@ -2807,6 +2807,10 @@
+@@ -3223,6 +3223,10 @@
        "alexmos@google.com", "creis@google.com", "lbrady@google.com" ],
      "expiry_milestone": 170
    },
@@ -30,8 +30,8 @@ diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.js
 +    "expiry_milestone": -1
 +  },
    {
-     "name": "disable-u18-feedback-desktop",
-     "owners": [ "chrome-signin-team@google.com" ],
+     "name": "disable-virtual-keyboard",
+     "owners": [ "dvallet@chromium.org", "essential-inputs-team@google.com" ],
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/disable-pull-to-refresh-effect.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/disable-pull-to-refresh-effect.grdp
 new file mode 100644
 --- /dev/null
@@ -49,16 +49,16 @@ new file mode 100644
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 --- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 +++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
-@@ -60,4 +60,10 @@ found in the LICENSE file.
+@@ -57,4 +57,10 @@ found in the LICENSE file.
+         android:key="touchpad_overscroll_history_navigation"
          android:summary="@string/touchpad_overscroll_history_navigation_summary"
-         android:title="@string/touchpad_overscroll_history_navigation_title" />
- 
+         android:title="@string/touchpad_overscroll_history_navigation_title"/>
++
 +    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
 +        android:title="@string/disable_pull_to_refresh_title"
 +        android:summary="@string/disable_pull_to_refresh_summary"
 +        app:featureName="disable-pull-to-refresh-effect"
 +        app:needRestart="true" />
-+
  </PreferenceScreen>
 diff --git a/content/browser/android/overscroll_controller_android.cc b/content/browser/android/overscroll_controller_android.cc
 --- a/content/browser/android/overscroll_controller_android.cc

@@ -22,42 +22,42 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/CloseAllTabsDialog.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/CloseAllTabsDialog.java
 --- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/CloseAllTabsDialog.java
 +++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/CloseAllTabsDialog.java
-@@ -11,6 +11,7 @@ import androidx.annotation.VisibleForTesting;
+@@ -12,6 +12,7 @@ import org.chromium.base.Callback;
  import org.chromium.base.metrics.RecordHistogram;
  import org.chromium.base.metrics.RecordUserAction;
  import org.chromium.build.annotations.NullMarked;
 +import org.chromium.chrome.browser.flags.ChromeFeatureList;
  import org.chromium.chrome.R;
- import org.chromium.chrome.browser.tabmodel.TabModelSelector;
- import org.chromium.ui.modaldialog.DialogDismissalCause;
-@@ -38,6 +39,11 @@ public class CloseAllTabsDialog {
-             Supplier<ModalDialogManager> modalDialogManagerSupplier,
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+ import org.chromium.chrome.browser.tabmodel.TabModel;
+@@ -46,6 +47,11 @@ public class CloseAllTabsDialog {
              TabModelSelector tabModelSelector,
-             Runnable onCloseAll) {
+             Callback<Boolean> onCloseAll,
+             boolean isIncognitoOnly) {
 +        if (!ChromeFeatureList.isEnabled(ChromeFeatureList.CLOSE_ALL_TABS_MODAL_DIALOG)) {
-+            onCloseAll.run();
++            // Same result as accepting the dialog without ticking the pinned-tabs checkbox.
++            onCloseAll.onResult(false);
 +            return;
 +        }
-+
          assert modalDialogManagerSupplier.get() != null;
          final ModalDialogManager manager = modalDialogManagerSupplier.get();
-         final boolean isIncognito = tabModelSelector.getCurrentModel().isIncognito();
+         final TabModel regularModel = tabModelSelector.getModel(/* incognito= */ false);
 diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
 --- a/chrome/browser/flags/android/chrome_feature_list.cc
 +++ b/chrome/browser/flags/android/chrome_feature_list.cc
-@@ -344,6 +344,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
-     &kClankStartupLatencyInjection,
+@@ -387,6 +387,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
+     &kClankStartupTabOptimizations,
      &kClankWhatsNew,
      &kClearIntentWhenRecreated,
 +    &kCloseAllTabsModalDialog,
      &kCommandLineOnNonRooted,
      &kCompositorViewRemeasureFix,
-     &kContextualPanelCloseButton,
+     &kCompositorViewShrinkWhenKeyboardHidden,
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 --- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 +++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
-@@ -468,6 +468,7 @@ public abstract class ChromeFeatureList {
-     public static final String CLANK_STARTUP_LATENCY_INJECTION = "ClankStartupLatencyInjection";
+@@ -503,6 +503,7 @@ public abstract class ChromeFeatureList {
+     public static final String CLANK_STARTUP_TAB_OPTIMIZATIONS = "ClankStartupTabOptimizations";
      public static final String CLANK_WHATS_NEW = "ClankWhatsNew";
      public static final String CLEAR_INTENT_WHEN_RECREATED = "ClearIntentWhenRecreated";
 +    public static final String CLOSE_ALL_TABS_MODAL_DIALOG = "CloseAllTabsModalDialog";

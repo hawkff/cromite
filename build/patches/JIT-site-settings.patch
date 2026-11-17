@@ -13,6 +13,7 @@ note: needs SitePerProcess and StrictOriginIsolation flags enabled
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 Require: Content-settings-infrastructure.patch
 ---
+ .../browser_ui/site_settings/android/BUILD.gn |   5 +
  .../permission_javascript_jit.png             | Bin 0 -> 433 bytes
  .../permission_javascript_jit.png             | Bin 0 -> 377 bytes
  .../permission_javascript_jit.png             | Bin 0 -> 518 bytes
@@ -27,7 +28,7 @@ Require: Content-settings-infrastructure.patch
  content/browser/site_info.cc                  |   7 ++
  content/browser/url_info.cc                   |   6 ++
  content/browser/url_info.h                    |   3 +
- 14 files changed, 153 insertions(+), 2 deletions(-)
+ 15 files changed, 158 insertions(+), 2 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-hdpi/permission_javascript_jit.png
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-mdpi/permission_javascript_jit.png
  create mode 100644 components/browser_ui/site_settings/android/java/res/drawable-xhdpi/permission_javascript_jit.png
@@ -37,6 +38,41 @@ Require: Content-settings-infrastructure.patch
  create mode 100644 components/browser_ui/strings/bromite_content_settings/javascript_jit.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/javascript_jit.inc
 
+diff --git a/components/browser_ui/site_settings/android/BUILD.gn b/components/browser_ui/site_settings/android/BUILD.gn
+--- a/components/browser_ui/site_settings/android/BUILD.gn
++++ b/components/browser_ui/site_settings/android/BUILD.gn
+@@ -235,26 +235,31 @@ robolectric_library("junit") {
+ android_resources("java_resources") {
+   sources = [
+     "java/res/drawable-hdpi/permission_images.png",
++    "java/res/drawable-hdpi/permission_javascript_jit.png",
+     "java/res/drawable-hdpi/permission_popups.png",
+     "java/res/drawable-hdpi/settings_autoplay.png",
+     "java/res/drawable-hdpi/settings_sensors.png",
+     "java/res/drawable-hdpi/web_asset.png",
+     "java/res/drawable-mdpi/permission_images.png",
++    "java/res/drawable-mdpi/permission_javascript_jit.png",
+     "java/res/drawable-mdpi/permission_popups.png",
+     "java/res/drawable-mdpi/settings_autoplay.png",
+     "java/res/drawable-mdpi/settings_sensors.png",
+     "java/res/drawable-mdpi/web_asset.png",
+     "java/res/drawable-xhdpi/permission_images.png",
++    "java/res/drawable-xhdpi/permission_javascript_jit.png",
+     "java/res/drawable-xhdpi/permission_popups.png",
+     "java/res/drawable-xhdpi/settings_autoplay.png",
+     "java/res/drawable-xhdpi/settings_sensors.png",
+     "java/res/drawable-xhdpi/web_asset.png",
+     "java/res/drawable-xxhdpi/permission_images.png",
++    "java/res/drawable-xxhdpi/permission_javascript_jit.png",
+     "java/res/drawable-xxhdpi/permission_popups.png",
+     "java/res/drawable-xxhdpi/settings_autoplay.png",
+     "java/res/drawable-xxhdpi/settings_sensors.png",
+     "java/res/drawable-xxhdpi/web_asset.png",
+     "java/res/drawable-xxxhdpi/permission_images.png",
++    "java/res/drawable-xxxhdpi/permission_javascript_jit.png",
+     "java/res/drawable-xxxhdpi/permission_popups.png",
+     "java/res/drawable-xxxhdpi/settings_autoplay.png",
+     "java/res/drawable-xxxhdpi/settings_sensors.png",
 diff --git a/components/browser_ui/site_settings/android/java/res/drawable-hdpi/permission_javascript_jit.png b/components/browser_ui/site_settings/android/java/res/drawable-hdpi/permission_javascript_jit.png
 new file mode 100644
 index 0000000000000000000000000000000000000000..88f0ec11d6b186923ace473eb426f80341adc5f1
@@ -279,7 +315,7 @@ new file mode 100644
 diff --git a/components/content_settings/core/browser/content_settings_registry.cc b/components/content_settings/core/browser/content_settings_registry.cc
 --- a/components/content_settings/core/browser/content_settings_registry.cc
 +++ b/components/content_settings/core/browser/content_settings_registry.cc
-@@ -570,7 +570,7 @@ void ContentSettingsRegistry::Init() {
+@@ -560,7 +560,7 @@ void ContentSettingsRegistry::Init() {
             PermissionSettingsInfo::EXCEPTIONS_ON_SECURE_ORIGINS_ONLY);
  
    Register(ContentSettingsType::JAVASCRIPT_JIT, "javascript-jit",
@@ -291,7 +327,7 @@ diff --git a/components/content_settings/core/browser/content_settings_registry.
 diff --git a/content/browser/renderer_host/navigation_request.cc b/content/browser/renderer_host/navigation_request.cc
 --- a/content/browser/renderer_host/navigation_request.cc
 +++ b/content/browser/renderer_host/navigation_request.cc
-@@ -4603,12 +4603,18 @@ UrlInfo NavigationRequest::GetUrlInfo() {
+@@ -4850,11 +4850,17 @@ UrlInfo NavigationRequest::GetUrlInfo() {
    // Compute the WebExposedIsolationInfo that will be bundled into UrlInfo.
    auto web_exposed_isolation_info = ComputeWebExposedIsolationInfo();
  
@@ -304,17 +340,16 @@ diff --git a/content/browser/renderer_host/navigation_request.cc b/content/brows
    url_info_init.WithOACHeaderRequest(oac_header_request)
        .WithCOOPSiteIsolation(ShouldRequestSiteIsolationForCOOP())
        .WithWebExposedIsolationInfo(web_exposed_isolation_info)
-       .WithEmbedderIsolationInfo(embedder_isolation_info_)
--      .WithMatchesAdFilterWithHost(response() && is_ad_tagged());
-+      .WithMatchesAdFilterWithHost(response() && is_ad_tagged())
+-      .WithEmbedderIsolationInfo(embedder_isolation_info_);
++      .WithEmbedderIsolationInfo(embedder_isolation_info_)
 +      .WithTopOrigin(top_origin);
  
-   // Compute the CrossOriginIsolationKey for the navigation.
-   std::optional<AgentClusterKey::CrossOriginIsolationKey>
+   if (base::FeatureList::IsEnabled(features::kExcludeAdsFromOriginIsolation)) {
+     // After the final response, use the decision from
 diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
 --- a/content/browser/renderer_host/render_process_host_impl.cc
 +++ b/content/browser/renderer_host/render_process_host_impl.cc
-@@ -3787,6 +3787,9 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
+@@ -3858,6 +3858,9 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
    if (IsJitDisabled()) {
      AppendToCommaSeparatedSwitch(
          command_line, blink::switches::kJavaScriptFlags, "--jitless");
@@ -327,7 +362,7 @@ diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content
 diff --git a/content/browser/site_info.cc b/content/browser/site_info.cc
 --- a/content/browser/site_info.cc
 +++ b/content/browser/site_info.cc
-@@ -328,6 +328,13 @@ SiteInfo SiteInfo::Create(const IsolationContext& isolation_context,
+@@ -357,6 +357,13 @@ SiteInfo SiteInfo::Create(const IsolationContext& isolation_context,
    is_jitless =
        is_jitless || GetContentClient()->browser()->IsJitDisabledForSite(
                          browser_context, agent_cluster_url_or_default);
@@ -344,7 +379,7 @@ diff --git a/content/browser/site_info.cc b/content/browser/site_info.cc
 diff --git a/content/browser/url_info.cc b/content/browser/url_info.cc
 --- a/content/browser/url_info.cc
 +++ b/content/browser/url_info.cc
-@@ -26,6 +26,7 @@ UrlInfo::UrlInfo(const UrlInfoInit& init)
+@@ -28,6 +28,7 @@ UrlInfo::UrlInfo(const UrlInfoInit& init)
        is_prefetch_with_cross_site_contamination(
            init.is_prefetch_with_cross_site_contamination_),
        origin(init.origin_),
@@ -352,7 +387,7 @@ diff --git a/content/browser/url_info.cc b/content/browser/url_info.cc
        is_sandboxed(init.is_sandboxed_),
        unique_sandbox_id(init.unique_sandbox_id_),
        storage_partition_config(init.storage_partition_config_),
-@@ -151,6 +152,11 @@ UrlInfoInit& UrlInfoInit::WithOrigin(const url::Origin& origin) {
+@@ -158,6 +159,11 @@ UrlInfoInit& UrlInfoInit::WithOrigin(const url::Origin& origin) {
    return *this;
  }
  

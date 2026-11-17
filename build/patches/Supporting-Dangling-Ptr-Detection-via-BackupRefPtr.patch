@@ -14,7 +14,7 @@ will not suffer from development errors related to memory management.
 
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
- base/allocator/partition_alloc_features.cc    |  6 +++-
+ base/allocator/partition_alloc_features.cc    |  3 ++
  base/allocator/partition_alloc_support.cc     | 30 ++++++++++++++-----
  .../partition_allocator/partition_alloc.gni   |  6 ++--
  base/observer_list_types.cc                   | 11 +++++++
@@ -28,7 +28,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../webapps/AddToHomescreenMediator.java      |  4 +--
  .../Enable-Partition-Alloc-BRP-Checks.inc     | 11 +++++++
  .../platform/wtf/allocator/partitions.cc      | 10 +------
- 14 files changed, 82 insertions(+), 30 deletions(-)
+ 14 files changed, 80 insertions(+), 29 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Supporting-Dangling-Ptr-Detection-via-BackupRefPtr.grdp
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Enable-Partition-Alloc-BRP-Checks.inc
 
@@ -51,17 +51,7 @@ diff --git a/base/allocator/partition_alloc_features.cc b/base/allocator/partiti
  
  constexpr FeatureParam<BackupRefPtrEnabledProcesses>::Option
      kBackupRefPtrEnabledProcessesOptions[] = {
-@@ -191,7 +193,8 @@ BASE_FEATURE_ENUM_PARAM(BackupRefPtrEnabledProcesses,
-                         &kPartitionAllocBackupRefPtr,
-                         kPAFeatureEnabledProcessesStr,
- // Exception for IS_DESKTOP_ANDROID approved in crbug.com/482155132.
--#if BUILDFLAG(IS_ANDROID) && !BUILDFLAG(IS_DESKTOP_ANDROID)
-+// Cromite keeps BackupRefPtr in all processes on Android, renderers included.
-+#if BUILDFLAG(IS_ANDROID) && false
-                         BackupRefPtrEnabledProcesses::kNonRenderer,
- #else
-                         BackupRefPtrEnabledProcesses::kAllProcesses,
-@@ -232,6 +235,7 @@ BASE_FEATURE(kPartitionAllocMemoryTagging,
+@@ -227,6 +229,7 @@ BASE_FEATURE(kPartitionAllocMemoryTagging,
               FEATURE_DISABLED_BY_DEFAULT
  #endif
  );
@@ -72,7 +62,7 @@ diff --git a/base/allocator/partition_alloc_features.cc b/base/allocator/partiti
 diff --git a/base/allocator/partition_alloc_support.cc b/base/allocator/partition_alloc_support.cc
 --- a/base/allocator/partition_alloc_support.cc
 +++ b/base/allocator/partition_alloc_support.cc
-@@ -317,6 +317,20 @@ void StartMemoryReclaimer(scoped_refptr<SequencedTaskRunner> task_runner) {
+@@ -332,6 +332,20 @@ void StartMemoryReclaimer(scoped_refptr<SequencedTaskRunner> task_runner) {
  std::map<std::string, std::string> ProposeSyntheticFinchTrials() {
    std::map<std::string, std::string> trials;
  
@@ -93,7 +83,7 @@ diff --git a/base/allocator/partition_alloc_support.cc b/base/allocator/partitio
  #if PA_BUILDFLAG(ENABLE_DANGLING_RAW_PTR_CHECKS)
    trials.emplace("DanglingPointerDetector", "Enabled");
  #else
-@@ -328,13 +342,18 @@ std::map<std::string, std::string> ProposeSyntheticFinchTrials() {
+@@ -343,13 +357,18 @@ std::map<std::string, std::string> ProposeSyntheticFinchTrials() {
    trials.emplace("VectorRawPtrExperiment", "Disabled");
  
  #if PA_BUILDFLAG(HAS_MEMORY_TAGGING)
@@ -115,7 +105,7 @@ diff --git a/base/allocator/partition_alloc_support.cc b/base/allocator/partitio
      }
  #if BUILDFLAG(IS_ANDROID)
      BootloaderOverride bootloader_override = GetBootloaderOverride();
-@@ -972,10 +991,7 @@ bool PartitionAllocSupport::ShouldEnablePartitionAllocWithAdvancedChecks(
+@@ -985,10 +1004,7 @@ bool PartitionAllocSupport::ShouldEnablePartitionAllocWithAdvancedChecks(
            base::features::kPartitionAllocWithAdvancedChecks)) {
      return false;
    }
@@ -130,7 +120,7 @@ diff --git a/base/allocator/partition_alloc_support.cc b/base/allocator/partitio
 diff --git a/base/allocator/partition_allocator/partition_alloc.gni b/base/allocator/partition_allocator/partition_alloc.gni
 --- a/base/allocator/partition_allocator/partition_alloc.gni
 +++ b/base/allocator/partition_allocator/partition_alloc.gni
-@@ -244,8 +244,8 @@ declare_args() {
+@@ -251,8 +251,8 @@ declare_args() {
    # This will write a fixed cookie pattern at the end of each allocation, and
    # later verify the pattern remain unchanged to ensure there is no OOB write.
    # It comes with performance and memory cost, hence enabled only in debug.
@@ -141,7 +131,7 @@ diff --git a/base/allocator/partition_allocator/partition_alloc.gni b/base/alloc
  
    # This will change partition cookie size to 4B or 8B, whichever equivalent to
    # size of InSlotMetadata. This option is useful for InSlotMetadata corruption
-@@ -399,7 +399,7 @@ declare_args() {
+@@ -412,7 +412,7 @@ declare_args() {
    # This is meant to be used primarily on bots. It is much easier to override
    # the feature flags using a binary flag instead of updating multiple bots's
    # scripts to pass command line arguments.
@@ -191,7 +181,7 @@ diff --git a/base/profiler/stack_sampling_profiler.cc b/base/profiler/stack_samp
 diff --git a/build_overrides/partition_alloc.gni b/build_overrides/partition_alloc.gni
 --- a/build_overrides/partition_alloc.gni
 +++ b/build_overrides/partition_alloc.gni
-@@ -105,7 +105,7 @@ use_partition_alloc_as_malloc_default =
+@@ -111,7 +111,7 @@ use_partition_alloc_as_malloc_default =
  
  enable_backup_ref_ptr_support_default = use_partition_alloc_as_malloc_default
  
@@ -200,7 +190,7 @@ diff --git a/build_overrides/partition_alloc.gni b/build_overrides/partition_all
  
  enable_dangling_raw_ptr_checks_default =
      # The DanglingPointerDetector relies on BackupRefPtr:
-@@ -132,6 +132,7 @@ enable_dangling_raw_ptr_checks_default =
+@@ -138,6 +138,7 @@ enable_dangling_raw_ptr_checks_default =
      # Only the `android-rel` CQ bot has enforced DanglingPointerDetector checks
      # at the moment. The other Android bots are not ready for it yet.
      !is_android
@@ -211,7 +201,7 @@ diff --git a/build_overrides/partition_alloc.gni b/build_overrides/partition_all
 diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
 --- a/chrome/android/java/res/xml/privacy_preferences.xml
 +++ b/chrome/android/java/res/xml/privacy_preferences.xml
-@@ -88,6 +88,11 @@ found in the LICENSE file.
+@@ -92,6 +92,11 @@ found in the LICENSE file.
          android:summary="@string/throttle_main_thread_to_60hz_summary"
          app:featureName="throttle-main-thread-to-60hz"
          app:needRestart="true" />
@@ -220,13 +210,13 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/androi
 +        android:summary="@string/dangling_pointer_detector_summary"
 +        app:featureName="enable-dangling-pointer-detector"
 +        app:needRestart="true" />
-     <PreferenceCategory
+     <org.chromium.components.browser_ui.settings.ChromeBasePreferenceCategory
          android:key="security_section"
        android:title="@string/security_section_title" />
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java b/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/CompositorViewHolder.java
-@@ -828,8 +828,8 @@ public class CompositorViewHolder extends FrameLayout
+@@ -840,8 +840,8 @@ public class CompositorViewHolder extends FrameLayout
              mApplicationBottomInsetSupplier.getSupplier().removeObserver(mOnViewportInsetsChanged);
          }
  
@@ -239,7 +229,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/Comp
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/LayoutManagerChromeTablet.java b/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/LayoutManagerChromeTablet.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/LayoutManagerChromeTablet.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/compositor/layouts/LayoutManagerChromeTablet.java
-@@ -207,18 +207,18 @@ public class LayoutManagerChromeTablet extends LayoutManagerChrome {
+@@ -220,18 +220,18 @@ public class LayoutManagerChromeTablet extends LayoutManagerChrome {
      @Override
      @SuppressWarnings("NullAway")
      public void destroy() {
@@ -281,7 +271,7 @@ new file mode 100644
 diff --git a/components/viz/service/frame_sinks/frame_sink_manager_impl.cc b/components/viz/service/frame_sinks/frame_sink_manager_impl.cc
 --- a/components/viz/service/frame_sinks/frame_sink_manager_impl.cc
 +++ b/components/viz/service/frame_sinks/frame_sink_manager_impl.cc
-@@ -374,6 +374,7 @@ void FrameSinkManagerImpl::CreateCompositorFrameSink(
+@@ -456,6 +456,7 @@ void FrameSinkManagerImpl::CreateCompositorFrameSink(
  void FrameSinkManagerImpl::DestroyCompositorFrameSink(
      const FrameSinkId& frame_sink_id,
      DestroyCompositorFrameSinkCallback callback) {
@@ -326,7 +316,7 @@ new file mode 100644
 diff --git a/third_party/blink/renderer/platform/wtf/allocator/partitions.cc b/third_party/blink/renderer/platform/wtf/allocator/partitions.cc
 --- a/third_party/blink/renderer/platform/wtf/allocator/partitions.cc
 +++ b/third_party/blink/renderer/platform/wtf/allocator/partitions.cc
-@@ -86,16 +86,8 @@ partition_alloc::PartitionOptions PartitionOptionsFromFeatures() {
+@@ -87,16 +87,8 @@ partition_alloc::PartitionOptions PartitionOptionsFromFeatures() {
    using partition_alloc::PartitionOptions;
  
  #if PA_BUILDFLAG(ENABLE_BACKUP_REF_PTR_SUPPORT)
