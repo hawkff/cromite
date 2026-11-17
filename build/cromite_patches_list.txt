@@ -322,5 +322,6 @@ Do-not-resolve-link-hosts-through-the-system-resolver.patch
 Skip-early-navigation-for-custom-tabs-outside-the-regular-profile.patch
 Use-an-ephemeral-profile-for-Auth-Tabs-in-incognito-modes.patch
 Judge-top-level-navigations-by-their-own-JIT-setting.patch
+Check-for-updates-in-the-hawkff-cromite-releases.patch
 
 # extension patches
