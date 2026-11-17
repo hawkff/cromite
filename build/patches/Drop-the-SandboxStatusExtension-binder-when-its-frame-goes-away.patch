@@ -1,0 +1,45 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 23:14:24 +0000
+Subject: Drop the SandboxStatusExtension binder when its frame goes away
+
+On Android every frame gets a SandboxStatusExtension, a ref-counted
+RenderFrameObserver. For main frames its constructor registers an
+associated interface binder that holds a reference to the object, so the
+Release() in OnDestruct() does not free it. RenderFrameImpl's destructor
+then calls RenderFrameGone() on every observer that is still alive, which
+clears the observer's frame pointer, and only later destroys its members.
+Destroying the associated interface registry drops the binder's reference
+and frees the extension. Its RenderFrameObserver destructor no longer
+knows the frame, so it does not remove itself from the frame's observer
+list. The list then holds a pointer to freed memory when it is destroyed,
+and with dangling pointer detection in crash mode the renderer stops
+every time a main frame is destroyed: on network error pages, on some
+cross-site navigations and when a tab is closed.
+
+Remove the binder from the registry in OnDestruct(), before the final
+Release(). The object is then freed while the frame still tracks it and
+removes itself from the observer list as usual. A reply still in flight
+keeps its own reference, as before, and finds no frame when it runs.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/renderer/sandbox_status_extension_android.cc | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/chrome/renderer/sandbox_status_extension_android.cc b/chrome/renderer/sandbox_status_extension_android.cc
+--- a/chrome/renderer/sandbox_status_extension_android.cc
++++ b/chrome/renderer/sandbox_status_extension_android.cc
+@@ -46,6 +46,12 @@ void SandboxStatusExtension::Create(content::RenderFrame* frame) {
+ }
+ 
+ void SandboxStatusExtension::OnDestruct() {
++  // The interface binder holds a reference to this object. Drop it now, while
++  // the frame still tracks its observers: the frame destroys its interface
++  // registry only after it has stopped tracking them, and freeing this object
++  // from there would leave a dangling entry in the frame's observer list.
++  render_frame()->GetAssociatedInterfaceRegistry()->RemoveInterface(
++      chrome::mojom::SandboxStatusExtension::Name_);
+   // This object is ref-counted, since a callback could still be in-flight.
+   Release();
+ }
+--

@@ -1,0 +1,99 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 23:14:20 +0000
+Subject: Do not leave a dangling active tab pointer in ActiveTabTracker
+
+On Android, ActiveTabTracker remembers the selected tab of each tab model
+in a raw_ptr<TabAndroid>. The pointer is cleared when a tab finishes
+closing or is removed from its model, but not when the whole tab model
+goes away: when the main activity is destroyed, its tabs are destroyed
+first and the tracker only later, from
+ActiveTabObserver::OnTabModelRemoved(). The tracker then still points at
+a freed tab, and with dangling pointer detection in crash mode the
+browser process stops when that pointer is released.
+
+Keep the active tab as a base::WeakPtr<TabAndroid> instead. TabAndroid
+already hands out weak pointers, and the pointer becomes null as soon as
+the tab is destroyed, whatever the order of destruction. The selection
+logic is unchanged.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../page_live_state_decorator_helper.cc       | 33 ++++++++++---------
+ 1 file changed, 17 insertions(+), 16 deletions(-)
+
+diff --git a/chrome/browser/performance_manager/decorators/helpers/page_live_state_decorator_helper.cc b/chrome/browser/performance_manager/decorators/helpers/page_live_state_decorator_helper.cc
+--- a/chrome/browser/performance_manager/decorators/helpers/page_live_state_decorator_helper.cc
++++ b/chrome/browser/performance_manager/decorators/helpers/page_live_state_decorator_helper.cc
+@@ -19,6 +19,7 @@
+ 
+ #include "base/check.h"
+ #include "base/feature_list.h"
++#include "base/memory/weak_ptr.h"
+ #include "base/sequence_checker.h"
+ #include "chrome/browser/android/tab_android.h"
+ #include "chrome/browser/flags/android/chrome_feature_list.h"
+@@ -49,27 +50,28 @@ class ActiveTabTracker : public TabModelObserver {
+ 
+   void DidSelectTab(TabAndroid* tab) override {
+     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-    if (tab == active_tab_) {
++    TabAndroid* active_tab = active_tab_.get();
++    if (tab == active_tab) {
+       return;
+     }
+-    if (active_tab_ && active_tab_->web_contents()) {
+-      PageLiveStateDecorator::SetIsActiveTab(active_tab_->web_contents(),
+-                                             false);
++    if (active_tab && active_tab->web_contents()) {
++      PageLiveStateDecorator::SetIsActiveTab(active_tab->web_contents(), false);
+     }
+     if (tab && tab->web_contents()) {
+       PageLiveStateDecorator::SetIsActiveTab(tab->web_contents(), true);
+     }
+-    active_tab_ = tab;
++    active_tab_ =
++        tab ? tab->GetTabAndroidWeakPtr() : base::WeakPtr<TabAndroid>();
+   }
+ 
+-  // OnFinishingTabClosure is not triggered when the tab model goes away. But it
+-  // does not cause holding a dead tab in active_tab_ because `ActiveTabTracker`
+-  // itself is removed anyway at `ActiveTabObserver::OnTabModelRemoved()`.
++  // OnFinishingTabClosure is not triggered when the tab model goes away: the
++  // tabs are destroyed before `ActiveTabObserver::OnTabModelRemoved()` removes
++  // this tracker, which is why `active_tab_` is a weak pointer.
+   void OnFinishingTabClosure(TabAndroid* tab,
+                              TabModel::TabClosingSource source) override {
+     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-    if (tab == active_tab_) {
+-      active_tab_ = nullptr;
++    if (tab == active_tab_.get()) {
++      active_tab_.reset();
+     }
+   }
+ 
+@@ -77,19 +79,18 @@ class ActiveTabTracker : public TabModelObserver {
+   // to another window).
+   void TabRemoved(TabAndroid* tab) override {
+     DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+-    if (tab == active_tab_) {
++    if (tab == active_tab_.get()) {
+       if (tab && tab->web_contents()) {
+         PageLiveStateDecorator::SetIsActiveTab(tab->web_contents(), false);
+       }
+-      active_tab_ = nullptr;
++      active_tab_.reset();
+     }
+   }
+ 
+  private:
+-  // The cached TabAndroid* is cleared on OnFinishingTabClosure() or
+-  // TabRemoved() so that no obsolete pointer is left.
+-  raw_ptr<TabAndroid> active_tab_ GUARDED_BY_CONTEXT(sequence_checker_) =
+-      nullptr;
++  // Cleared on OnFinishingTabClosure() or TabRemoved(), and invalidated when
++  // the tab is destroyed without either, e.g. when its tab model goes away.
++  base::WeakPtr<TabAndroid> active_tab_ GUARDED_BY_CONTEXT(sequence_checker_);
+ 
+   SEQUENCE_CHECKER(sequence_checker_);
+ };
+--
