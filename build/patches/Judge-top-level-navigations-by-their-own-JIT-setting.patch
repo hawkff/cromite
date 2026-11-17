@@ -1,0 +1,55 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:30:57 +0000
+Subject: Judge top-level navigations by their own JIT setting
+
+NavigationRequest::GetUrlInfo() passed the origin of the current main frame
+as the top origin of every navigation. SiteInfo::Create() uses that origin
+only to turn JIT on: a page with JIT allowed also allows JIT in its
+subframes, and a page with JIT blocked does not take JIT away from a
+subframe whose own setting allows it. For a main-frame navigation that
+frame is the page being left. When JIT was allowed for one site, a link or
+a popup from that site to another site therefore gave the new site's first
+document a renderer with JIT, although JIT stayed blocked for it.
+
+Pass the top origin only for subframe navigations. A main-frame navigation,
+including the first navigation of a popup, is now decided by the JIT
+setting of its destination. Subframes and PDF content behave as before.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../renderer_host/navigation_request.cc        | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/content/browser/renderer_host/navigation_request.cc b/content/browser/renderer_host/navigation_request.cc
+--- a/content/browser/renderer_host/navigation_request.cc
++++ b/content/browser/renderer_host/navigation_request.cc
+@@ -4850,17 +4850,21 @@ UrlInfo NavigationRequest::GetUrlInfo() {
+   // Compute the WebExposedIsolationInfo that will be bundled into UrlInfo.
+   auto web_exposed_isolation_info = ComputeWebExposedIsolationInfo();
+ 
+-  url::Origin top_origin = frame_tree_node_
+-      ->current_frame_host()
+-      ->GetMainFrame()
+-      ->GetLastCommittedOrigin();
+-
+   UrlInfoInit url_info_init(GetURL());
+   url_info_init.WithOACHeaderRequest(oac_header_request)
+       .WithCOOPSiteIsolation(ShouldRequestSiteIsolationForCOOP())
+       .WithWebExposedIsolationInfo(web_exposed_isolation_info)
+-      .WithEmbedderIsolationInfo(embedder_isolation_info_)
+-      .WithTopOrigin(top_origin);
++      .WithEmbedderIsolationInfo(embedder_isolation_info_);
++
++  // The top origin can only turn JIT on: a page with JIT allowed also allows
++  // JIT in its subframes, and a page with JIT blocked does not take JIT away
++  // from a subframe whose own setting allows it. For a main frame the current
++  // page is the one being left, so the destination keeps its own setting.
++  if (!frame_tree_node_->IsMainFrame()) {
++    url_info_init.WithTopOrigin(frame_tree_node_->current_frame_host()
++                                    ->GetMainFrame()
++                                    ->GetLastCommittedOrigin());
++  }
+ 
+   if (base::FeatureList::IsEnabled(features::kExcludeAdsFromOriginIsolation)) {
+     // After the final response, use the decision from
+--
