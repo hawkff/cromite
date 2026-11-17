@@ -1,0 +1,454 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 23:01:31 +0000
+Subject: Add an executable memory rule to the Android seccomp policy
+
+BaselinePolicyAndroid gets an option that governs mmap, mmap2, mprotect
+and pkey_mprotect calls that ask for PROT_EXEC. By default nothing
+changes.
+
+In the deny mode such a call crashes the process with the usual seccomp
+crash report, as the Android GPU process policy already does for every
+PROT_EXEC request. The rule refuses new requests for executable memory
+through mmap, mmap2, mprotect and pkey_mprotect. It looks only at the
+prot argument, because a filter cannot see what a file descriptor refers
+to, so libraries cannot be loaded after the filter starts either. Memory
+that is already mapped both writable and executable stays usable, which
+includes the code cache of the Java runtime in renderers on Android
+versions before 17, and the rule does not cover writes through
+/proc/self/mem.
+
+In the report mode such a call is logged under the Android log tag
+cr_seccomp, followed by the /proc/self/maps line of the affected memory,
+and then performed, so that a test run can list every executable mapping
+a process creates. The handler performs mprotect and pkey_mprotect again
+with a marker in an argument that the kernel ignores, which the filter
+lets through. It performs mmap and mmap2 in two steps: first without
+PROT_EXEC, then it adds PROT_EXEC with such an mprotect. If the second
+step fails, the handler logs that and ends the process as the deny mode
+does, because the first step may already have replaced memory at a fixed
+address. The report mode protects nothing.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../baseline_policy_android.cc                |   7 +
+ .../baseline_policy_android.h                 |   5 +
+ .../baseline_policy_android_unittest.cc       |  61 ++++++++
+ .../seccomp-bpf-helpers/sigsys_handlers.cc    | 145 ++++++++++++++++++
+ .../seccomp-bpf-helpers/sigsys_handlers.h     |  18 +++
+ .../syscall_parameters_restrictions.cc        |  29 ++++
+ .../syscall_parameters_restrictions.h         |   9 ++
+ 7 files changed, 274 insertions(+)
+
+diff --git a/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.cc b/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.cc
+--- a/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.cc
++++ b/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.cc
+@@ -235,6 +235,13 @@ ResultExpr BaselinePolicyAndroid::EvaluateSyscall(int sysno) const {
+     return RestrictAndroidIoctl(options_.allow_userfaultfd_ioctls);
+   }
+ 
++  if (options_.exec_memory != ExecMemory::kAllow &&
++      (SyscallSets::IsMmap(sysno) || sysno == __NR_mprotect ||
++       sysno == __NR_pkey_mprotect)) {
++    return RestrictExecMemory(sysno, BaselinePolicy::EvaluateSyscall(sysno),
++                              options_.exec_memory == ExecMemory::kReport);
++  }
++
+   if (sysno == __NR_madvise) {
+     // Allow MADV_PAGEOUT
+     const Arg<int> advice(2);
+diff --git a/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.h b/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.h
+--- a/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.h
++++ b/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android.h
+@@ -24,11 +24,16 @@ namespace sandbox {
+ // features. This needs an audit. https://crbug.com/739879
+ class SANDBOX_EXPORT BaselinePolicyAndroid : public BaselinePolicy {
+  public:
++  // How mmap(), mprotect() and pkey_mprotect() calls that ask for PROT_EXEC
++  // are handled. See RestrictExecMemory().
++  enum class ExecMemory { kAllow, kReport, kDeny };
++
+   struct RuntimeOptions {
+     // Allows a subset of the userfaultfd ioctls that are needed for ART GC.
+     bool allow_userfaultfd_ioctls = false;
+     bool should_restrict_renderer_syscalls = false;
+     bool should_restrict_clone_params = false;
++    ExecMemory exec_memory = ExecMemory::kAllow;
+   };
+ 
+   BaselinePolicyAndroid();
+diff --git a/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android_unittest.cc b/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android_unittest.cc
+--- a/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android_unittest.cc
++++ b/sandbox/linux/seccomp-bpf-helpers/baseline_policy_android_unittest.cc
+@@ -12,6 +12,7 @@
+ #include <linux/userfaultfd.h>
+ #include <sched.h>
+ #include <sys/ioctl.h>
++#include <sys/mman.h>
+ #include <sys/resource.h>
+ #include <sys/stat.h>
+ #include <sys/syscall.h>
+@@ -219,5 +220,65 @@ BPF_DEATH_TEST_C(BaselinePolicyAndroid,
+   TestUtils::HandlePostForkReturn(pid);
+ }
+ 
++class DenyExecMemoryBaselinePolicyAndroid : public BaselinePolicyAndroid {
++ public:
++  DenyExecMemoryBaselinePolicyAndroid()
++      : BaselinePolicyAndroid(
++            RuntimeOptions{.exec_memory = ExecMemory::kDeny}) {}
++};
++
++class ReportExecMemoryBaselinePolicyAndroid : public BaselinePolicyAndroid {
++ public:
++  ReportExecMemoryBaselinePolicyAndroid()
++      : BaselinePolicyAndroid(
++            RuntimeOptions{.exec_memory = ExecMemory::kReport}) {}
++};
++
++BPF_TEST_C(BaselinePolicyAndroid,
++           ExecMemory_DenyAllowsOtherMappings,
++           DenyExecMemoryBaselinePolicyAndroid) {
++  void* page = mmap(nullptr, 4096, PROT_READ | PROT_WRITE,
++                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  BPF_ASSERT_NE(MAP_FAILED, page);
++  BPF_ASSERT_EQ(0, mprotect(page, 4096, PROT_READ));
++  BPF_ASSERT_EQ(0, munmap(page, 4096));
++}
++
++BPF_DEATH_TEST_C(BaselinePolicyAndroid,
++                 ExecMemory_DenyMmap,
++                 DEATH_SEGV_MESSAGE(GetExecMemoryErrorMessageContentForTests()),
++                 DenyExecMemoryBaselinePolicyAndroid) {
++  mmap(nullptr, 4096, PROT_READ | PROT_EXEC, MAP_PRIVATE | MAP_ANONYMOUS, -1,
++       0);
++}
++
++BPF_DEATH_TEST_C(BaselinePolicyAndroid,
++                 ExecMemory_DenyMprotect,
++                 DEATH_SEGV_MESSAGE(GetExecMemoryErrorMessageContentForTests()),
++                 DenyExecMemoryBaselinePolicyAndroid) {
++  void* page = mmap(nullptr, 4096, PROT_READ | PROT_WRITE,
++                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  BPF_ASSERT_NE(MAP_FAILED, page);
++  mprotect(page, 4096, PROT_READ | PROT_EXEC);
++}
++
++// The report mode performs the calls, so the kernel decides the result. It
++// must not crash, and memory without PROT_EXEC must stay usable.
++BPF_TEST_C(BaselinePolicyAndroid,
++           ExecMemory_ReportPerformsCalls,
++           ReportExecMemoryBaselinePolicyAndroid) {
++  void* page = mmap(nullptr, 4096, PROT_READ | PROT_EXEC,
++                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  if (page != MAP_FAILED) {
++    BPF_ASSERT_EQ(0, munmap(page, 4096));
++  }
++  page = mmap(nullptr, 4096, PROT_READ | PROT_WRITE,
++              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  BPF_ASSERT_NE(MAP_FAILED, page);
++  mprotect(page, 4096, PROT_READ | PROT_EXEC);
++  BPF_ASSERT_EQ(0, mprotect(page, 4096, PROT_READ | PROT_WRITE));
++  BPF_ASSERT_EQ(0, munmap(page, 4096));
++}
++
+ }  // namespace
+ }  // namespace sandbox
+diff --git a/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc b/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc
+--- a/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc
++++ b/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.cc
+@@ -11,9 +11,13 @@
+ #include <stddef.h>
+ #include <stdint.h>
+ #include <string.h>
++#include <sys/mman.h>
+ #include <sys/syscall.h>
+ #include <unistd.h>
+ 
++#include <array>
++#include <string_view>
++
+ #include "base/check.h"
+ #include "base/compiler_specific.h"
+ #include "base/debug/crash_logging.h"
+@@ -46,6 +50,7 @@
+ #define SECCOMP_MESSAGE_PTRACE_CONTENT "ptrace() failure"
+ #define SECCOMP_MESSAGE_SOCKET_CONTENT "socket() failure"
+ #define SECCOMP_MESSAGE_SOCKOPT_CONTENT "*sockopt() failure"
++#define SECCOMP_MESSAGE_EXEC_MEMORY_CONTENT "executable memory failure"
+ 
+ namespace {
+ 
+@@ -135,6 +140,77 @@ void PrintAndSetSeccompCrashKey(const struct arch_seccomp_data& args) {
+ #endif
+ }
+ 
++constexpr std::string_view kMapsLinePrefix = "executable memory map: ";
++using MapsLine = std::array<char, 512>;
++
++// Parses the lowercase hexadecimal number that starts at |*pos| in |line| and
++// ends with |terminator|, and moves |*pos| past the terminator.
++bool ParseMapsNumber(const MapsLine& line,
++                     size_t length,
++                     size_t* pos,
++                     char terminator,
++                     uintptr_t* value) {
++  *value = 0;
++  for (; *pos < length; ++*pos) {
++    const char c = line[*pos];
++    if (c == terminator) {
++      ++*pos;
++      return true;
++    }
++    if (c >= '0' && c <= '9') {
++      *value = *value * 16 + static_cast<uintptr_t>(c - '0');
++    } else if (c >= 'a' && c <= 'f') {
++      *value = *value * 16 + static_cast<uintptr_t>(c - 'a' + 10);
++    } else {
++      return false;
++    }
++  }
++  return false;
++}
++
++// Writes the line of /proc/self/maps whose address range contains |address|.
++void WriteMapsLine(uintptr_t address) {
++  const int fd = static_cast<int>(HANDLE_EINTR(
++      syscall(__NR_openat, AT_FDCWD, "/proc/self/maps", O_RDONLY | O_CLOEXEC)));
++  if (fd < 0) {
++    return;
++  }
++  MapsLine line;
++  size_t length = 0;
++  for (char c : kMapsLinePrefix) {
++    line[length++] = c;
++  }
++  bool found = false;
++  std::array<char, 1024> chunk;
++  ssize_t count = 0;
++  while (!found &&
++         (count = HANDLE_EINTR(read(fd, chunk.data(), chunk.size()))) > 0) {
++    for (size_t i = 0; i < static_cast<size_t>(count) && !found; ++i) {
++      if (chunk[i] != '\n') {
++        // Overlong lines are cut; the address range comes first.
++        if (length < line.size() - 1) {
++          line[length++] = chunk[i];
++        }
++        continue;
++      }
++      size_t pos = kMapsLinePrefix.size();
++      uintptr_t start = 0;
++      uintptr_t end = 0;
++      found = ParseMapsNumber(line, length, &pos, '-', &start) &&
++              ParseMapsNumber(line, length, &pos, ' ', &end) &&
++              start <= address && address < end;
++      if (!found) {
++        length = kMapsLinePrefix.size();
++      }
++    }
++  }
++  close(fd);
++  if (found) {
++    line[length] = '\0';
++    WriteToStdErr(line.data(), length);
++  }
++}
++
+ }  // namespace
+ 
+ namespace sandbox {
+@@ -397,6 +473,63 @@ intptr_t SIGSYSFstatatHandler(const struct arch_seccomp_data& args,
+   return -ENOSYS;
+ }
+ 
++intptr_t SIGSYSExecMemoryFailure(const struct arch_seccomp_data& args,
++                                 void* aux) {
++  static constexpr char kSeccompExecMemoryError[] =
++      __FILE__ ":**CRASHING**:" SECCOMP_MESSAGE_EXEC_MEMORY_CONTENT "\n";
++  WriteToStdErr(kSeccompExecMemoryError, sizeof(kSeccompExecMemoryError) - 1);
++  return CrashSIGSYS_Handler(args, aux);
++}
++
++intptr_t SIGSYSExecMemoryReport(const struct arch_seccomp_data& args,
++                                void* aux) {
++  const intptr_t addr = static_cast<intptr_t>(args.args[0]);
++  const intptr_t len = static_cast<intptr_t>(args.args[1]);
++  const intptr_t prot = static_cast<intptr_t>(args.args[2]);
++  const intptr_t marker = static_cast<intptr_t>(kExecMemoryReportMarker);
++  const bool is_mprotect =
++      args.nr == __NR_mprotect || args.nr == __NR_pkey_mprotect;
++  intptr_t ret;
++  if (is_mprotect) {
++    ret = Syscall::Call(args.nr, addr, len, prot,
++                        static_cast<intptr_t>(args.args[3]),
++                        static_cast<intptr_t>(args.args[4]), marker);
++  } else {
++    ret = Syscall::Call(args.nr, addr, len, prot & ~PROT_EXEC,
++                        static_cast<intptr_t>(args.args[3]),
++                        static_cast<intptr_t>(args.args[4]),
++                        static_cast<intptr_t>(args.args[5]));
++    // Syscall::Call() returns -1 to -4095 on errors.
++    if (ret >= 0 || ret < -4095) {
++      const intptr_t protect_ret =
++          Syscall::Call(__NR_mprotect, ret, len, prot, 0, 0, marker);
++      if (protect_ret != 0) {
++        // The mapping without PROT_EXEC may already have replaced memory at a
++        // fixed address, so the request cannot be undone. End the process as
++        // the deny mode does.
++        static constexpr char kSeccompExecMemoryReplayError[] =
++            __FILE__ ":**CRASHING**:executable memory replay failure\n";
++        WriteToStdErr(kSeccompExecMemoryReplayError,
++                      sizeof(kSeccompExecMemoryReplayError) - 1);
++        return CrashSIGSYS_Handler(args, aux);
++      }
++    }
++  }
++
++  char message[256];
++  const size_t message_length = base::strings::SafeSPrintf(
++      message,
++      "executable memory request: nr=0x%x arg1=0x%x arg2=0x%x arg3=0x%x "
++      "arg4=0x%x arg5=0x%x ret=0x%x",
++      args.nr, args.args[0], args.args[1], args.args[2], args.args[3],
++      args.args[4], static_cast<uintptr_t>(ret));
++  WriteToStdErr(message, message_length);
++  if (is_mprotect || ret >= 0 || ret < -4095) {
++    WriteMapsLine(static_cast<uintptr_t>(is_mprotect ? addr : ret));
++  }
++  return ret;
++}
++
+ bpf_dsl::ResultExpr CrashSIGSYS() {
+   return bpf_dsl::Trap(CrashSIGSYS_Handler, nullptr);
+ }
+@@ -442,6 +575,14 @@ bpf_dsl::ResultExpr RewriteFstatatSIGSYS(int fs_denied_errno) {
+                        reinterpret_cast<void*>(fs_denied_errno));
+ }
+ 
++bpf_dsl::ResultExpr CrashSIGSYSExecMemory() {
++  return bpf_dsl::Trap(SIGSYSExecMemoryFailure, nullptr);
++}
++
++bpf_dsl::ResultExpr ReportExecMemorySIGSYS() {
++  return bpf_dsl::Trap(SIGSYSExecMemoryReport, nullptr);
++}
++
+ #if defined(__NR_socketcall)
+ bool CanRewriteSocketcall() {
+   static bool can_rewrite_socketcall = []() {
+@@ -595,4 +736,8 @@ const char* GetSockoptErrorMessageContentForTests() {
+   return SECCOMP_MESSAGE_SOCKOPT_CONTENT;
+ }
+ 
++const char* GetExecMemoryErrorMessageContentForTests() {
++  return SECCOMP_MESSAGE_EXEC_MEMORY_CONTENT;
++}
++
+ }  // namespace sandbox.
+diff --git a/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h b/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h
+--- a/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h
++++ b/sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h
+@@ -89,6 +89,21 @@ SANDBOX_EXPORT intptr_t
+ SIGSYSFstatatHandler(const struct arch_seccomp_data& args,
+                      void* fs_denied_errno);
+ 
++// Logs that the system call asked for executable memory, then crashes in the
++// same way as CrashSIGSYS_Handler.
++SANDBOX_EXPORT intptr_t
++SIGSYSExecMemoryFailure(const struct arch_seccomp_data& args, void* aux);
++
++// Logs an mmap(), mmap2(), mprotect() or pkey_mprotect() call that asks for
++// PROT_EXEC and the /proc/self/maps line of the affected memory, and returns
++// the result of performing the call. mprotect() and pkey_mprotect() are
++// performed with kExecMemoryReportMarker as the sixth argument, which the
++// kernel ignores, so that the policy can let them through. mmap() and mmap2()
++// are performed without PROT_EXEC, which such an mprotect() then adds.
++SANDBOX_EXPORT intptr_t
++SIGSYSExecMemoryReport(const struct arch_seccomp_data& args, void* aux);
++inline constexpr uintptr_t kExecMemoryReportMarker = 0x5e1f6a7e;
++
+ // Variants of the above functions for use with bpf_dsl.
+ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYS();
+ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYSClone();
+@@ -101,6 +116,8 @@ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYSSocket();
+ SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYSSockopt();
+ SANDBOX_EXPORT bpf_dsl::ResultExpr RewriteSchedSIGSYS();
+ SANDBOX_EXPORT bpf_dsl::ResultExpr RewriteFstatatSIGSYS(int fs_denied_errno);
++SANDBOX_EXPORT bpf_dsl::ResultExpr CrashSIGSYSExecMemory();
++SANDBOX_EXPORT bpf_dsl::ResultExpr ReportExecMemorySIGSYS();
+ 
+ #if defined(__NR_socketcall)
+ // True if the kernel supports direct socket-API syscalls like socket(2) and
+@@ -133,6 +150,7 @@ SANDBOX_EXPORT const char* GetFutexErrorMessageContentForTests();
+ SANDBOX_EXPORT const char* GetPtraceErrorMessageContentForTests();
+ SANDBOX_EXPORT const char* GetSocketErrorMessageContentForTests();
+ SANDBOX_EXPORT const char* GetSockoptErrorMessageContentForTests();
++SANDBOX_EXPORT const char* GetExecMemoryErrorMessageContentForTests();
+ 
+ }  // namespace sandbox.
+ 
+diff --git a/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc b/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc
+--- a/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc
++++ b/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.cc
+@@ -22,6 +22,8 @@
+ #include <time.h>
+ #include <unistd.h>
+ 
++#include <utility>
++
+ #include "base/allocator/partition_alloc_features.h"
+ #include "base/check.h"
+ #include "base/feature_list.h"
+@@ -292,6 +294,33 @@ ResultExpr RestrictMprotectFlags() {
+   return If((prot & ~kAllowedMask) == 0, Allow()).Else(CrashSIGSYS());
+ }
+ 
++ResultExpr RestrictExecMemory(int sysno,
++                              ResultExpr fallback,
++                              bool report_only) {
++#if defined(__i386__)
++  // The legacy i386 mmap takes a pointer to its arguments, and |fallback|
++  // returns ENOSYS for it.
++  if (sysno == __NR_mmap) {
++    return fallback;
++  }
++#endif
++  CHECK(SyscallSets::IsMmap(sysno) || sysno == __NR_mprotect ||
++        sysno == __NR_pkey_mprotect);
++  const Arg<int> prot(2);
++  const BoolExpr no_exec = (prot & PROT_EXEC) == 0;
++  if (!report_only) {
++    return If(no_exec, std::move(fallback)).Else(CrashSIGSYSExecMemory());
++  }
++  if (SyscallSets::IsMmap(sysno)) {
++    return If(no_exec, std::move(fallback)).Else(ReportExecMemorySIGSYS());
++  }
++  // The report handler performs the call again with the marker.
++  const Arg<uintptr_t> marker(5);
++  return If(AnyOf(no_exec, marker == kExecMemoryReportMarker),
++            std::move(fallback))
++      .Else(ReportExecMemorySIGSYS());
++}
++
+ ResultExpr RestrictFcntlCommands() {
+   // We also restrict the flags in F_SETFL. We don't want to permit flags with
+   // a history of trouble such as O_DIRECT. The flags you see are actually the
+diff --git a/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.h b/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.h
+--- a/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.h
++++ b/sandbox/linux/seccomp-bpf-helpers/syscall_parameters_restrictions.h
+@@ -52,6 +52,15 @@ SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictMremapFlagsForODML();
+ // PROT_BTI | PROT_MTE is additionally allowed on 64-bit Arm.
+ SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictMprotectFlags();
+ 
++// Restrict PROT_EXEC in mmap(2), mmap2(2), mprotect(2) and pkey_mprotect(2);
++// |sysno| must be one of them. Calls without PROT_EXEC get |fallback|. Calls
++// with PROT_EXEC crash, or, if |report_only| is true, are logged and then
++// performed (see SIGSYSExecMemoryReport()).
++SANDBOX_EXPORT bpf_dsl::ResultExpr RestrictExecMemory(
++    int sysno,
++    bpf_dsl::ResultExpr fallback,
++    bool report_only);
++
+ // Restrict fcntl(2) cmd argument to:
+ // We allow F_GETFL, F_SETFL, F_GETFD, F_SETFD, F_DUPFD, F_DUPFD_CLOEXEC,
+ // F_SETLK, F_SETLKW and F_GETLK.
+--
