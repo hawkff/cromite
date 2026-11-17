@@ -1,0 +1,150 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 22:53:33 +0000
+Subject: Download filter lists and components from the project site
+
+The ad block filter lists came from uazo.github.io, the "Cromite
+experimental filters" list from raw.githubusercontent.com/uazo, and the
+component update manifest from uazo.github.io. All three now come from
+one base address, defined as CROMITE_STATIC_FILES_URL in
+components/cromite/static_files_url.h, with the same file names:
+
+  filters/<list>.txt                  filter lists
+  filters/experimental-cromite-filters.txt
+  components/query4_0.json            component update manifest
+
+The download address of the fonts pack comes from the manifest, so it
+moves with the manifest.
+
+The summary of the setting for snippets and other privileged filters
+showed the address of one list. It now names the two lists that may use
+privileged filters.
+
+When the base address cannot be reached, installed lists stay in use.
+A list that was never downloaded is retried with a growing delay of up
+to one hour, and the component manifest is requested again at the next
+component update check, every five hours.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/browser/adblock/android/adblock_strings.grd     |  6 +++---
+ components/adblock/core/subscription/BUILD.gn          |  1 +
+ .../adblock/core/subscription/subscription_config.cc   |  5 +++--
+ components/component_updater/BUILD.gn                  |  1 +
+ .../component_updater_url_constants.cc                 |  4 +++-
+ components/cromite/BUILD.gn                            |  3 +++
+ components/cromite/static_files_url.h                  | 10 ++++++++++
+ 7 files changed, 24 insertions(+), 6 deletions(-)
+ create mode 100644 components/cromite/BUILD.gn
+ create mode 100644 components/cromite/static_files_url.h
+
+diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser/adblock/android/adblock_strings.grd
+--- a/chrome/browser/adblock/android/adblock_strings.grd
++++ b/chrome/browser/adblock/android/adblock_strings.grd
+@@ -199,9 +199,9 @@
+       </message>
+       <message name="IDS_ADBLOCK_SETTINGS_PRIVILEGED_FILTERS_ENABLED_SUMMARY" desc="">
+         Snippets are pieces of JavaScript code, injected by the Adblock Plus, that execute within the context of a website and combat advanced ads that circumvent ordinary blocking.
+-The functionality is ONLY allowed for the list
+-https://uazo.github.io/cromite/filters/abp-filters-anti-cv.txt
+-which is activated by this setting.
++The functionality is ONLY allowed for the lists
++"ABP filters" and "Cromite experimental filters",
++which are activated by this setting.
+       </message>
+       <message name="IDS_ADBLOCK_SETTINGS_OPEN_REPO_URL_TEXT" desc="">
+         Open ABP anti-circumvention filter list repo
+diff --git a/components/adblock/core/subscription/BUILD.gn b/components/adblock/core/subscription/BUILD.gn
+--- a/components/adblock/core/subscription/BUILD.gn
++++ b/components/adblock/core/subscription/BUILD.gn
+@@ -68,6 +68,7 @@ source_set("subscription") {
+     "//components/adblock/core/common:utils",
+     "//components/adblock/core/converter",
+     "//components/adblock/core/resources:adblock_resources",
++    "//components/cromite:static_files_url",
+   ]
+ 
+   public_deps = [
+diff --git a/components/adblock/core/subscription/subscription_config.cc b/components/adblock/core/subscription/subscription_config.cc
+--- a/components/adblock/core/subscription/subscription_config.cc
++++ b/components/adblock/core/subscription/subscription_config.cc
+@@ -25,13 +25,14 @@
+ #include "base/strings/string_util.h"
+ #include "components/adblock/core/common/adblock_constants.h"
+ #include "components/adblock/core/resources/grit/adblock_resources.h"
++#include "components/cromite/static_files_url.h"
+ #include "net/base/url_util.h"
+ 
+ namespace {
+ int g_port_for_testing = 0;
+ 
+ std::string GetHost() {
+-  GURL url("https://uazo.github.io/cromite/filters/");
++  GURL url(CROMITE_STATIC_FILES_URL "filters/");
+   if (!g_port_for_testing) {
+     return url.spec();
+   }
+@@ -287,7 +288,7 @@ const std::vector<KnownSubscriptionInfo>& config::GetKnownSubscriptions() {
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeAtFirstRun,
+        SubscriptionPrivilegedFilterStatus::AllowedAndChecked},
+-      {GURL("https://raw.githubusercontent.com/uazo/cromite/master/tools/filters/experimental-cromite-filters.txt"),
++      {GURL(GetHost() + "experimental-cromite-filters.txt"),
+        "Cromite experimental filters",
+        {},
+        SubscriptionUiVisibility::Visible,
+diff --git a/components/component_updater/BUILD.gn b/components/component_updater/BUILD.gn
+--- a/components/component_updater/BUILD.gn
++++ b/components/component_updater/BUILD.gn
+@@ -59,6 +59,7 @@ static_library("component_updater") {
+   deps = [
+     "//base",
+     "//build:branding_buildflags",
++    "//components/cromite:static_files_url",
+     "//components/crx_file",
+     "//components/prefs",
+     "//components/update_client",
+diff --git a/components/component_updater/component_updater_url_constants.cc b/components/component_updater/component_updater_url_constants.cc
+--- a/components/component_updater/component_updater_url_constants.cc
++++ b/components/component_updater/component_updater_url_constants.cc
+@@ -4,6 +4,8 @@
+ 
+ #include "components/component_updater/component_updater_url_constants.h"
+ 
++#include "components/cromite/static_files_url.h"
++
+ namespace component_updater {
+ 
+ // The default URL for the v3 protocol service endpoint. In some cases, the
+@@ -15,7 +17,7 @@ namespace component_updater {
+ // The value of |kDefaultUrlSource| can be overridden with
+ // --component-updater=url-source=someurl.
+ const char kUpdaterJSONDefaultUrl[] =
+-    "https://uazo.github.io/cromite/components/query4_0.json";
++    CROMITE_STATIC_FILES_URL "components/query4_0.json";
+ 
+ const char kUpdaterJSONFallbackUrl[] =
+     "about:blank";
+diff --git a/components/cromite/BUILD.gn b/components/cromite/BUILD.gn
+new file mode 100644
+--- /dev/null
++++ b/components/cromite/BUILD.gn
+@@ -0,0 +1,3 @@
++source_set("static_files_url") {
++  sources = [ "static_files_url.h" ]
++}
+diff --git a/components/cromite/static_files_url.h b/components/cromite/static_files_url.h
+new file mode 100644
+--- /dev/null
++++ b/components/cromite/static_files_url.h
+@@ -0,0 +1,10 @@
++#ifndef COMPONENTS_CROMITE_STATIC_FILES_URL_H_
++#define COMPONENTS_CROMITE_STATIC_FILES_URL_H_
++
++// Base address of the static files that the browser downloads: the ad block
++// filter lists under "filters/" and the component update manifest under
++// "components/". It is a string literal so that callers can append a path
++// at compile time.
++#define CROMITE_STATIC_FILES_URL "https://hawkff.github.io/cromite/"
++
++#endif  // COMPONENTS_CROMITE_STATIC_FILES_URL_H_
+--

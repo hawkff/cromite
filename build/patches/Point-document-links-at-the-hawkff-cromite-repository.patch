@@ -1,0 +1,75 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 22:53:37 +0000
+Subject: Point document links at the hawkff/cromite repository
+
+The first run screen linked the ad blocking, privacy policy and
+automatic updates documents of uazo/cromite, and the help entry of the
+legacy ad block settings linked its BROMITE_LEGACY_ADBLOCK document.
+These links now open the same documents in the docs directory of
+hawkff/cromite on the main branch.
+
+On desktop builds, the help menu opened the uazo/cromite issue list and
+the About page linked www.cromite.org. Both now open the hawkff/cromite
+repository.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ chrome/android/java/res/values/values.xml                   | 2 +-
+ .../cromite_android_chrome_strings_grd/Welcome-screen.grdp  | 6 +++---
+ chrome/common/url_constants.h                               | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/chrome/android/java/res/values/values.xml b/chrome/android/java/res/values/values.xml
+--- a/chrome/android/java/res/values/values.xml
++++ b/chrome/android/java/res/values/values.xml
+@@ -24,7 +24,7 @@ found in the LICENSE file.
+ 
+     <string name="adblock_on">Autoupdate enabled</string>
+     <string name="adblock_off">Autoupdate disabled</string>
+-    <string name="adblock_help_url">https://github.com/uazo/cromite/blob/master/docs/BROMITE_LEGACY_ADBLOCK.md</string>
++    <string name="adblock_help_url">https://github.com/hawkff/cromite/blob/main/docs/BROMITE_LEGACY_ADBLOCK.md</string>
+ 
+     <string name="proxy_title">Proxy configuration</string>
+     <string name="proxy_url">chrome://proxy</string>
+diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp
+--- a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp
++++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp
+@@ -13,13 +13,13 @@ The following checkbox controls instead <ph name="BEGIN_PRIVACY_LINK3">&lt;PRIVA
+     </message>
+ 
+     <message name="IDS_PRIVACY_LINK1" desc="URL for Bromite wiki page about ad blocking" translateable="false">
+-        https://github.com/uazo/cromite/blob/master/docs/ADBLOCKING.md
++        https://github.com/hawkff/cromite/blob/main/docs/ADBLOCKING.md
+     </message>
+     <message name="IDS_PRIVACY_LINK2" desc="URL for privacy policy for the ad block updater" translateable="false">
+-        https://github.com/uazo/cromite/blob/master/docs/PRIVACY_POLICY.md
++        https://github.com/hawkff/cromite/blob/main/docs/PRIVACY_POLICY.md
+     </message>
+     <message name="IDS_PRIVACY_LINK3" desc="URL for Bromite wiki page about automatic updates" translateable="false">
+-        https://github.com/uazo/cromite/blob/master/docs/AUTOMATIC_UPDATES.md
++        https://github.com/hawkff/cromite/blob/main/docs/AUTOMATIC_UPDATES.md
+     </message>
+     <message name="IDS_PRIVACY_LINK4" desc="URL for privacy policy for the Bromite auto updater" translateable="false">
+         https://docs.github.com/en/github/site-policy/github-privacy-statement#github-pages
+diff --git a/chrome/common/url_constants.h b/chrome/common/url_constants.h
+--- a/chrome/common/url_constants.h
++++ b/chrome/common/url_constants.h
+@@ -106,7 +106,7 @@ inline constexpr char kChromeHelpViaMenuURL[] =
+ #endif  // BUILDFLAG(IS_CHROMEOS)
+ 
+ inline constexpr char kChromeHelpViaWebUIURL[] =
+-    "https://github.com/uazo/cromite/issues";
++    "https://github.com/hawkff/cromite";
+ #if BUILDFLAG(IS_CHROMEOS)
+ inline constexpr char kChromeOsHelpViaWebUIURL[] =
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+@@ -170,7 +170,7 @@ inline constexpr char kChromeUIUntrustedNewTabPageUrl[] =
+     "chrome-untrusted://new-tab-page/";
+ 
+ // The URL for the Chromium project used in the About dialog.
+-inline constexpr char16_t kChromiumProjectURL[] = u"https://www.cromite.org/";
++inline constexpr char16_t kChromiumProjectURL[] = u"https://github.com/hawkff/cromite";
+ #if BUILDFLAG(IS_CHROMEOS)
+ static_assert(std::u16string_view(kChromiumProjectURL) ==
+               ash::chrome_external_urls::kChromiumProjectURL);
+--

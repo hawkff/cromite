@@ -325,5 +325,7 @@ Judge-top-level-navigations-by-their-own-JIT-setting.patch
 Check-for-updates-in-the-hawkff-cromite-releases.patch
 Build-the-WebAssembly-interpreter-on-Android.patch
 Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.patch
+Download-filter-lists-and-components-from-the-project-site.patch
+Point-document-links-at-the-hawkff-cromite-repository.patch
 
 # extension patches
