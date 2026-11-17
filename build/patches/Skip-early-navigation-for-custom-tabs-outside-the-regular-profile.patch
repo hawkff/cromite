@@ -1,0 +1,58 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 08:52:02 +0000
+Subject: Skip early navigation for custom tabs outside the regular profile
+
+When another app opens a link in a custom tab, LaunchIntentDispatcher can
+start loading the page early in a hidden tab that was prepared in advance.
+That tab always belongs to the regular profile, so the early navigation
+sends the regular profile's cookies and can store site data there. A
+custom tab that opens in another profile does not use the hidden tab and
+loads the page again.
+
+Skip the early navigation in every case in which the custom tab does not
+open in the regular profile: in always-incognito mode; when the tab opens
+in incognito or in an ephemeral profile because of the option to open
+external links in incognito or because the app asked for it and the
+request is accepted, the only case skipped before; and with the
+MayLaunchUrlUsesSeparateStoragePartition feature, with which this browser
+opens custom tabs other than Auth Tabs in an ephemeral profile (it is off
+by default). In those cases the page starts loading slightly later.
+
+An incognito request from an app is now judged with the calling app's
+package, which the custom tab also uses to accept it. An app that is
+identified only by that package therefore no longer gets an early
+navigation in the regular profile while its tab opens in incognito.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../chrome/browser/LaunchIntentDispatcher.java    | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java b/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
+@@ -551,9 +551,22 @@ public class LaunchIntentDispatcher {
+         }
+     }
+ 
++    /**
++     * Whether the custom tab for this link will open in a profile other than the regular one, so
++     * that the regular profile's hidden tab must not load it.
++     */
++    private boolean opensOutsideRegularProfile() {
++        // Judge an incognito request with the calling app's package, as the custom tab does.
++        Intent intent = new Intent(mIntent);
++        maybePutCallingAppPackage(intent);
++        return AlwaysIncognitoLinkInterceptor.isAlwaysIncognito()
++                || IntentHandler.willLaunchIncognitoCustomTab(intent)
++                || ChromeFeatureList.sMayLaunchurlUsesSeparateStoragePartition.isEnabled();
++    }
++
+     private boolean maybeStartNavigation() {
+         if (!ProfileManager.isInitialized()) return false;
+-        if (IntentHandler.willLaunchIncognitoCustomTab(mIntent)) return false;
++        if (opensOutsideRegularProfile()) return false;
+         if (clearTopIntentsForCustomTabsEnabled(mIntent)
+                 && SessionDataHolder.getInstance()
+                                 .getActiveHandlerClassInCurrentTask(mIntent, mActivity)
+--

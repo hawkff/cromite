@@ -1,0 +1,57 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 05:25:02 +0000
+Subject: Use an ephemeral profile for Auth Tabs in incognito modes
+
+Auth Tabs, the custom tabs that apps open for a sign-in flow, used the
+regular profile unless the app asked for ephemeral browsing, even when the
+link was otherwise treated as opening off the record. The sign-in page
+then saw the cookies and site data of the regular profile and could store
+new ones there. Auth Tabs now use an ephemeral profile in every case in
+which the browser opens the link off the record: in always-incognito mode,
+with the option to open external links in incognito, when the app asks for
+an ephemeral tab, and when the app asks for an incognito tab and the
+browser accepts the request. The ephemeral profile starts empty and is
+discarded when the tab closes, so these sign-in flows start logged out.
+Other Auth Tabs keep the regular profile. Auth Tabs only open when custom
+tab intents are allowed in the privacy settings; otherwise these links
+open in a browser tab.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../browser/customtabs/AuthTabIntentDataProvider.java    | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/AuthTabIntentDataProvider.java b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/AuthTabIntentDataProvider.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/AuthTabIntentDataProvider.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/AuthTabIntentDataProvider.java
+@@ -17,6 +17,7 @@ import org.chromium.base.IntentUtils;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.R;
++import org.chromium.chrome.browser.AlwaysIncognitoLinkInterceptor;
+ import org.chromium.chrome.browser.IntentHandler;
+ import org.chromium.chrome.browser.browserservices.intents.BrowserServicesIntentDataProvider;
+ import org.chromium.chrome.browser.browserservices.intents.ColorProvider;
+@@ -106,7 +107,7 @@ public class AuthTabIntentDataProvider extends BrowserServicesIntentDataProvider
+             builder.setAuthRedirectHost(redirectUrl.getHost());
+             builder.setAuthRedirectPath(redirectUrl.getPath());
+             builder.setCustomTabMode(
+-                    isEphemeralTab(intent)
++                    isEphemeralTab(intent) || opensOffTheRecord(intent)
+                             ? CustomTabProfileType.EPHEMERAL
+                             : CustomTabProfileType.REGULAR);
+             builder.setIsCloseButtonEnabled(true);
+@@ -288,6 +289,12 @@ public class AuthTabIntentDataProvider extends BrowserServicesIntentDataProvider
+         return scaledBitmap;
+     }
+ 
++    /** Whether LaunchIntentDispatcher treats the link as opening off the record. */
++    private static boolean opensOffTheRecord(Intent intent) {
++        return AlwaysIncognitoLinkInterceptor.isAlwaysIncognito()
++                || IntentHandler.willLaunchIncognitoCustomTab(intent);
++    }
++
+     @VisibleForTesting
+     static boolean isEphemeralTab(Intent intent) {
+         return IntentUtils.safeGetBooleanExtra(
+--

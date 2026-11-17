@@ -318,5 +318,8 @@ Send-a-reduced-Accept-Language-header.patch
 Use-origin-keyed-processes-by-default.patch
 Always-show-trivial-subdomains-in-formatted-URLs.patch
 Turn-off-heap-profiler-reporting.patch
+Do-not-resolve-link-hosts-through-the-system-resolver.patch
+Skip-early-navigation-for-custom-tabs-outside-the-regular-profile.patch
+Use-an-ephemeral-profile-for-Auth-Tabs-in-incognito-modes.patch
 
 # extension patches
