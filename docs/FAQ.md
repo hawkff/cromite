@@ -22,12 +22,12 @@ Please note that the patch is called ungoogled-chromium but has nothing to do wi
 No, since it is unclear whether any externally retrieved DRM required licence is bound to the device and the correct way to delete it.
 
 ## Is Cromite on Play Store?
-No, but there are plans to activate it.
+No.
 
 ## Is Cromite on F-Droid?
 It is not on the official F-Droid repository.
 
-You can use F-Droid client to install and receive updates via [the official Cromite F-Droid repository](https://www.cromite.org/fdroid/repo).
+The update check in the browser reads the [releases of this repository](https://github.com/hawkff/cromite/releases). See [Automatic updates](AUTOMATIC_UPDATES.md).
 
 ## Using Cromite will favour the monopoly of the Chromium/Blink engine, why do you develop and maintain Cromite?
 

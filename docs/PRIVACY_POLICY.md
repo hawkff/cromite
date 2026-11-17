@@ -3,11 +3,16 @@
 ## SUMMARY
 This document describes the features in Cromite that communicate with third-party services: some of these settings are active by default but can be easy deactivated via the user interface.
 -	Automatic browser update check (disabled by default)
-<br>Cromite check address “https://github.com/uazo/cromite/releases/download” once a day
+<br>When it is on, Cromite sends one request at most once a day for the latest release file of https://github.com/hawkff/cromite
 
 -	Download of selected adblock subscription (enabled by default)
-<br>Cromite check user-selected urls in the adblock section once a day. 
-By default, some subscriptions from https://easylist-downloads.adblockplus.org are automatically selected.
+<br>Cromite checks the subscriptions selected in the adblock section about every 12 hours and downloads a list again when its own expiry time has passed.
+By default, some subscriptions are automatically selected. Cromite downloads them from https://hawkff.github.io/cromite/filters/, which serves unmodified copies of public lists such as EasyList.
+
+-	Download of the fonts pack for fingerprinting protection (enabled by default)
+<br>Cromite downloads the fonts pack once per installation from https://hawkff.github.io/cromite/components/.
+
+GitHub answers all of these requests, so GitHub receives the requesting IP address and the request headers, including the user agent. The project gets no access logs. See the [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
 
 Please note that all browsing data are recorded on disk and that access protection to such data is delegated to the operating system. In windows, only the cookie value information is encrypted by default through the api provided by Windows. Exactly like chromium, all other information is recorded in unencrypted mode.
 
@@ -77,8 +82,8 @@ In Android, the installation of PWAs is disabled and cannot be re-enabled.
 
 Cromite does not download or update any google components.
 
-Cromite, by default, downloads from www.cromite.org a zip containing the fonts it uses for anti-fingerpriting protection. If the zip has already been downloaded, no connection is made again.
-In www.cromite.org, no log is active.
+The fonts fingerprinting protection is on by default. While it is on, Cromite downloads a pack of about 60 MB with the fonts it uses for that protection from https://hawkff.github.io/cromite/components/fonts_component.zip. It downloads the pack once per installation. It requests the component manifest about a minute after start and then every 5 hours until the pack is installed. Once the pack is installed, no connection is made again. Turning the protection off stops these requests.
+GitHub serves these files, so GitHub receives the requesting IP address and the request headers, including the user agent. The project gets no access logs. See the [GitHub Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
 
 #### NETWORK TIME
 Cromite never uses network time to verify SSL certificates, and no call is made to verify it.
