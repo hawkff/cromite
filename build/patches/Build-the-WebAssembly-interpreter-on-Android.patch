@@ -1,0 +1,435 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 21:19:37 +0000
+Subject: Build the WebAssembly interpreter on Android
+
+V8 contains a WebAssembly interpreter that runs modules without
+generating machine code. Its build files accept it only on Windows,
+Linux, macOS and iOS, so v8_enable_drumbrake fails the build for
+Android.
+
+Allow Android on 64-bit x64 and arm64, the CPUs the interpreter already
+supports elsewhere. On Android the interpreter checks memory bounds in
+its instruction handlers instead of relying on guard pages, which is
+already the default for platforms other than desktop and iOS. Android
+builds compile the snapshot in a Linux host toolchain, so use the same
+bounds-checked mode there too; otherwise mksnapshot and the device V8
+would disagree on the list of builtins.
+
+Build arguments apply to every toolchain. An Android build also
+configures 32-bit secondary toolchains, which have no pointer
+compression and cannot build the interpreter. Leave the interpreter out
+of those toolchains instead of failing, so a single build argument works
+for the whole build.
+
+The interpreter sources had not followed some V8 changes and did not
+compile: TrustedManaged::raw() now takes a DisallowGarbageCollection
+scope, TrustedCast only accepts trusted object types, and the
+SharedFunctionInfo flag bits moved into SharedFunctionInfo::Flags. Use
+unsafe_raw(), Cast for objects inside the sandbox and the new flag
+names. The generated code is the same.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ v8/gni/v8.gni                                 | 15 ++++++--
+ .../arm64/interpreter-builtins-arm64.cc       |  4 +--
+ .../interpreter/wasm-interpreter-objects.cc   | 12 +++----
+ .../interpreter/wasm-interpreter-runtime.cc   | 36 +++++++++----------
+ v8/src/wasm/interpreter/wasm-interpreter.cc   | 26 +++++++-------
+ .../x64/interpreter-builtins-x64.cc           |  4 +--
+ 6 files changed, 53 insertions(+), 44 deletions(-)
+
+diff --git a/v8/gni/v8.gni b/v8/gni/v8.gni
+--- a/v8/gni/v8.gni
++++ b/v8/gni/v8.gni
+@@ -150,9 +150,11 @@ declare_args() {
+   # While arm64 uses the standard AAPCS64 calling convention, component builds
+   # work without this restriction only on iOS due to platform-specific
+   # build constraints.
++  # Android builds compile the snapshot in a Linux host toolchain, which must
++  # use the same setting as the device, because it changes the builtins list.
+   v8_drumbrake_bounds_checks =
+       (is_win && (is_asan || is_ubsan || is_msan || is_tsan)) ||
+-      !(is_win || is_linux || is_mac || is_ios) ||
++      !(is_win || is_linux || is_mac || is_ios) || target_os == "android" ||
+       (v8_current_cpu != "x64" && v8_current_cpu != "arm64") || !is_clang ||
+       (is_component_build && target_os != "ios")
+ 
+@@ -358,13 +360,20 @@ if (v8_enable_pointer_compression == "") {
+ }
+ 
+ # The Wasm interpreter is currently supported only on arm64 and x64, on
+-# Windows, Linux, MacOS and tvOS.
++# Windows, Linux, MacOS, tvOS and Android.
+ is_drumbrake_supported =
+     v8_enable_webassembly && v8_enable_pointer_compression &&
+     (v8_current_cpu == "x64" || v8_current_cpu == "arm64" ||
+      v8_current_cpu == "riscv64") &&
+     (target_os == "win" || target_os == "linux" || target_os == "mac" ||
+-     target_os == "ios")
++     target_os == "ios" || target_os == "android")
++
++# Build arguments apply to every toolchain. Android builds also configure
++# 32-bit secondary toolchains, which have no pointer compression and cannot
++# build the interpreter, so leave it out there instead of failing.
++if (!is_drumbrake_supported) {
++  v8_enable_drumbrake = false
++}
+ 
+ # Turbofan is enabled by default, except in lite mode.
+ if (v8_enable_turbofan == "") {
+diff --git a/v8/src/wasm/interpreter/arm64/interpreter-builtins-arm64.cc b/v8/src/wasm/interpreter/arm64/interpreter-builtins-arm64.cc
+--- a/v8/src/wasm/interpreter/arm64/interpreter-builtins-arm64.cc
++++ b/v8/src/wasm/interpreter/arm64/interpreter-builtins-arm64.cc
+@@ -586,8 +586,8 @@ void Builtins::Generate_GenericWasmToJSInterpreterWrapper(
+   DEFINE_REG(flags);
+   __ Ldr(flags, FieldMemOperand(shared_function_info,
+                                 offsetof(SharedFunctionInfo, flags_)));
+-  __ Tst(flags, Immediate(SharedFunctionInfo::IsNativeBit::kMask |
+-                          SharedFunctionInfo::IsStrictBit::kMask));
++  __ Tst(flags, Immediate(SharedFunctionInfo::Flags::IsNativeBit::kMask |
++                          SharedFunctionInfo::Flags::IsStrictBit::kMask));
+   FREE_REG(flags);
+   __ B(&receiver_undefined, ne);
+   __ LoadGlobalProxy(receiver);
+diff --git a/v8/src/wasm/interpreter/wasm-interpreter-objects.cc b/v8/src/wasm/interpreter/wasm-interpreter-objects.cc
+--- a/v8/src/wasm/interpreter/wasm-interpreter-objects.cc
++++ b/v8/src/wasm/interpreter/wasm-interpreter-objects.cc
+@@ -32,9 +32,9 @@ bool WasmInterpreterObject::RunInterpreter(
+   // Publish the currently-executing trusted instance data to the runtime so
+   // that wasm_trusted_instance_data() serves it from the GC-rooted cache.
+   wasm::WasmInterpreterRuntime::InstanceScope instance_scope(
+-      handle->raw()->interpreter()->GetWasmRuntime(), trusted_data);
++      handle->unsafe_raw()->interpreter()->GetWasmRuntime(), trusted_data);
+ 
+-  return handle->raw()->Execute(thread, frame_pointer,
++  return handle->unsafe_raw()->Execute(thread, frame_pointer,
+                                 static_cast<uint32_t>(func_index),
+                                 argument_values, return_values);
+ }
+@@ -55,9 +55,9 @@ bool WasmInterpreterObject::RunInterpreter(
+       wasm::GetInterpreterHandle(isolate, trusted_data);
+ 
+   wasm::WasmInterpreterRuntime::InstanceScope instance_scope(
+-      handle->raw()->interpreter()->GetWasmRuntime(), trusted_data);
++      handle->unsafe_raw()->interpreter()->GetWasmRuntime(), trusted_data);
+ 
+-  return handle->raw()->Execute(
++  return handle->unsafe_raw()->Execute(
+       thread, frame_pointer, static_cast<uint32_t>(func_index), interpreter_sp);
+ }
+ 
+@@ -66,7 +66,7 @@ std::vector<WasmInterpreterStackEntry>
+ WasmInterpreterObject::GetInterpretedStack(
+     Tagged<WasmTrustedInstanceData> trusted_data, Address frame_pointer) {
+   CHECK(trusted_data->has_interpreter_handle());
+-  return trusted_data->interpreter_handle()->raw()->GetInterpretedStack(
++  return trusted_data->interpreter_handle()->unsafe_raw()->GetInterpretedStack(
+       frame_pointer);
+ }
+ 
+@@ -75,7 +75,7 @@ int WasmInterpreterObject::GetFunctionIndex(
+     Tagged<WasmTrustedInstanceData> trusted_data, Address frame_pointer,
+     int index) {
+   CHECK(trusted_data->has_interpreter_handle());
+-  return trusted_data->interpreter_handle()->raw()->GetFunctionIndex(
++  return trusted_data->interpreter_handle()->unsafe_raw()->GetFunctionIndex(
+       frame_pointer, index);
+ }
+ 
+diff --git a/v8/src/wasm/interpreter/wasm-interpreter-runtime.cc b/v8/src/wasm/interpreter/wasm-interpreter-runtime.cc
+--- a/v8/src/wasm/interpreter/wasm-interpreter-runtime.cc
++++ b/v8/src/wasm/interpreter/wasm-interpreter-runtime.cc
+@@ -130,7 +130,7 @@ RUNTIME_FUNCTION(Runtime_WasmRunInterpreter) {
+       wasm::GetOrCreateInterpreterHandle(isolate, trusted_data);
+ 
+   if (wasm::WasmBytecode::ContainsSimd(sig)) {
+-    interpreter_handle->raw()->SetTrapFunctionIndex(func_index);
++    interpreter_handle->unsafe_raw()->SetTrapFunctionIndex(func_index);
+     isolate->Throw(*isolate->factory()->NewTypeError(
+         MessageTemplate::kWasmTrapJSTypeError));
+     return ReadOnlyRoots(isolate).exception();
+@@ -183,7 +183,7 @@ RUNTIME_FUNCTION(Runtime_WasmRunInterpreter) {
+     }
+ 
+       if (isolate->has_exception()) {
+-        interpreter_handle->raw()->SetTrapFunctionIndex(func_index);
++        interpreter_handle->unsafe_raw()->SetTrapFunctionIndex(func_index);
+         return ReadOnlyRoots(isolate).exception();
+       }
+ 
+@@ -426,7 +426,7 @@ void WasmInterpreterRuntime::UpdateMemoryAddress(
+   DirectHandle<TrustedManaged<InterpreterHandle>> handle =
+       GetOrCreateInterpreterHandle(isolate, trusted_data);
+   WasmInterpreterRuntime* wasm_runtime =
+-      handle->raw()->interpreter()->GetWasmRuntime();
++      handle->unsafe_raw()->interpreter()->GetWasmRuntime();
+   DCHECK_LT(memory_index, wasm_runtime->module_->memories.size());
+ 
+   // Publish the trusted data for the duration of this call.
+@@ -459,7 +459,7 @@ bool WasmInterpreterRuntime::TableGet(const uint8_t*& current_code,
+   // This function assumes that it is executed in a HandleScope.
+ 
+   auto table = direct_handle(
+-      TrustedCast<WasmTableObject>(
++      Cast<WasmTableObject>(
+           wasm_trusted_instance_data()->tables()->get(table_index)),
+       isolate_);
+   uint32_t table_size = table->current_length();
+@@ -479,7 +479,7 @@ void WasmInterpreterRuntime::TableSet(const uint8_t*& current_code,
+   // This function assumes that it is executed in a HandleScope.
+ 
+   auto table = direct_handle(
+-      TrustedCast<WasmTableObject>(
++      Cast<WasmTableObject>(
+           wasm_trusted_instance_data()->tables()->get(table_index)),
+       isolate_);
+   uint32_t table_size = table->current_length();
+@@ -502,7 +502,7 @@ void WasmInterpreterRuntime::TableInit(const uint8_t*& current_code,
+   DirectHandle<WasmTrustedInstanceData> trusted_data =
+       wasm_trusted_instance_data();
+   auto table = direct_handle(
+-      TrustedCast<WasmTableObject>(trusted_data->tables()->get(table_index)),
++      Cast<WasmTableObject>(trusted_data->tables()->get(table_index)),
+       isolate_);
+   if (IsSubtypeOf(table->type(module_), kWasmFuncRef, module_)) {
+     PurgeIndirectCallCache(table_index);
+@@ -530,7 +530,7 @@ void WasmInterpreterRuntime::TableCopy(const uint8_t*& current_code,
+   DirectHandle<WasmTrustedInstanceData> trusted_data =
+       wasm_trusted_instance_data();
+   auto table_dst =
+-      direct_handle(TrustedCast<WasmTableObject>(
++      direct_handle(Cast<WasmTableObject>(
+                         trusted_data->tables()->get(dst_table_index)),
+                     isolate_);
+   if (IsSubtypeOf(table_dst->type(module_), kWasmFuncRef, module_)) {
+@@ -549,7 +549,7 @@ uint32_t WasmInterpreterRuntime::TableGrow(uint32_t table_index, uint32_t delta,
+   // This function assumes that it is executed in a HandleScope.
+ 
+   auto table = direct_handle(
+-      TrustedCast<WasmTableObject>(
++      Cast<WasmTableObject>(
+           wasm_trusted_instance_data()->tables()->get(table_index)),
+       isolate_);
+   DirectHandle<WasmDispatchTable> dispatch_table(
+@@ -560,7 +560,7 @@ uint32_t WasmInterpreterRuntime::TableGrow(uint32_t table_index, uint32_t delta,
+ uint32_t WasmInterpreterRuntime::TableSize(uint32_t table_index) {
+   HandleScope handle_scope(isolate_);  // Avoid leaking handles.
+   auto table = direct_handle(
+-      TrustedCast<WasmTableObject>(
++      Cast<WasmTableObject>(
+           wasm_trusted_instance_data()->tables()->get(table_index)),
+       isolate_);
+   return table->current_length();
+@@ -573,7 +573,7 @@ void WasmInterpreterRuntime::TableFill(const uint8_t*& current_code,
+   // This function assumes that it is executed in a HandleScope.
+ 
+   auto table = direct_handle(
+-      TrustedCast<WasmTableObject>(
++      Cast<WasmTableObject>(
+           wasm_trusted_instance_data()->tables()->get(table_index)),
+       isolate_);
+   uint32_t table_size = table->current_length();
+@@ -651,7 +651,7 @@ void WasmInterpreterRuntime::UnpackException(
+     uint32_t* sp, const WasmTag& tag, DirectHandle<Object> exception_object,
+     uint32_t first_param_slot_index, uint32_t first_param_ref_stack_index) {
+   DirectHandle<FixedArray> encoded_values = GetExceptionValuesField(
+-      isolate_, TrustedCast<WasmExceptionPackage>(exception_object));
++      isolate_, Cast<WasmExceptionPackage>(exception_object));
+   SBXCHECK_LE(WasmExceptionPackage::GetEncodedSize(module_, &tag),
+               static_cast<uint32_t>(encoded_values->length()));
+   // Decode the exception values from the given exception package and push
+@@ -759,7 +759,7 @@ WasmInterpreterRuntime::CreateWasmExceptionPackage(uint32_t tag_index) const {
+   DirectHandle<WasmTrustedInstanceData> trusted_data =
+       wasm_trusted_instance_data();
+   DirectHandle<WasmExceptionTag> exception_tag(
+-      TrustedCast<WasmExceptionTag>(trusted_data->tags_table()->get(tag_index)),
++      Cast<WasmExceptionTag>(trusted_data->tags_table()->get(tag_index)),
+       isolate_);
+   const WasmTag& tag = GetWasmTag(tag_index);
+   uint32_t encoded_size = WasmExceptionPackage::GetEncodedSize(module_, &tag);
+@@ -861,7 +861,7 @@ WasmInterpreterRuntime::HandleException(uint32_t* sp,
+           // The exception was thrown by Wasm code and it's wrapped in a
+           // WasmExceptionPackage.
+           DirectHandle<Object> caught_tag = GetExceptionTagField(
+-              isolate_, TrustedCast<WasmExceptionPackage>(exception));
++              isolate_, Cast<WasmExceptionPackage>(exception));
+           DirectHandle<Object> expected_tag(
+               trusted_data->tags_table()->get(catch_handler.tag_index),
+               isolate_);
+@@ -905,7 +905,7 @@ WasmInterpreterRuntime::HandleException(uint32_t* sp,
+           DirectHandle<JSObject> js_tag_object(
+               isolate_->native_context()->wasm_js_tag(), isolate_);
+           DirectHandle<WasmTagObject> wasm_tag_object(
+-              TrustedCast<WasmTagObject>(*js_tag_object), isolate_);
++              Cast<WasmTagObject>(*js_tag_object), isolate_);
+           DirectHandle<Object> caught_tag(wasm_tag_object->tag(), isolate_);
+           DirectHandle<Object> expected_tag(
+               trusted_data->tags_table()->get(catch_handler.tag_index),
+@@ -1955,7 +1955,7 @@ void WasmInterpreterRuntime::ClearIndirectCallCacheEntry(
+   DirectHandle<TrustedManaged<InterpreterHandle>> handle =
+       GetOrCreateInterpreterHandle(isolate, trusted_data);
+   WasmInterpreterRuntime* wasm_runtime =
+-      handle->raw()->interpreter()->GetWasmRuntime();
++      handle->unsafe_raw()->interpreter()->GetWasmRuntime();
+   // SANDBOX SAFETY: `indirect_call_tables_` is an out-of-cage std::vector.
+   // Bounds-check unconditionally (see PurgeIndirectCallCache) so a mismatched
+   // {table_index}/{entry_index} can never drive an out-of-cage OOB write.
+@@ -1972,7 +1972,7 @@ void WasmInterpreterRuntime::UpdateIndirectCallTable(
+   DirectHandle<TrustedManaged<InterpreterHandle>> handle =
+       GetOrCreateInterpreterHandle(isolate, trusted_data);
+   WasmInterpreterRuntime* wasm_runtime =
+-      handle->raw()->interpreter()->GetWasmRuntime();
++      handle->unsafe_raw()->interpreter()->GetWasmRuntime();
+ 
+   // Publish the trusted data for the duration of this call.
+   InstanceScope instance_scope(wasm_runtime, trusted_data);
+@@ -2875,7 +2875,7 @@ DirectHandle<Map> WasmInterpreterRuntime::RttCanon(uint32_t type_index) const {
+   // {managed_object_maps} holds the canonical RTTs for all (shared and
+   // non-shared) types on the single trusted instance data.
+   DirectHandle<Map> rtt{
+-      TrustedCast<Map>(
++      Cast<Map>(
+           wasm_trusted_instance_data()->managed_object_maps()->get(type_index)),
+       isolate_};
+   return rtt;
+@@ -3490,7 +3490,7 @@ DirectHandle<WasmInstanceObject> InterpreterHandle::GetInstanceObject() {
+   // Check that this is indeed the instance which is connected to this
+   // interpreter.
+   DCHECK_EQ(this,
+-            instance_obj->trusted_data(isolate_)->interpreter_handle()->raw());
++            instance_obj->trusted_data(isolate_)->interpreter_handle()->unsafe_raw());
+   return instance_obj;
+ }
+ 
+diff --git a/v8/src/wasm/interpreter/wasm-interpreter.cc b/v8/src/wasm/interpreter/wasm-interpreter.cc
+--- a/v8/src/wasm/interpreter/wasm-interpreter.cc
++++ b/v8/src/wasm/interpreter/wasm-interpreter.cc
+@@ -6249,7 +6249,7 @@ class Handlers : public HandlersBase {
+     DCHECK(IsWasmStruct(*struct_obj));
+     Address field_addr = (*struct_obj).ptr() + field_offset;
+     StoreRefIntoMemory(
+-        TrustedCast<HeapObject>(*struct_obj), field_addr,
++        Cast<HeapObject>(*struct_obj), field_addr,
+         field_offset +
+             kHeapObjectTag,  // field_offset is offset into tagged object.
+         *ref, UPDATE_WRITE_BARRIER);
+@@ -6333,7 +6333,7 @@ class Handlers : public HandlersBase {
+       Address element_addr = array->ElementAddress(0);
+       uint32_t element_offset = array->element_offset(0);
+       for (uint32_t i = 0; i < elem_count; i++) {
+-        StoreRefIntoMemory(TrustedCast<HeapObject>(*array), element_addr,
++        StoreRefIntoMemory(Cast<HeapObject>(*array), element_addr,
+                            element_offset, *value, mode);
+         element_addr += sizeof(Tagged_t);
+         element_offset += sizeof(Tagged_t);
+@@ -6406,7 +6406,7 @@ class Handlers : public HandlersBase {
+                                           ? UPDATE_WRITE_BARRIER
+                                           : SKIP_WRITE_BARRIER;
+               WasmRef ref = pop<WasmRef>(sp, code, wasm_runtime);
+-              StoreRefIntoMemory(TrustedCast<HeapObject>(*array), element_addr,
++              StoreRefIntoMemory(Cast<HeapObject>(*array), element_addr,
+                                  element_offset, *ref, mode);
+               break;
+             }
+@@ -6478,7 +6478,7 @@ class Handlers : public HandlersBase {
+             WriteBarrierMode mode = array_new_result.needs_write_barrier
+                                         ? UPDATE_WRITE_BARRIER
+                                         : SKIP_WRITE_BARRIER;
+-            StoreRefIntoMemory(TrustedCast<HeapObject>(*array), element_addr,
++            StoreRefIntoMemory(Cast<HeapObject>(*array), element_addr,
+                                element_offset,
+                                wasm_runtime->GetNullValue(element_type), mode);
+             break;
+@@ -6609,7 +6609,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     push<int32_t>(sp, code, wasm_runtime, array->length());
+ 
+     NextOp();
+@@ -6638,12 +6638,12 @@ class Handlers : public HandlersBase {
+     } else if (V8_UNLIKELY(wasm_runtime->IsRefNull(dest_array))) {
+       TRAP(MessageTemplate::kWasmTrapNullDereference)
+     } else if (V8_UNLIKELY(dest_offset + size >
+-                           TrustedCast<WasmArray>(*dest_array)->length())) {
++                           Cast<WasmArray>(*dest_array)->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     } else if (V8_UNLIKELY(wasm_runtime->IsRefNull(src_array))) {
+       TRAP(MessageTemplate::kWasmTrapNullDereference)
+     } else if (V8_UNLIKELY(src_offset + size >
+-                           TrustedCast<WasmArray>(*src_array)->length())) {
++                           Cast<WasmArray>(*src_array)->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+ 
+@@ -6673,7 +6673,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     if (V8_UNLIKELY(index >= array->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+@@ -6703,7 +6703,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     if (V8_UNLIKELY(index >= array->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+@@ -6728,7 +6728,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     if (V8_UNLIKELY(index >= array->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+@@ -6757,7 +6757,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     if (V8_UNLIKELY(index >= array->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+@@ -6784,7 +6784,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     if (V8_UNLIKELY(static_cast<uint64_t>(offset) + size > array->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+@@ -6822,7 +6822,7 @@ class Handlers : public HandlersBase {
+     }
+     DCHECK(IsWasmArray(*array_obj));
+ 
+-    Tagged<WasmArray> array = TrustedCast<WasmArray>(*array_obj);
++    Tagged<WasmArray> array = Cast<WasmArray>(*array_obj);
+     if (V8_UNLIKELY(static_cast<uint64_t>(offset) + size > array->length())) {
+       TRAP(MessageTemplate::kWasmTrapArrayOutOfBounds)
+     }
+diff --git a/v8/src/wasm/interpreter/x64/interpreter-builtins-x64.cc b/v8/src/wasm/interpreter/x64/interpreter-builtins-x64.cc
+--- a/v8/src/wasm/interpreter/x64/interpreter-builtins-x64.cc
++++ b/v8/src/wasm/interpreter/x64/interpreter-builtins-x64.cc
+@@ -498,8 +498,8 @@ void Builtins::Generate_GenericWasmToJSInterpreterWrapper(
+   Register flags = rbx;
+   __ movl(flags, FieldOperand(shared_function_info,
+                               offsetof(SharedFunctionInfo, flags_)));
+-  __ testq(flags, Immediate(SharedFunctionInfo::IsNativeBit::kMask |
+-                            SharedFunctionInfo::IsStrictBit::kMask));
++  __ testq(flags, Immediate(SharedFunctionInfo::Flags::IsNativeBit::kMask |
++                            SharedFunctionInfo::Flags::IsStrictBit::kMask));
+   flags = no_reg;
+   __ j(not_equal, &receiver_undefined);
+   __ LoadGlobalProxy(receiver);
+--
