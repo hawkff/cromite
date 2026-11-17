@@ -6,18 +6,18 @@ Disabling some omissions of complete urls
 
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
- .../ShareSheetBottomSheetContent.java         |  4 +-
- .../EphemeralTabSheetContent.java             |  4 +-
- .../chrome_location_bar_model_delegate.cc     |  2 +-
- .../components/bookmarks/BookmarkItem.java    |  1 +
- .../omnibox/browser/titled_url_match_utils.cc |  2 +-
- .../page_info/PageInfoController.java         |  3 +-
+ .../share/share_sheet/ShareSheetBottomSheetContent.java       | 4 +---
+ .../chrome/browser/ephemeraltab/EphemeralTabSheetContent.java | 4 +---
+ .../browser/ui/toolbar/chrome_location_bar_model_delegate.cc  | 2 +-
+ .../src/org/chromium/components/bookmarks/BookmarkItem.java   | 1 +
+ components/omnibox/browser/titled_url_match_utils.cc          | 2 +-
+ .../org/chromium/components/page_info/PageInfoController.java | 3 +--
  6 files changed, 6 insertions(+), 10 deletions(-)
 
 diff --git a/chrome/browser/share/android/java/src/org/chromium/chrome/browser/share/share_sheet/ShareSheetBottomSheetContent.java b/chrome/browser/share/android/java/src/org/chromium/chrome/browser/share/share_sheet/ShareSheetBottomSheetContent.java
 --- a/chrome/browser/share/android/java/src/org/chromium/chrome/browser/share/share_sheet/ShareSheetBottomSheetContent.java
 +++ b/chrome/browser/share/android/java/src/org/chromium/chrome/browser/share/share_sheet/ShareSheetBottomSheetContent.java
-@@ -276,9 +276,7 @@ class ShareSheetBottomSheetContent implements BottomSheetContent, OnItemClickLis
+@@ -257,9 +257,7 @@ class ShareSheetBottomSheetContent implements BottomSheetContent, OnItemClickLis
              ShareSheetLinkToggleCoordinator shareSheetLinkToggleCoordinator) {
          // Default preview is to show title + url.
          String title = mParams.getTitle();
@@ -31,7 +31,7 @@ diff --git a/chrome/browser/share/android/java/src/org/chromium/chrome/browser/s
 diff --git a/chrome/browser/ui/android/ephemeraltab/java/src/org/chromium/chrome/browser/ephemeraltab/EphemeralTabSheetContent.java b/chrome/browser/ui/android/ephemeraltab/java/src/org/chromium/chrome/browser/ephemeraltab/EphemeralTabSheetContent.java
 --- a/chrome/browser/ui/android/ephemeraltab/java/src/org/chromium/chrome/browser/ephemeraltab/EphemeralTabSheetContent.java
 +++ b/chrome/browser/ui/android/ephemeraltab/java/src/org/chromium/chrome/browser/ephemeraltab/EphemeralTabSheetContent.java
-@@ -265,9 +265,7 @@ public class EphemeralTabSheetContent implements BottomSheetContent {
+@@ -269,9 +269,7 @@ public class EphemeralTabSheetContent implements BottomSheetContent {
          if (url == null) {
              originView.setText("");
          } else {
@@ -78,7 +78,7 @@ diff --git a/components/omnibox/browser/titled_url_match_utils.cc b/components/o
 diff --git a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java
 --- a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java
 +++ b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java
-@@ -238,8 +238,7 @@ public class PageInfoController
+@@ -245,8 +245,7 @@ public class PageInfoController
                  OmniboxUrlEmphasizer.getOriginEndIndex(
                          displayUrlBuilder.toString(), autocompleteSchemeClassifier);
          autocompleteSchemeClassifier.destroy();

@@ -25,7 +25,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -4155,6 +4155,31 @@ bool ShouldPromptOnMultipleMatchingCertificates(const Profile* profile) {
+@@ -4228,6 +4228,31 @@ bool ShouldPromptOnMultipleMatchingCertificates(const Profile* profile) {
    return false;
  }
  
@@ -57,7 +57,7 @@ diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/ch
  }  // namespace
  
  base::OnceClosure ChromeContentBrowserClient::SelectClientCertificate(
-@@ -8074,12 +8099,17 @@ content::ContentBrowserClient::LocalNetworkAccessRequestPolicyOverride
+@@ -8418,12 +8443,17 @@ content::ContentBrowserClient::LocalNetworkAccessRequestPolicyOverride
  ChromeContentBrowserClient::ShouldOverrideLocalNetworkAccessRequestPolicy(
      content::BrowserContext* browser_context,
      const url::Origin& origin) {
@@ -240,7 +240,7 @@ new file mode 100644
 diff --git a/content/browser/renderer_host/local_network_access_util.cc b/content/browser/renderer_host/local_network_access_util.cc
 --- a/content/browser/renderer_host/local_network_access_util.cc
 +++ b/content/browser/renderer_host/local_network_access_util.cc
-@@ -121,13 +121,13 @@ Policy DerivePolicyForNonSecureContext(
+@@ -125,13 +125,13 @@ Policy DerivePolicyForNonSecureContext(
        // Requests from the `unknown` address space are controlled separately
        // because it is unclear why they happen in the first place. The goal is
        // to reduce instances of this happening before enabling this feature.
@@ -256,7 +256,7 @@ diff --git a/content/browser/renderer_host/local_network_access_util.cc b/conten
      case AddressSpace::kPublic:
      case AddressSpace::kLoopback:
        // Private network requests from non secure contexts are blocked if the
-@@ -137,7 +137,7 @@ Policy DerivePolicyForNonSecureContext(
+@@ -141,7 +141,7 @@ Policy DerivePolicyForNonSecureContext(
        // has no effect. Indeed, requests initiated from the local address space
        // are never considered private network requests - they cannot target
        // more-private address spaces.
@@ -275,7 +275,7 @@ new file mode 100644
 diff --git a/services/network/public/cpp/features.cc b/services/network/public/cpp/features.cc
 --- a/services/network/public/cpp/features.cc
 +++ b/services/network/public/cpp/features.cc
-@@ -240,7 +240,7 @@ BASE_FEATURE_PARAM(bool,
+@@ -227,7 +227,7 @@ BASE_FEATURE_PARAM(bool,
                     kLocalNetworkAccessChecksWarn,
                     &kLocalNetworkAccessChecks,
                     /*name=*/"LocalNetworkAccessChecksWarn",

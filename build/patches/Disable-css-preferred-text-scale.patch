@@ -34,7 +34,7 @@ diff --git a/third_party/blink/renderer/core/css/document_style_environment_vari
 diff --git a/third_party/blink/renderer/core/css/style_environment_variables.cc b/third_party/blink/renderer/core/css/style_environment_variables.cc
 --- a/third_party/blink/renderer/core/css/style_environment_variables.cc
 +++ b/third_party/blink/renderer/core/css/style_environment_variables.cc
-@@ -50,7 +50,9 @@ void SetDefaultEnvironmentVariables(StyleEnvironmentVariables* instance) {
+@@ -51,7 +51,9 @@ void SetDefaultEnvironmentVariables(StyleEnvironmentVariables* instance) {
    instance->SetVariable(UADefinedVariable::kKeyboardInsetHeight,
                          kKeyboardInsetDefault);
  
@@ -48,7 +48,7 @@ diff --git a/third_party/blink/renderer/core/css/style_environment_variables.cc 
 diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/renderer/core/page/page.cc
 --- a/third_party/blink/renderer/core/page/page.cc
 +++ b/third_party/blink/renderer/core/page/page.cc
-@@ -1054,7 +1054,9 @@ void Page::SettingsChanged(ChangeType change_type) {
+@@ -1044,7 +1044,9 @@ void Page::SettingsChanged(ChangeType change_type) {
        }
        break;
      case ChangeType::kFontScaleFactor:
@@ -62,9 +62,9 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
 diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
 --- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
 +++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
-@@ -1836,6 +1836,9 @@
-       name: "CSSPositionStickyStaticScrollPosition",
-       status: "test",
+@@ -2000,6 +2000,9 @@
+       name: "CSSPrivate",
+       status: "experimental",
      },
 +    {
 +      name: "CSSPreferredTextScale", status: "test", public: true

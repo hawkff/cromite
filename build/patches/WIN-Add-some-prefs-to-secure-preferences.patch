@@ -28,7 +28,7 @@ diff --git a/chrome/browser/prefs/chrome_pref_service_factory.cc b/chrome/browse
 diff --git a/services/preferences/tracked/pref_hash_filter.cc b/services/preferences/tracked/pref_hash_filter.cc
 --- a/services/preferences/tracked/pref_hash_filter.cc
 +++ b/services/preferences/tracked/pref_hash_filter.cc
-@@ -133,7 +133,7 @@ PrefHashFilter::PrefHashFilter(
+@@ -134,7 +134,7 @@ PrefHashFilter::PrefHashFilter(
            base::FeatureList::IsEnabled(tracked::kEncryptedPrefHashing)) {
    // For base::UmaHistogramExactLinear, number of tracked histograms must 100 or
    // below.

@@ -14,18 +14,18 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
-@@ -2792,6 +2792,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
+@@ -3070,6 +3070,7 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
      }
  
      private boolean maybeShowPromo(Profile profile) {
 +        if ((true)) return false;
          // NOTE: Only one promo can be shown in one run to avoid nagging users too much.
  
-         // The PWA Restore promotion runs when we've detected that a user has switched to a new
+         if (mToolbarManager != null && mToolbarManager.maybeShowBottomBarPromo(profile)) {
 diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_ui_prefs.cc
 --- a/chrome/browser/ui/browser_ui_prefs.cc
 +++ b/chrome/browser/ui/browser_ui_prefs.cc
-@@ -199,7 +199,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+@@ -203,7 +203,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
  
    registry->RegisterBooleanPref(prefs::kEnterpriseHardwarePlatformAPIEnabled,
                                  false);
@@ -37,7 +37,7 @@ diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_u
 diff --git a/chrome/browser/user_education/java/src/org/chromium/chrome/browser/user_education/UserEducationHelper.java b/chrome/browser/user_education/java/src/org/chromium/chrome/browser/user_education/UserEducationHelper.java
 --- a/chrome/browser/user_education/java/src/org/chromium/chrome/browser/user_education/UserEducationHelper.java
 +++ b/chrome/browser/user_education/java/src/org/chromium/chrome/browser/user_education/UserEducationHelper.java
-@@ -124,6 +124,7 @@ public class UserEducationHelper {
+@@ -139,6 +139,7 @@ public class UserEducationHelper {
      }
  
      private void showIph(Tracker tracker, IphCommand iphCommand) {

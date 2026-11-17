@@ -23,7 +23,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/third_party/blink/renderer/core/execution_context/execution_context.h b/third_party/blink/renderer/core/execution_context/execution_context.h
 --- a/third_party/blink/renderer/core/execution_context/execution_context.h
 +++ b/third_party/blink/renderer/core/execution_context/execution_context.h
-@@ -402,6 +402,7 @@ class CORE_EXPORT ExecutionContext : public Supplementable<ExecutionContext>,
+@@ -403,6 +403,7 @@ class CORE_EXPORT ExecutionContext : public Supplementable<ExecutionContext>,
    void SetAddressSpace(network::mojom::blink::IPAddressSpace ip_address_space);
  
    HeapObserverList<ContextLifecycleObserver>& ContextLifecycleObserverSet();
@@ -46,7 +46,7 @@ diff --git a/third_party/blink/renderer/core/loader/base_fetch_context.h b/third
 diff --git a/third_party/blink/renderer/core/loader/frame_fetch_context.cc b/third_party/blink/renderer/core/loader/frame_fetch_context.cc
 --- a/third_party/blink/renderer/core/loader/frame_fetch_context.cc
 +++ b/third_party/blink/renderer/core/loader/frame_fetch_context.cc
-@@ -1140,6 +1140,26 @@ bool FrameFetchContext::ShouldBlockRequestByInspector(const KURL& url) const {
+@@ -1132,6 +1132,26 @@ bool FrameFetchContext::ShouldBlockRequestByInspector(const KURL& url) const {
    return should_block_request;
  }
  
@@ -140,7 +140,7 @@ diff --git a/third_party/blink/renderer/core/loader/worker_fetch_context.h b/thi
 diff --git a/third_party/blink/renderer/core/workers/installed_scripts_manager.cc b/third_party/blink/renderer/core/workers/installed_scripts_manager.cc
 --- a/third_party/blink/renderer/core/workers/installed_scripts_manager.cc
 +++ b/third_party/blink/renderer/core/workers/installed_scripts_manager.cc
-@@ -35,7 +35,7 @@ InstalledScriptsManager::ScriptData::ScriptData(
+@@ -37,7 +37,7 @@ InstalledScriptsManager::ScriptData::ScriptData(
    if (network_utils::IsReservedIPAddress(script_url_.Host()))
      response_address_space_ = network::mojom::IPAddressSpace::kLocal;
    if (SecurityOrigin::Create(script_url_)->IsLocalhost())
@@ -152,7 +152,7 @@ diff --git a/third_party/blink/renderer/core/workers/installed_scripts_manager.c
 diff --git a/third_party/blink/renderer/modules/background_fetch/background_fetch_manager.cc b/third_party/blink/renderer/modules/background_fetch/background_fetch_manager.cc
 --- a/third_party/blink/renderer/modules/background_fetch/background_fetch_manager.cc
 +++ b/third_party/blink/renderer/modules/background_fetch/background_fetch_manager.cc
-@@ -107,6 +107,30 @@ bool ShouldBlockDanglingMarkup(const KURL& request_url) {
+@@ -108,6 +108,30 @@ bool ShouldBlockDanglingMarkup(const KURL& request_url) {
           request_url.ProtocolIsInHttpFamily();
  }
  
@@ -183,7 +183,7 @@ diff --git a/third_party/blink/renderer/modules/background_fetch/background_fetc
  scoped_refptr<BlobDataHandle> ExtractBlobHandle(
      Request* request,
      ExceptionState& exception_state) {
-@@ -266,6 +290,13 @@ ScriptPromise<BackgroundFetchRegistration> BackgroundFetchManager::fetch(
+@@ -269,6 +293,13 @@ ScriptPromise<BackgroundFetchRegistration> BackgroundFetchManager::fetch(
                                   exception_state);
      }
  
@@ -200,7 +200,7 @@ diff --git a/third_party/blink/renderer/modules/background_fetch/background_fetc
 diff --git a/third_party/blink/renderer/modules/websockets/websocket_channel_impl.cc b/third_party/blink/renderer/modules/websockets/websocket_channel_impl.cc
 --- a/third_party/blink/renderer/modules/websockets/websocket_channel_impl.cc
 +++ b/third_party/blink/renderer/modules/websockets/websocket_channel_impl.cc
-@@ -296,6 +296,12 @@ bool WebSocketChannelImpl::Connect(
+@@ -297,6 +297,12 @@ bool WebSocketChannelImpl::Connect(
      return false;
    }
  

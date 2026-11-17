@@ -33,7 +33,7 @@ Pre-requisites: eyeo Browser Ad filtering Solution: Base Module
 diff --git a/chrome/browser/extensions/BUILD.gn b/chrome/browser/extensions/BUILD.gn
 --- a/chrome/browser/extensions/BUILD.gn
 +++ b/chrome/browser/extensions/BUILD.gn
-@@ -637,6 +637,16 @@ source_set("extensions") {
+@@ -653,6 +653,16 @@ source_set("extensions") {
      "//ui/native_window_tracker",
      "//ui/shell_dialogs",
    ]
@@ -63,7 +63,7 @@ diff --git a/chrome/browser/extensions/api/BUILD.gn b/chrome/browser/extensions/
  
  import("//chrome/common/extensions/api/api_sources.gni")
  import("//chrome/common/features.gni")
-@@ -237,6 +240,7 @@ function_registration("api_registration") {
+@@ -202,6 +205,7 @@ function_registration("api_registration") {
      # include generated headers from these targets.
      # TODO(brettw) this should be made unnecessary if possible.
      "//chrome/common/extensions/api",
@@ -1146,10 +1146,10 @@ diff --git a/chrome/browser/extensions/api/api_browser_context_keyed_service_fac
 +// Use of this source code is governed by the GPLv3 that can be found in the
 +// components/adblock/LICENSE file.
  
- #include "chrome/browser/extensions/api/bookmarks/bookmarks_api.h"
- #include "chrome/browser/extensions/api/bookmarks/bookmarks_api_watcher.h"
-@@ -33,10 +37,12 @@
  #include "build/build_config.h"
+ #include "chrome/browser/extensions/api/bookmarks/bookmarks_api.h"
+@@ -34,10 +38,12 @@
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
  #include "build/chromeos_buildflags.h"
  #include "chrome/browser/extensions/api/activity_log_private/activity_log_private_api.h"
 +#include "chrome/browser/extensions/api/adblock_private/adblock_private_api.h"
@@ -1161,7 +1161,7 @@ diff --git a/chrome/browser/extensions/api/api_browser_context_keyed_service_fac
  #include "chrome/browser/extensions/api/image_writer_private/operation_manager.h"
  #include "chrome/browser/extensions/api/language_settings_private/language_settings_private_delegate_factory.h"
  #include "chrome/browser/extensions/api/networking_private/networking_private_ui_delegate_factory_impl.h"
-@@ -108,6 +114,8 @@ void EnsureApiBrowserContextKeyedServiceFactoriesBuilt() {
+@@ -109,6 +115,8 @@ void EnsureApiBrowserContextKeyedServiceFactoriesBuilt() {
  
  #if BUILDFLAG(ENABLE_EXTENSIONS)
    extensions::ActivityLogAPI::GetFactoryInstance();
@@ -2405,7 +2405,7 @@ diff --git a/chrome/common/extensions/api/_api_features.json b/chrome/common/ext
  
  // This features file defines extension APIs implemented under src/chrome.
  // See chrome/common/extensions/api/_features.md to understand this file, as
-@@ -96,6 +100,16 @@
+@@ -70,6 +74,16 @@
      "dependencies": ["permission:glicPrivate"],
      "feature_flag": "ApiGlicPrivate"
    },
@@ -2422,7 +2422,7 @@ diff --git a/chrome/common/extensions/api/_api_features.json b/chrome/common/ext
    "glicPrivate.invoke": {
      "dependencies": ["permission:glicPrivate.invoke"]
    },
-@@ -580,6 +594,14 @@
+@@ -517,6 +531,14 @@
      "channel": "stable",
      "contexts": []
    },
@@ -2434,9 +2434,9 @@ diff --git a/chrome/common/extensions/api/_api_features.json b/chrome/common/ext
 +    "dependencies": [],
 +    "matches": ["chrome://settings/*"]
 +  }],
-   "fileBrowserHandler": {
-     "dependencies": ["permission:fileBrowserHandler"],
-     "contexts": ["privileged_extension"],
+   "fontSettings": {
+     "dependencies": ["permission:fontSettings"],
+     "contexts": ["privileged_extension"]
 diff --git a/chrome/common/extensions/api/_permission_features.json b/chrome/common/extensions/api/_permission_features.json
 --- a/chrome/common/extensions/api/_permission_features.json
 +++ b/chrome/common/extensions/api/_permission_features.json
@@ -2451,7 +2451,7 @@ diff --git a/chrome/common/extensions/api/_permission_features.json b/chrome/com
  
  // This features file defines permissions for extension APIs implemented
  // under src/chrome.
-@@ -60,6 +64,13 @@
+@@ -57,6 +61,13 @@
        "5107DE9024C329EEA9C9A72D94C16723790C6422"   // Apps Developer Tool Dev.
      ]
    },
@@ -2465,7 +2465,7 @@ diff --git a/chrome/common/extensions/api/_permission_features.json b/chrome/com
    "autofillPrivate": {
      "channel": "trunk",
      "extension_types": ["extension", "platform_app"],
-@@ -567,6 +578,13 @@
+@@ -506,6 +517,13 @@
        ]
      }
    ],
@@ -2921,7 +2921,7 @@ diff --git a/chrome/common/extensions/permissions/chrome_api_permissions.cc b/ch
      {APIPermissionID::kBackground, "background",
       APIPermissionInfo::kFlagDoesNotRequireManagedSessionFullLoginWarning},
      {APIPermissionID::kDeclarativeContent, "declarativeContent"},
-@@ -89,6 +95,8 @@ constexpr APIPermissionInfo::InitInfo permissions_to_register[] = {
+@@ -84,6 +90,8 @@ constexpr APIPermissionInfo::InitInfo permissions_to_register[] = {
      {APIPermissionID::kEnterpriseNetworkingAttributes,
       "enterprise.networkingAttributes",
       APIPermissionInfo::kFlagDoesNotRequireManagedSessionFullLoginWarning},
@@ -2929,7 +2929,7 @@ diff --git a/chrome/common/extensions/permissions/chrome_api_permissions.cc b/ch
 +     APIPermissionInfo::kFlagCannotBeOptional},
      {APIPermissionID::kEnterprisePlatformKeys, "enterprise.platformKeys",
       APIPermissionInfo::kFlagDoesNotRequireManagedSessionFullLoginWarning},
-     {APIPermissionID::kFavicon, "favicon"},
+     {APIPermissionID::kEnterpriseWebrtc, "enterprise.webrtc",
 diff --git a/extensions/browser/extension_event_histogram_value.h b/extensions/browser/extension_event_histogram_value.h
 --- a/extensions/browser/extension_event_histogram_value.h
 +++ b/extensions/browser/extension_event_histogram_value.h
@@ -2968,10 +2968,10 @@ diff --git a/extensions/common/mojom/api_permission_id.mojom b/extensions/common
  
  module extensions.mojom;
  
-@@ -298,6 +302,8 @@ enum APIPermissionID {
-   kBluetoothLowEnergy = 271,
-   kBluetoothPeripheral = 272,
+@@ -300,6 +304,8 @@ enum APIPermissionID {
    kPublicSuffix = 273,
+   kEnterpriseWebrtc = 274,
+   kMimeTypesHandlerPdf = 275,
 +  kAdblockPrivate = 999,
 +  kEyeoFilteringPrivate = 1000,
  

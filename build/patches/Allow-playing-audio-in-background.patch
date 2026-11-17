@@ -23,7 +23,7 @@ diff --git a/content/public/renderer/render_frame_media_playback_options.cc b/co
 diff --git a/third_party/blink/renderer/platform/media/web_media_player_impl.cc b/third_party/blink/renderer/platform/media/web_media_player_impl.cc
 --- a/third_party/blink/renderer/platform/media/web_media_player_impl.cc
 +++ b/third_party/blink/renderer/platform/media/web_media_player_impl.cc
-@@ -1345,6 +1345,14 @@ bool WebMediaPlayerImpl::HasAudio() const {
+@@ -1347,6 +1347,14 @@ bool WebMediaPlayerImpl::HasAudio() const {
    return pipeline_metadata_.has_audio;
  }
  
@@ -38,7 +38,7 @@ diff --git a/third_party/blink/renderer/platform/media/web_media_player_impl.cc 
  bool WebMediaPlayerImpl::IsHDR() const {
    DCHECK(main_task_runner_->BelongsToCurrentThread());
  
-@@ -3774,7 +3782,10 @@ bool WebMediaPlayerImpl::ShouldPausePlaybackWhenHidden() const {
+@@ -3734,7 +3742,10 @@ bool WebMediaPlayerImpl::ShouldPausePlaybackWhenHidden() const {
        audio_source_provider_->IsAudioBeingCaptured();
  
    // Audio only stream is allowed to play when in background.
@@ -53,7 +53,7 @@ diff --git a/third_party/blink/renderer/platform/media/web_media_player_impl.cc 
 diff --git a/third_party/blink/renderer/platform/media/web_media_player_impl.h b/third_party/blink/renderer/platform/media/web_media_player_impl.h
 --- a/third_party/blink/renderer/platform/media/web_media_player_impl.h
 +++ b/third_party/blink/renderer/platform/media/web_media_player_impl.h
-@@ -211,6 +211,10 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
+@@ -220,6 +220,10 @@ class PLATFORM_EXPORT WebMediaPlayerImpl
    // True if the loaded media has a playable video/audio track.
    bool HasVideo() const override;
    bool HasAudio() const override;

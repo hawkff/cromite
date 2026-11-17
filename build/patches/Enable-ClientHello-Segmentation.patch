@@ -144,7 +144,7 @@ diff --git a/net/socket/ssl_client_socket.h b/net/socket/ssl_client_socket.h
 diff --git a/net/socket/ssl_client_socket_impl.cc b/net/socket/ssl_client_socket_impl.cc
 --- a/net/socket/ssl_client_socket_impl.cc
 +++ b/net/socket/ssl_client_socket_impl.cc
-@@ -350,6 +350,10 @@ void SSLClientSocketImpl::SetSSLKeyLogger(
+@@ -347,6 +347,10 @@ void SSLClientSocketImpl::SetSSLKeyLogger(
    SSLContext::GetInstance()->SetSSLKeyLogger(std::move(logger));
  }
  
@@ -155,7 +155,7 @@ diff --git a/net/socket/ssl_client_socket_impl.cc b/net/socket/ssl_client_socket
  std::vector<uint8_t> SSLClientSocketImpl::GetECHRetryConfigs() {
    const uint8_t* retry_configs;
    size_t retry_configs_len;
-@@ -418,6 +422,10 @@ int SSLClientSocketImpl::Connect(CompletionOnceCallback callback) {
+@@ -415,6 +419,10 @@ int SSLClientSocketImpl::Connect(CompletionOnceCallback callback) {
      return rv;
    }
  
@@ -166,7 +166,7 @@ diff --git a/net/socket/ssl_client_socket_impl.cc b/net/socket/ssl_client_socket
    // Set SSL to client mode. Handshake happens in the loop below.
    SSL_set_connect_state(ssl_.get());
  
-@@ -958,6 +966,7 @@ int SSLClientSocketImpl::DoHandshake() {
+@@ -955,6 +963,7 @@ int SSLClientSocketImpl::DoHandshake() {
  
    int rv = SSL_do_handshake(ssl_.get());
    int net_error = OK;
@@ -174,7 +174,7 @@ diff --git a/net/socket/ssl_client_socket_impl.cc b/net/socket/ssl_client_socket
    if (rv <= 0) {
      int ssl_error = SSL_get_error(ssl_.get(), rv);
      if (ssl_error == SSL_ERROR_WANT_X509_LOOKUP && !send_client_cert_) {
-@@ -984,8 +993,11 @@ int SSLClientSocketImpl::DoHandshake() {
+@@ -981,8 +990,11 @@ int SSLClientSocketImpl::DoHandshake() {
        return ERR_IO_PENDING;
      }
  
@@ -216,9 +216,9 @@ diff --git a/net/socket/ssl_connect_job.cc b/net/socket/ssl_connect_job.cc
  constexpr base::TimeDelta kSSLHandshakeTimeout(base::Seconds(30));
 +constexpr base::TimeDelta kSSLHandshakeTimeoutWithFragmentation(base::Seconds(2));
  
- }  // namespace
- 
-@@ -101,7 +102,10 @@ SSLConnectJob::SSLConnectJob(
+ bool IsEchEnabled(SSLClientContext* ssl_client_context,
+                   const HostPortPair& host_and_port) {
+@@ -107,7 +108,10 @@ SSLConnectJob::SSLConnectJob(
            NetLogEventType::SSL_CONNECT_JOB_CONNECT),
        params_(std::move(params)),
        callback_(base::BindRepeating(&SSLConnectJob::OnIOComplete,
@@ -230,7 +230,7 @@ diff --git a/net/socket/ssl_connect_job.cc b/net/socket/ssl_connect_job.cc
  
  SSLConnectJob::~SSLConnectJob() {
    // In the case the job was canceled, need to delete nested job first to
-@@ -359,7 +363,10 @@ int SSLConnectJob::DoSSLConnect() {
+@@ -365,7 +369,10 @@ int SSLConnectJob::DoSSLConnect() {
    next_state_ = STATE_SSL_CONNECT_COMPLETE;
  
    // Set the timeout to just the time allowed for the SSL handshake.
@@ -242,7 +242,7 @@ diff --git a/net/socket/ssl_connect_job.cc b/net/socket/ssl_connect_job.cc
  
    // Get the transport's connect start and DNS times.
    const LoadTimingInfo::ConnectTiming& socket_connect_timing =
-@@ -419,6 +426,7 @@ int SSLConnectJob::DoSSLConnect() {
+@@ -425,6 +432,7 @@ int SSLConnectJob::DoSSLConnect() {
    }
    ssl_config.server_padding_to_request =
        ssl_client_context()->config().RequestServerPadding();
@@ -250,7 +250,7 @@ diff --git a/net/socket/ssl_connect_job.cc b/net/socket/ssl_connect_job.cc
  
    net_log().AddEvent(NetLogEventType::SSL_CONNECT_JOB_SSL_CONNECT, [&] {
      base::DictValue dict;
-@@ -475,6 +483,12 @@ int SSLConnectJob::DoSSLConnectComplete(int result) {
+@@ -482,6 +490,12 @@ int SSLConnectJob::DoSSLConnectComplete(int result) {
    // retry on a potentially unreliably network connection.
    //
    // TODO(crbug.com/40085786): Remove this now redundant retry.
@@ -263,7 +263,7 @@ diff --git a/net/socket/ssl_connect_job.cc b/net/socket/ssl_connect_job.cc
    if (disable_legacy_crypto_with_fallback_ &&
        (result == ERR_CONNECTION_CLOSED || result == ERR_CONNECTION_RESET ||
         result == ERR_SSL_PROTOCOL_ERROR ||
-@@ -546,6 +560,16 @@ SSLConnectJob::State SSLConnectJob::GetInitialState(
+@@ -554,6 +568,16 @@ SSLConnectJob::State SSLConnectJob::GetInitialState(
    NOTREACHED();
  }
  
@@ -303,7 +303,7 @@ diff --git a/net/socket/ssl_connect_job.h b/net/socket/ssl_connect_job.h
 diff --git a/net/ssl/ssl_config.h b/net/ssl/ssl_config.h
 --- a/net/ssl/ssl_config.h
 +++ b/net/ssl/ssl_config.h
-@@ -137,6 +137,8 @@ struct NET_EXPORT SSLConfig {
+@@ -136,6 +136,8 @@ struct NET_EXPORT SSLConfig {
    // retry the connection.
    std::vector<uint8_t> ech_config_list;
  

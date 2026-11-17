@@ -27,7 +27,7 @@ new file mode 100644
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 --- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 +++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
-@@ -11,6 +11,11 @@ found in the LICENSE file.
+@@ -14,6 +14,11 @@ found in the LICENSE file.
          android:key="zoom_info"
          android:title="@string/zoom_info_preference_title"/>
  
@@ -42,7 +42,7 @@ diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibil
 diff --git a/content/public/android/java/src/org/chromium/content/browser/accessibility/WebContentsAccessibilityImpl.java b/content/public/android/java/src/org/chromium/content/browser/accessibility/WebContentsAccessibilityImpl.java
 --- a/content/public/android/java/src/org/chromium/content/browser/accessibility/WebContentsAccessibilityImpl.java
 +++ b/content/public/android/java/src/org/chromium/content/browser/accessibility/WebContentsAccessibilityImpl.java
-@@ -1450,6 +1450,11 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
+@@ -1549,6 +1549,11 @@ public class WebContentsAccessibilityImpl extends AccessibilityNodeProviderCompa
              structure.setChildCount(0);
              return;
          }

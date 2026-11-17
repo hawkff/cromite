@@ -14,7 +14,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/browser/android/rlz/rlz_ping_handler.cc b/chrome/browser/android/rlz/rlz_ping_handler.cc
 --- a/chrome/browser/android/rlz/rlz_ping_handler.cc
 +++ b/chrome/browser/android/rlz/rlz_ping_handler.cc
-@@ -76,7 +76,7 @@ void RlzPingHandler::Ping(const base::android::JavaRef<jstring>& j_brand,
+@@ -71,7 +71,7 @@ void RlzPingHandler::Ping(const std::string& brand,
    DCHECK_EQ(id.length(), 50u);
  
    GURL request_url(base::StringPrintf(
@@ -26,7 +26,7 @@ diff --git a/chrome/browser/android/rlz/rlz_ping_handler.cc b/chrome/browser/and
 diff --git a/rlz/lib/lib_values.cc b/rlz/lib/lib_values.cc
 --- a/rlz/lib/lib_values.cc
 +++ b/rlz/lib/lib_values.cc
-@@ -45,7 +45,6 @@ const char kSetDccResponseVariable[] = "set_dcc";
+@@ -43,7 +43,6 @@ const char kSetDccResponseVariable[] = "set_dcc";
  //
  
  const char kFinancialPingPath[] = "/tools/pso/ping";
@@ -37,7 +37,7 @@ diff --git a/rlz/lib/lib_values.cc b/rlz/lib/lib_values.cc
 diff --git a/rlz/lib/lib_values.h b/rlz/lib/lib_values.h
 --- a/rlz/lib/lib_values.h
 +++ b/rlz/lib/lib_values.h
-@@ -72,7 +72,6 @@ extern const char kSetDccResponseVariable[];
+@@ -75,7 +75,6 @@ extern const char kSetDccResponseVariable[];
  //
  
  extern const char kFinancialPingPath[];

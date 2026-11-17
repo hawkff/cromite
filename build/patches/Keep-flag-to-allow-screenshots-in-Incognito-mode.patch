@@ -28,7 +28,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/incognito/Incog
 diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.json
 --- a/chrome/browser/flag-metadata.json
 +++ b/chrome/browser/flag-metadata.json
-@@ -6169,10 +6169,10 @@
+@@ -6360,10 +6360,10 @@
      "expiry_milestone": 160
    },
    {
@@ -41,5 +41,5 @@ diff --git a/chrome/browser/flag-metadata.json b/chrome/browser/flag-metadata.js
 +    "expiry_milestone": -1          // -
    },
    {
-     "name": "incognito-theme-overlay-testing",
+     "name": "infobar-banner-revamp",
 --

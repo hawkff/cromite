@@ -42,7 +42,7 @@ new file mode 100644
 diff --git a/third_party/blink/renderer/core/dom/document.cc b/third_party/blink/renderer/core/dom/document.cc
 --- a/third_party/blink/renderer/core/dom/document.cc
 +++ b/third_party/blink/renderer/core/dom/document.cc
-@@ -5119,6 +5119,14 @@ void Document::ProcessBaseElement() {
+@@ -5158,6 +5158,14 @@ void Document::ProcessBaseElement() {
    KURL base_element_url;
    if (!href.IsNull()) {
      StringView stripped_href = StripLeadingAndTrailingHtmlSpaces(href);
@@ -57,7 +57,7 @@ diff --git a/third_party/blink/renderer/core/dom/document.cc b/third_party/blink
      if (!stripped_href.empty())
        base_element_url = KURL(FallbackBaseURL(), stripped_href);
    }
-@@ -5136,6 +5144,14 @@ void Document::ProcessBaseElement() {
+@@ -5175,6 +5183,14 @@ void Document::ProcessBaseElement() {
          !GetExecutionContext()->GetSecurityOrigin()->CanRequest(
              base_element_url)) {
        UseCounter::Count(*this, WebFeature::kBaseWithCrossOriginHref);
@@ -72,7 +72,7 @@ diff --git a/third_party/blink/renderer/core/dom/document.cc b/third_party/blink
      }
    }
  
-@@ -5169,6 +5185,8 @@ void Document::ProcessBaseElement() {
+@@ -5208,6 +5224,8 @@ void Document::ProcessBaseElement() {
        UseCounter::Count(*this, WebFeature::kBaseWithOpenBracketInTarget);
      }
      base_target_ = target;
@@ -84,7 +84,7 @@ diff --git a/third_party/blink/renderer/core/dom/document.cc b/third_party/blink
 diff --git a/third_party/blink/renderer/core/dom/element.cc b/third_party/blink/renderer/core/dom/element.cc
 --- a/third_party/blink/renderer/core/dom/element.cc
 +++ b/third_party/blink/renderer/core/dom/element.cc
-@@ -4082,8 +4082,26 @@ void Element::StripScriptingAttributes(
+@@ -4197,8 +4197,26 @@ void Element::StripScriptingAttributes(
    attribute_vector.Shrink(destination);
  }
  
@@ -115,7 +115,7 @@ diff --git a/third_party/blink/renderer/core/dom/element.cc b/third_party/blink/
 diff --git a/third_party/blink/renderer/core/dom/element.h b/third_party/blink/renderer/core/dom/element.h
 --- a/third_party/blink/renderer/core/dom/element.h
 +++ b/third_party/blink/renderer/core/dom/element.h
-@@ -879,7 +879,8 @@ class CORE_EXPORT Element : public ContainerNode {
+@@ -888,7 +888,8 @@ class CORE_EXPORT Element : public ContainerNode {
    virtual bool HasLegalLinkAttribute(const QualifiedName&) const;
  
    // Only called by the parser immediately after element construction.
@@ -128,16 +128,16 @@ diff --git a/third_party/blink/renderer/core/dom/element.h b/third_party/blink/r
 diff --git a/third_party/blink/renderer/core/editing/serializers/markup_formatter.cc b/third_party/blink/renderer/core/editing/serializers/markup_formatter.cc
 --- a/third_party/blink/renderer/core/editing/serializers/markup_formatter.cc
 +++ b/third_party/blink/renderer/core/editing/serializers/markup_formatter.cc
-@@ -28,6 +28,8 @@
- #include "third_party/blink/renderer/core/editing/serializers/markup_formatter.h"
+@@ -29,6 +29,8 @@
  
+ #include "base/memory/raw_ptr_exclusion.h"
  #include "third_party/blink/renderer/core/dom/cdata_section.h"
 +#include "third_party/blink/renderer/platform/heap/garbage_collected.h"
 +#include "third_party/blink/renderer/core/inspector/console_message.h"
  #include "third_party/blink/renderer/core/dom/comment.h"
  #include "third_party/blink/renderer/core/dom/document.h"
  #include "third_party/blink/renderer/core/dom/document_fragment.h"
-@@ -245,6 +247,16 @@ void MarkupFormatter::AppendEndMarkup(const Element& element,
+@@ -247,6 +249,16 @@ void MarkupFormatter::AppendEndMarkup(const Element& element,
  void MarkupFormatter::AppendAttributeValue(const String& attribute,
                                             SerializationType type,
                                             StringBuilder& result) {
@@ -157,7 +157,7 @@ diff --git a/third_party/blink/renderer/core/editing/serializers/markup_formatte
 diff --git a/third_party/blink/renderer/core/html/forms/html_form_element.cc b/third_party/blink/renderer/core/html/forms/html_form_element.cc
 --- a/third_party/blink/renderer/core/html/forms/html_form_element.cc
 +++ b/third_party/blink/renderer/core/html/forms/html_form_element.cc
-@@ -665,7 +665,7 @@ void HTMLFormElement::PrepareForSubmission(const Event* event,
+@@ -726,7 +726,7 @@ void HTMLFormElement::PrepareForSubmission(const Event* event,
      if (form_control_element && form_control_element->BlocksFormSubmission()) {
        UseCounter::Count(GetDocument(),
                          WebFeature::kFormSubmittedWithUnclosedFormControl);
@@ -169,7 +169,7 @@ diff --git a/third_party/blink/renderer/core/html/forms/html_form_element.cc b/t
 diff --git a/third_party/blink/renderer/core/html/html_base_element.cc b/third_party/blink/renderer/core/html/html_base_element.cc
 --- a/third_party/blink/renderer/core/html/html_base_element.cc
 +++ b/third_party/blink/renderer/core/html/html_base_element.cc
-@@ -61,6 +61,12 @@ bool HTMLBaseElement::IsURLAttribute(const Attribute& attribute) const {
+@@ -64,6 +64,12 @@ bool HTMLBaseElement::IsURLAttribute(const Attribute& attribute) const {
           HTMLElement::IsURLAttribute(attribute);
  }
  
@@ -197,7 +197,7 @@ diff --git a/third_party/blink/renderer/core/html/html_base_element.h b/third_pa
 diff --git a/third_party/blink/renderer/core/html/html_frame_element_base.cc b/third_party/blink/renderer/core/html/html_frame_element_base.cc
 --- a/third_party/blink/renderer/core/html/html_frame_element_base.cc
 +++ b/third_party/blink/renderer/core/html/html_frame_element_base.cc
-@@ -121,6 +121,16 @@ void HTMLFrameElementBase::ParseAttribute(
+@@ -138,6 +138,16 @@ void HTMLFrameElementBase::ParseAttribute(
      frame_name_ = value;
    } else if (name == html_names::kNameAttr) {
      frame_name_ = value;
@@ -212,12 +212,12 @@ diff --git a/third_party/blink/renderer/core/html/html_frame_element_base.cc b/t
 +      //frame_name_ = g_empty_atom;
 +    }
    } else if (name == html_names::kMarginwidthAttr) {
-     SetMarginWidth(StringToIntLoose(value).value_or(0));
+     SetMarginWidth(ParseMarginAttribute(value));
    } else if (name == html_names::kMarginheightAttr) {
 diff --git a/third_party/blink/renderer/core/html/html_iframe_element.cc b/third_party/blink/renderer/core/html/html_iframe_element.cc
 --- a/third_party/blink/renderer/core/html/html_iframe_element.cc
 +++ b/third_party/blink/renderer/core/html/html_iframe_element.cc
-@@ -208,6 +208,12 @@ void HTMLIFrameElement::CollectStyleForPresentationAttribute(
+@@ -209,6 +209,12 @@ void HTMLIFrameElement::CollectStyleForPresentationAttribute(
    }
  }
  
@@ -230,7 +230,7 @@ diff --git a/third_party/blink/renderer/core/html/html_iframe_element.cc b/third
  void HTMLIFrameElement::ParseAttribute(
      const AttributeModificationParams& params) {
    const QualifiedName& name = params.name;
-@@ -222,6 +228,16 @@ void HTMLIFrameElement::ParseAttribute(
+@@ -223,6 +229,16 @@ void HTMLIFrameElement::ParseAttribute(
      }
      AtomicString old_name = name_;
      name_ = value;
@@ -270,7 +270,7 @@ diff --git a/third_party/blink/renderer/core/loader/frame_load_request.cc b/thir
  #include "third_party/blink/renderer/core/fileapi/public_url_manager.h"
  #include "third_party/blink/renderer/core/frame/local_dom_window.h"
  #include "third_party/blink/renderer/core/frame/local_frame.h"
-@@ -180,6 +181,14 @@ void FrameLoadRequest::ResolveBlobURLIfNeeded() {
+@@ -179,6 +180,14 @@ void FrameLoadRequest::ResolveBlobURLIfNeeded() {
  const AtomicString& FrameLoadRequest::CleanNavigationTarget(
      const AtomicString& target) const {
    if (ContainsNewLineAndLessThan(target)) {
@@ -333,8 +333,8 @@ diff --git a/third_party/blink/renderer/core/page/frame_tree.cc b/third_party/bl
 diff --git a/third_party/blink/renderer/platform/runtime_enabled_features.json5 b/third_party/blink/renderer/platform/runtime_enabled_features.json5
 --- a/third_party/blink/renderer/platform/runtime_enabled_features.json5
 +++ b/third_party/blink/renderer/platform/runtime_enabled_features.json5
-@@ -3977,6 +3977,12 @@
-       name: "MacDisableCtrlHomeEnd",
+@@ -4319,6 +4319,12 @@
+       name: "MacFontWeightFromOS2",
        status: "stable",
      },
 +    {

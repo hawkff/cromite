@@ -15,13 +15,13 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -1687,7 +1687,7 @@ source_set("core") {
+@@ -1527,7 +1527,7 @@ source_set("core") {
+       "//chrome/browser/commerce",
        "//chrome/browser/commerce/android:shopping_service_jni",
        "//chrome/browser/composeplate/android:jni_headers",
-       "//chrome/browser/endpoint_fetcher:jni_headers",
 -      "//chrome/browser/dev_ui",
 +      #"//chrome/browser/dev_ui",
-       "//chrome/browser/facilitated_payments",
+       "//chrome/browser/endpoint_fetcher:jni_headers",
        "//chrome/browser/feed",
-       "//chrome/browser/flags:flags_android",
+       "//chrome/browser/finds/core",
 --

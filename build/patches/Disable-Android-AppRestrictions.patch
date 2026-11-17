@@ -35,7 +35,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/AppHooks.java b
 diff --git a/chrome/browser/flags/BUILD.gn b/chrome/browser/flags/BUILD.gn
 --- a/chrome/browser/flags/BUILD.gn
 +++ b/chrome/browser/flags/BUILD.gn
-@@ -28,6 +28,7 @@ android_library("java") {
+@@ -29,6 +29,7 @@ android_library("java") {
      "//build/android:build_java",
      "//chrome/browser/preferences:java",
      "//content/public/android:content_main_dex_java",
@@ -90,7 +90,7 @@ new file mode 100644
 diff --git a/components/policy/android/java/src/org/chromium/components/policy/AppRestrictionsProvider.java b/components/policy/android/java/src/org/chromium/components/policy/AppRestrictionsProvider.java
 --- a/components/policy/android/java/src/org/chromium/components/policy/AppRestrictionsProvider.java
 +++ b/components/policy/android/java/src/org/chromium/components/policy/AppRestrictionsProvider.java
-@@ -19,6 +19,15 @@ import org.chromium.build.annotations.NullMarked;
+@@ -24,6 +24,15 @@ import org.chromium.build.annotations.Nullable;
  @NullMarked
  public class AppRestrictionsProvider extends AbstractAppRestrictionsProvider {
      private static final String TAG = "AppResProvider";
@@ -105,8 +105,8 @@ diff --git a/components/policy/android/java/src/org/chromium/components/policy/A
 +    }
  
      /**
-      * Get the app restriction information from provided user manager, and record some timing
-@@ -30,6 +39,9 @@ public class AppRestrictionsProvider extends AbstractAppRestrictionsProvider {
+      * Get the app restriction information from provided restrictions manager.
+@@ -54,6 +63,9 @@ public class AppRestrictionsProvider extends AbstractAppRestrictionsProvider {
       */
      public static Bundle getApplicationRestrictionsFromUserManager(
              UserManager userManager, String packageName) {
@@ -119,7 +119,7 @@ diff --git a/components/policy/android/java/src/org/chromium/components/policy/A
 diff --git a/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java b/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java
 --- a/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java
 +++ b/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java
-@@ -112,6 +112,10 @@ public class EnterpriseInfoImpl extends EnterpriseInfo {
+@@ -108,6 +108,10 @@ public class EnterpriseInfoImpl extends EnterpriseInfo {
              new AsyncTask<OwnedState>() {
                  // TODO: Unit test this function. https://crbug.com/40137392
                  private OwnedState calculateIsRunningOnManagedProfile(Context context) {
@@ -127,9 +127,9 @@ diff --git a/components/policy/android/java/src/org/chromium/components/policy/E
 +                        return new OwnedState(/*hasDeviceOwnerApp*/false,
 +                            /*hasProfileOwnerApp*/false);
 +                    }
-                     long startTime = SystemClock.elapsedRealtime();
                      boolean hasProfileOwnerApp = false;
                      boolean hasDeviceOwnerApp = false;
+                     DevicePolicyManager devicePolicyManager =
 diff --git a/cromite_flags/chrome/browser/about_flags_cc/DisableAndroidAppRestriction.inc b/cromite_flags/chrome/browser/about_flags_cc/DisableAndroidAppRestriction.inc
 new file mode 100644
 --- /dev/null

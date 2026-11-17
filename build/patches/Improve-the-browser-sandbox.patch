@@ -36,7 +36,7 @@ diff --git a/chrome/android/java/res/xml/developer_preferences.xml b/chrome/andr
 diff --git a/chrome/browser/net/system_network_context_manager.cc b/chrome/browser/net/system_network_context_manager.cc
 --- a/chrome/browser/net/system_network_context_manager.cc
 +++ b/chrome/browser/net/system_network_context_manager.cc
-@@ -359,7 +359,7 @@ namespace features {
+@@ -375,7 +375,7 @@ namespace features {
  // this feature is disabled any failed launches in the current browser session
  // will still result in sandbox being disabled for the lifetime of the running
  // browser.
@@ -91,16 +91,16 @@ new file mode 100644
 diff --git a/sandbox/policy/features.cc b/sandbox/policy/features.cc
 --- a/sandbox/policy/features.cc
 +++ b/sandbox/policy/features.cc
-@@ -127,7 +127,7 @@ BASE_FEATURE(kHigherRendererMemoryLimit, base::FEATURE_DISABLED_BY_DEFAULT);
+@@ -129,7 +129,7 @@ BASE_FEATURE(kHigherRendererMemoryLimit, base::FEATURE_DISABLED_BY_DEFAULT);
  
  #if BUILDFLAG(IS_ANDROID)
  // Enables the experimental Android GPU sandbox using Landlock.
 -BASE_FEATURE(kAndroidGpuSandbox, base::FEATURE_DISABLED_BY_DEFAULT);
 +CROMITE_FEATURE(kAndroidGpuSandbox, "AndroidGpuSandbox", base::FEATURE_DISABLED_BY_DEFAULT);
+ // Enables the seccomp-bpf filter sandbox for the GPU process on Android.
+ BASE_FEATURE(kSeccompFilterGpuSandbox, base::FEATURE_DISABLED_BY_DEFAULT);
  // Enables the renderer on Android to use a separate seccomp policy.
- BASE_FEATURE(kUseRendererProcessPolicy, base::FEATURE_ENABLED_BY_DEFAULT);
- // When enabled, this features restricts a set of syscalls in
-@@ -182,4 +182,12 @@ bool IsNetworkSandboxEnabled() {
+@@ -186,4 +186,12 @@ bool IsNetworkSandboxEnabled() {
  #endif  // BUILDFLAG(IS_MAC) || BUILDFLAG(IS_FUCHSIA)
  }
  

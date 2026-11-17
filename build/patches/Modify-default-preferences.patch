@@ -31,18 +31,18 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
 --- a/chrome/browser/about_flags.cc
 +++ b/chrome/browser/about_flags.cc
-@@ -93,6 +93,7 @@
+@@ -91,6 +91,7 @@
  #include "components/autofill/core/common/autofill_payments_features.h"
  #include "components/autofill/core/common/autofill_switches.h"
  #include "components/autofill/core/common/autofill_util.h"
 +#include "components/bookmarks/browser/features.h"
  #include "components/bookmarks/common/bookmark_features.h"
+ #include "components/browser_actuator/public/features.h"
  #include "components/browser_sync/browser_sync_switches.h"
- #include "components/browser_ui/contacts_picker/android/features.h"
 diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
 --- a/chrome/browser/chrome_content_browser_client.cc
 +++ b/chrome/browser/chrome_content_browser_client.cc
-@@ -1610,7 +1610,7 @@ void ChromeContentBrowserClient::RegisterLocalStatePrefs(
+@@ -1641,7 +1641,7 @@ void ChromeContentBrowserClient::RegisterLocalStatePrefs(
  void ChromeContentBrowserClient::RegisterProfilePrefs(
      user_prefs::PrefRegistrySyncable* registry) {
    registry->RegisterBooleanPref(prefs::kDisable3DAPIs, false);
@@ -54,7 +54,7 @@ diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/ch
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
-@@ -1204,7 +1204,7 @@ void RegisterProfilePrefsForMigration(
+@@ -1335,7 +1335,7 @@ void RegisterProfilePrefsForMigration(
    registry->RegisterTimePref(kMerchantTrustPageInfoLastOpenTime, base::Time());
  
    // Deprecated 12/2025.
@@ -78,7 +78,7 @@ diff --git a/chrome/browser/preloading/preloading_prefs.h b/chrome/browser/prelo
 diff --git a/chrome/browser/profiles/profile.cc b/chrome/browser/profiles/profile.cc
 --- a/chrome/browser/profiles/profile.cc
 +++ b/chrome/browser/profiles/profile.cc
-@@ -338,7 +338,7 @@ const char Profile::kProfileKey[] = "__PROFILE__";
+@@ -329,7 +329,7 @@ const char Profile::kProfileKey[] = "__PROFILE__";
  void Profile::RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
    registry->RegisterBooleanPref(
        prefs::kSearchSuggestEnabled,
@@ -99,7 +99,7 @@ diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_u
        user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
    registry->RegisterDictionaryPref(prefs::kBrowserWindowPlacement);
    registry->RegisterDictionaryPref(prefs::kBrowserWindowPlacementPopup);
-@@ -221,7 +221,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+@@ -225,7 +225,7 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
  #endif
  
    registry->RegisterBooleanPref(
@@ -235,7 +235,7 @@ diff --git a/components/content_settings/core/browser/content_settings_registry.
             /*allowlisted_primary_schemes=*/{},
             /*valid_settings=*/{CONTENT_SETTING_ALLOW, CONTENT_SETTING_BLOCK},
             WebsiteSettingsInfo::TOP_ORIGIN_ONLY_SCOPE,
-@@ -349,7 +349,7 @@ void ContentSettingsRegistry::Init() {
+@@ -338,7 +338,7 @@ void ContentSettingsRegistry::Init() {
    // TODO(crbug.com/40602007): Update this to "SECURE_ONLY" once
    // DeviceOrientationEvents and DeviceMotionEvents are only fired in secure
    // contexts.
@@ -271,7 +271,7 @@ diff --git a/components/payments/core/payment_prefs.cc b/components/payments/cor
 diff --git a/components/safe_browsing/core/common/safe_browsing_prefs.cc b/components/safe_browsing/core/common/safe_browsing_prefs.cc
 --- a/components/safe_browsing/core/common/safe_browsing_prefs.cc
 +++ b/components/safe_browsing/core/common/safe_browsing_prefs.cc
-@@ -270,13 +270,13 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
+@@ -358,13 +358,13 @@ void RegisterProfilePrefs(PrefRegistrySimple* registry) {
    registry->RegisterBooleanPref(
        prefs::kSafeBrowsingSawInterstitialScoutReporting, false);
    registry->RegisterBooleanPref(
