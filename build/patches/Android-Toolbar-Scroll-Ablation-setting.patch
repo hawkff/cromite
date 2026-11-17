@@ -18,7 +18,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/browser/browser_controls/android/java/src/org/chromium/chrome/browser/browser_controls/BrowserStateBrowserControlsVisibilityDelegate.java b/chrome/browser/browser_controls/android/java/src/org/chromium/chrome/browser/browser_controls/BrowserStateBrowserControlsVisibilityDelegate.java
 --- a/chrome/browser/browser_controls/android/java/src/org/chromium/chrome/browser/browser_controls/BrowserStateBrowserControlsVisibilityDelegate.java
 +++ b/chrome/browser/browser_controls/android/java/src/org/chromium/chrome/browser/browser_controls/BrowserStateBrowserControlsVisibilityDelegate.java
-@@ -40,6 +40,7 @@ public class BrowserStateBrowserControlsVisibilityDelegate extends BrowserContro
+@@ -43,6 +43,7 @@ public class BrowserStateBrowserControlsVisibilityDelegate extends BrowserContro
      private final NonNullObservableSupplier<Boolean> mPersistentFullscreenMode;
  
      private long mCurrentShowingStartTime;
@@ -26,16 +26,16 @@ diff --git a/chrome/browser/browser_controls/android/java/src/org/chromium/chrom
  
      /**
       * Constructs a BrowserControlsVisibilityDelegate designed to deal with overrides driven by the
-@@ -65,7 +66,8 @@ public class BrowserStateBrowserControlsVisibilityDelegate extends BrowserContro
+@@ -80,7 +81,8 @@ public class BrowserStateBrowserControlsVisibilityDelegate extends BrowserContro
          long currentShowingTime = SystemClock.uptimeMillis() - mCurrentShowingStartTime;
-         if (currentShowingTime >= MINIMUM_SHOW_DURATION_MS) return;
+         if (currentShowingTime >= minShowDuration) return;
  
 -        final int temporaryToken = mTokenHolder.acquireToken();
 +        mTokenHolder.releaseToken(temporaryToken);
 +        temporaryToken = mTokenHolder.acquireToken();
          mHandler.postDelayed(
                  () -> mTokenHolder.releaseToken(temporaryToken),
-                 MINIMUM_SHOW_DURATION_MS - currentShowingTime);
+                 minShowDuration - currentShowingTime);
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Toolbar-Scroll-Ablation-flag.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Toolbar-Scroll-Ablation-flag.grdp
 new file mode 100644
 --- /dev/null
@@ -53,7 +53,7 @@ new file mode 100644
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 --- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 +++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
-@@ -81,6 +81,12 @@ found in the LICENSE file.
+@@ -79,6 +79,12 @@ found in the LICENSE file.
          app:featureName="disable-pull-to-refresh-effect"
          app:needRestart="true" />
  

@@ -94,7 +94,7 @@ diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/bro
          mContainerView.setOnGenericMotionListener(
                  (view, event) -> MotionEventUtils.isPointerEvent(event));
  
-@@ -337,6 +348,59 @@ public class SnackbarView implements InsetObserver.WindowInsetObserver {
+@@ -340,6 +351,59 @@ public class SnackbarView implements InsetObserver.WindowInsetObserver {
          return mIsBeingDragged;
      }
  

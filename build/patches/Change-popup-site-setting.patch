@@ -23,7 +23,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/browser/ui/blocked_content/tab_under_navigation_throttle.cc b/chrome/browser/ui/blocked_content/tab_under_navigation_throttle.cc
 --- a/chrome/browser/ui/blocked_content/tab_under_navigation_throttle.cc
 +++ b/chrome/browser/ui/blocked_content/tab_under_navigation_throttle.cc
-@@ -143,9 +143,14 @@ TabUnderNavigationThrottle::MaybeBlockNavigation() {
+@@ -144,9 +144,14 @@ TabUnderNavigationThrottle::MaybeBlockNavigation() {
  
    LogTabUnderAttempt(navigation_handle());
  
@@ -106,7 +106,7 @@ diff --git a/components/blocked_content/android/popup_blocked_message_delegate.h
 diff --git a/components/blocked_content/popup_blocker.cc b/components/blocked_content/popup_blocker.cc
 --- a/components/blocked_content/popup_blocker.cc
 +++ b/components/blocked_content/popup_blocker.cc
-@@ -70,6 +70,9 @@ PopupBlockType ShouldBlockPopup(content::WebContents* web_contents,
+@@ -71,6 +71,9 @@ PopupBlockType ShouldBlockPopup(content::WebContents* web_contents,
    if (cs == CONTENT_SETTING_ALLOW)
      return PopupBlockType::kNotBlocked;
  

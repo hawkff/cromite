@@ -18,7 +18,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/browser/ui/omnibox/omnibox_edit_model.cc b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
 --- a/chrome/browser/ui/omnibox/omnibox_edit_model.cc
 +++ b/chrome/browser/ui/omnibox/omnibox_edit_model.cc
-@@ -1949,8 +1949,12 @@ gfx::Image OmniboxEditModel::GetMatchIcon(const AutocompleteMatch& match,
+@@ -2019,8 +2019,12 @@ gfx::Image OmniboxEditModel::GetMatchIcon(const AutocompleteMatch& match,
      }
    }
  
@@ -34,7 +34,7 @@ diff --git a/chrome/browser/ui/omnibox/omnibox_edit_model.cc b/chrome/browser/ui
 diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 --- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 +++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
-@@ -921,6 +921,7 @@ SearchboxHandler::CreateAutocompleteMatch(
+@@ -1083,6 +1083,7 @@ SearchboxHandler::CreateAutocompleteMatch(
    mojom_match->destination_url = match.destination_url;
    mojom_match->suggestion_group_id =
        match.suggestion_group_id.value_or(omnibox::GROUP_INVALID);
@@ -42,15 +42,15 @@ diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.c
    const bool is_bookmarked =
        bookmark_model->IsBookmarked(match.destination_url);
    // For starter pack suggestions, use template url to generate proper vector
-@@ -931,6 +932,7 @@ SearchboxHandler::CreateAutocompleteMatch(
+@@ -1093,6 +1094,7 @@ SearchboxHandler::CreateAutocompleteMatch(
            : turl_service->GetTemplateURLForKeyword(match.associated_keyword);
    mojom_match->icon_path = AutocompleteIconToResourceName(
        match.GetVectorIcon(is_bookmarked, associated_keyword_turl));
 +#endif
-   // For enterprise search aggregator people suggestions, use branded icon if
-   // branded build.
-   if (match.enterprise_search_aggregator_type ==
-@@ -1009,7 +1011,9 @@ SearchboxHandler::CreateAutocompleteMatch(
+   OverrideIconPaths(match, mojom_match.get());
+   mojom_match->icon_url = match.icon_url;
+   // For featured enterprise search suggestions, use template url to generate
+@@ -1126,7 +1128,9 @@ SearchboxHandler::CreateAutocompleteMatch(
  #endif
        std::string icon_path;
        if (action->GetIconImage().IsEmpty()) {

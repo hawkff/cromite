@@ -4,7 +4,7 @@ Subject: Do not build API keys infobar
 
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
- chrome/browser/ui/startup/BUILD.gn         |  2 --
+ chrome/browser/ui/startup/BUILD.gn | 2 --
  1 file changed, 2 deletions(-)
 
 diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn

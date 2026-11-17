@@ -148,7 +148,7 @@ diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/re
  blink_python_runner("runtime_enabled_features") {
    script = "../build/scripts/make_runtime_features.py"
  
-@@ -178,6 +195,7 @@ group("make_platform_generated") {
+@@ -177,6 +194,7 @@ group("make_platform_generated") {
      ":color_data",
      ":font_family_names",
      ":runtime_enabled_features",
@@ -156,7 +156,7 @@ diff --git a/third_party/blink/renderer/platform/BUILD.gn b/third_party/blink/re
      ":runtime_feature_state_override_context",
      "//third_party/blink/public:buildflags",
      "//third_party/blink/public/common:buildflags",
-@@ -1708,6 +1726,9 @@ component("platform") {
+@@ -1754,6 +1772,9 @@ component("platform") {
        sources += [ _output ]
      }
    }

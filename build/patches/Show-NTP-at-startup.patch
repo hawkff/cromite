@@ -99,7 +99,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeInactivit
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -3446,6 +3446,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3718,6 +3718,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
          mInactivityTrackerSupplier.set(
                  new ChromeInactivityTracker(
                          ChromePreferenceKeys.TABBED_ACTIVITY_LAST_BACKGROUNDED_TIME_MS_PREF));
@@ -108,7 +108,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
          TabUsageTracker.initialize(this.getLifecycleDispatcher(), tabModelSelector);
          TabGroupUsageTracker.initialize(
                  this.getLifecycleDispatcher(), tabModelSelector, this::isWarmOnResume);
-@@ -3476,13 +3478,13 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3748,13 +3750,13 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          getTabModelSelectorSupplier(),
                          getTabContentManagerSupplier(),
                          SetupListModuleUtils::isSetupListActive);
@@ -124,16 +124,16 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
          }
  
          SafetyHubMagicStackBuilder safetyHubMagicStackBuilder =
-@@ -3491,7 +3493,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3763,7 +3765,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          mTabModelProfileSupplier,
                          mTabModelSelector,
-                         getModalDialogManagerSupplier());
+                         getModalDialogManagerSupplier().asNonNull());
 -        moduleRegistry.registerModule(ModuleType.SAFETY_HUB, safetyHubMagicStackBuilder);
 +        moduleRegistry.registerModule(ModuleType.SAFETY_HUB, safetyHubMagicStackBuilder, /*active*/ false);
  
          // Fetch and register the appropriate collection of educational tip or setup list modules.
          HomeTipsModulesProvider.registerTipModules(
-@@ -3507,7 +3509,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3780,7 +3782,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          () ->
                                  SettingsNavigationFactory.createSettingsNavigation()
                                          .startSettings(this, TabsSettings.class));
@@ -158,7 +158,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tasks/ReturnToC
  import org.chromium.chrome.browser.ntp.NewTabPage;
  import org.chromium.chrome.browser.profiles.Profile;
  import org.chromium.chrome.browser.tab.Tab;
-@@ -136,6 +138,18 @@ public final class ReturnToChromeUtil {
+@@ -137,6 +139,18 @@ public final class ReturnToChromeUtil {
              return false;
          }
  
@@ -177,7 +177,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tasks/ReturnToC
          // Checks whether to show the NTP homepage due to feature flag
          // HOME_SURFACE_RETURN_TIME_SECONDS.
          long lastVisibleTimeMs = inactivityTracker.getLastVisibleTimeMs();
-@@ -244,7 +258,7 @@ public final class ReturnToChromeUtil {
+@@ -246,7 +260,7 @@ public final class ReturnToChromeUtil {
              TabModel currentTabModel,
              TabCreator tabCreator,
              HomeSurfaceTracker homeSurfaceTracker) {
@@ -189,7 +189,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tasks/ReturnToC
 diff --git a/chrome/app/settings_strings.grdp b/chrome/app/settings_strings.grdp
 --- a/chrome/app/settings_strings.grdp
 +++ b/chrome/app/settings_strings.grdp
-@@ -1028,7 +1028,7 @@
+@@ -1112,7 +1112,7 @@
        Open a specific page or set of pages
      </message>
      <message name="IDS_SETTINGS_ON_STARTUP_CONTINUE_AND_OPEN_SPECIFIC" desc="Radio button option to continue where you left off and open a specific set of pages.">
@@ -217,14 +217,14 @@ diff --git a/chrome/browser/educational_tip/java/src/org/chromium/chrome/browser
 diff --git a/chrome/browser/flags/android/chrome_feature_list.cc b/chrome/browser/flags/android/chrome_feature_list.cc
 --- a/chrome/browser/flags/android/chrome_feature_list.cc
 +++ b/chrome/browser/flags/android/chrome_feature_list.cc
-@@ -474,6 +474,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
-     &kSettingsInTab,
+@@ -515,6 +515,7 @@ const base::Feature* const kFeaturesExposedToJava[] = {
+     &kSettingsInTabDesktop,
      &kSettingsInTabUrlNav,
-     &kSettingsMultiColumn,
+     &kSettingsSearchCollapsibleSearchBox,
 +    &kShowNtpAtStartupAndroid,
-     &kSettingsSingleActivity,
      &kShareCustomActionsInCCT,
      &kSharedIntentUI,
+     &kShortCircuitUnfocusAnimation,
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sShowNtpAtStartupAndroid.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sShowNtpAtStartupAndroid.java
 new file mode 100644
 --- /dev/null
@@ -297,7 +297,7 @@ diff --git a/chrome/browser/magic_stack/android/java/src/org/chromium/chrome/bro
 diff --git a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
 --- a/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
 +++ b/chrome/browser/preferences/android/java/src/org/chromium/chrome/browser/preferences/ChromePreferenceKeys.java
-@@ -1031,6 +1031,8 @@ public final class ChromePreferenceKeys {
+@@ -1021,6 +1021,8 @@ public final class ChromePreferenceKeys {
  
      public static final String TABBED_ACTIVITY_LAST_BACKGROUNDED_TIME_MS_PREF =
              "ChromeTabbedActivity.BackgroundTimeMs";
@@ -402,7 +402,7 @@ diff --git a/chrome/browser/single_tab/android/java/res/layout/single_tab_module
 diff --git a/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherCoordinator.java b/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherCoordinator.java
 --- a/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherCoordinator.java
 +++ b/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherCoordinator.java
-@@ -183,7 +183,7 @@ public class SingleTabSwitcherCoordinator implements ModuleProvider {
+@@ -182,7 +182,7 @@ public class SingleTabSwitcherCoordinator implements ModuleProvider {
  
      /** Returns the layout resource id for the single tab card. */
      public static int getModuleLayoutId() {
@@ -414,7 +414,7 @@ diff --git a/chrome/browser/single_tab/android/java/src/org/chromium/chrome/brow
 diff --git a/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherOnNtpMediator.java b/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherOnNtpMediator.java
 --- a/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherOnNtpMediator.java
 +++ b/chrome/browser/single_tab/android/java/src/org/chromium/chrome/browser/single_tab/SingleTabSwitcherOnNtpMediator.java
-@@ -110,6 +110,7 @@ public class SingleTabSwitcherOnNtpMediator {
+@@ -109,6 +109,7 @@ public class SingleTabSwitcherOnNtpMediator {
                          mSingleTabCardClickedCallback = null;
                      }
                  });
@@ -422,9 +422,9 @@ diff --git a/chrome/browser/single_tab/android/java/src/org/chromium/chrome/brow
          mPropertyModel.set(
                  SEE_MORE_LINK_CLICK_LISTENER,
                  () -> {
-@@ -272,14 +273,14 @@ public class SingleTabSwitcherOnNtpMediator {
+@@ -266,14 +267,14 @@ public class SingleTabSwitcherOnNtpMediator {
+                         @Override
                          public void onPageLoadFinished(Tab tab, GURL url) {
-                             super.onPageLoadFinished(tab, url);
                              mPropertyModel.set(TITLE, tab.getTitle());
 -                            mPropertyModel.set(URL, getDomainUrl(tab.getUrl()));
 +                            mPropertyModel.set(URL, tab.getUrl().getPossiblyInvalidSpec());

@@ -75,7 +75,7 @@ diff --git a/chrome/android/java/res/xml/homepage_preferences.xml b/chrome/andro
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java b/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/net/connectivitydetector/ConnectivityDetector.java
-@@ -470,7 +470,6 @@ public class ConnectivityDetector implements NetworkChangeNotifier.ConnectionTyp
+@@ -448,7 +448,6 @@ public class ConnectivityDetector implements NetworkChangeNotifier.ConnectionTyp
      @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
      public void setConnectionState(@ConnectionState int connectionState) {
          Log.i(TAG, "setConnectionState connectionState=" + connectionState);
@@ -282,7 +282,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/offlinepages/in
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedRootUiCoordinator.java
-@@ -1994,7 +1994,10 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
+@@ -2115,7 +2115,10 @@ public class TabbedRootUiCoordinator extends RootUiCoordinator {
                              mActivity,
                              mStatusIndicatorCoordinator,
                              isUrlBarFocusedSupplier,
@@ -297,7 +297,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/Tab
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java b/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java
-@@ -190,6 +190,13 @@ public abstract class TabModelSelectorBase
+@@ -195,6 +195,13 @@ public abstract class TabModelSelectorBase
          return null;
      }
  
@@ -310,7 +310,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabMod
 +
      @Override
      public TabModel getCurrentModel() {
-         if (mTabModelInternals.size() == 0) return EmptyTabModel.getInstance(false);
+         if (mTabModelInternals.isEmpty()) return EmptyTabModel.getInstance(false);
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sAskForRestartOnConnectionChange.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sAskForRestartOnConnectionChange.java
 new file mode 100644
 --- /dev/null
@@ -351,7 +351,7 @@ new file mode 100644
 diff --git a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelector.java b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelector.java
 --- a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelector.java
 +++ b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelector.java
-@@ -148,6 +148,8 @@ public interface TabModelSelector {
+@@ -143,6 +143,8 @@ public interface TabModelSelector {
      /** Get total pinned tab count across all tab models */
      int getTotalPinnedTabCount();
  
@@ -417,8 +417,8 @@ diff --git a/chrome/browser/tabwindow/android/java/src/org/chromium/chrome/brows
 diff --git a/chrome/browser/tabwindow/internal/android/java/src/org/chromium/chrome/browser/tabwindow/TabWindowManagerImpl.java b/chrome/browser/tabwindow/internal/android/java/src/org/chromium/chrome/browser/tabwindow/TabWindowManagerImpl.java
 --- a/chrome/browser/tabwindow/internal/android/java/src/org/chromium/chrome/browser/tabwindow/TabWindowManagerImpl.java
 +++ b/chrome/browser/tabwindow/internal/android/java/src/org/chromium/chrome/browser/tabwindow/TabWindowManagerImpl.java
-@@ -569,6 +569,16 @@ public class TabWindowManagerImpl implements TabWindowManager {
-         return tabModelSelector.getModel(isIncognito).getTabsInGroup(tabGroupId);
+@@ -579,6 +579,16 @@ public class TabWindowManagerImpl implements TabWindowManager {
+         return false;
      }
  
 +    @Override
@@ -457,7 +457,7 @@ new file mode 100644
 diff --git a/chrome/browser/ui/messages/android/java/res/layout/floating_snackbar.xml b/chrome/browser/ui/messages/android/java/res/layout/floating_snackbar.xml
 --- a/chrome/browser/ui/messages/android/java/res/layout/floating_snackbar.xml
 +++ b/chrome/browser/ui/messages/android/java/res/layout/floating_snackbar.xml
-@@ -50,5 +50,15 @@ found in the LICENSE file.
+@@ -51,5 +51,15 @@ found in the LICENSE file.
        android:paddingEnd="@dimen/snackbar_button_padding"
        android:paddingStart="@dimen/snackbar_button_padding"
        style="@style/TextButton" />
@@ -476,7 +476,7 @@ diff --git a/chrome/browser/ui/messages/android/java/res/layout/floating_snackba
 diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/Snackbar.java b/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/Snackbar.java
 --- a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/Snackbar.java
 +++ b/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/Snackbar.java
-@@ -158,6 +158,8 @@ public class Snackbar {
+@@ -164,6 +164,8 @@ public class Snackbar {
      private @Nullable String mTemplateText;
      private @Nullable String mActionText;
      private @Nullable Object mActionData;
@@ -485,7 +485,7 @@ diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/bro
      private int mBackgroundColor;
      private int mTextAppearanceResId;
      private boolean mDefaultLines = true;
-@@ -281,6 +283,20 @@ public class Snackbar {
+@@ -294,6 +296,20 @@ public class Snackbar {
          return this;
      }
  
@@ -509,7 +509,7 @@ diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/bro
 diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/SnackbarManager.java b/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/SnackbarManager.java
 --- a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/SnackbarManager.java
 +++ b/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/browser/ui/messages/snackbar/SnackbarManager.java
-@@ -535,6 +535,12 @@ public class SnackbarManager
+@@ -556,6 +556,12 @@ public class SnackbarManager
                          new SnackbarView(
                                  mActivity,
                                  this,
@@ -550,7 +550,7 @@ diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/bro
          mProfileImageView = (ImageView) mContainerView.findViewById(R.id.snackbar_profile_image);
          // Add bottom margin to extend the snackbar view into the bottom window inset. This
          // margin has to be applied to the snackbar view itself to avoid weird visual clipping
-@@ -457,6 +461,12 @@ public class SnackbarView implements InsetObserver.WindowInsetObserver {
+@@ -460,6 +464,12 @@ public class SnackbarView implements InsetObserver.WindowInsetObserver {
              mActionButtonView.setVisibility(View.VISIBLE);
              mActionButtonView.setContentDescription(snackbar.getActionText());
              setViewText(mActionButtonView, snackbar.getActionText(), animate);
@@ -566,7 +566,7 @@ diff --git a/chrome/browser/ui/messages/android/java/src/org/chromium/chrome/bro
 diff --git a/content/browser/web_contents/web_contents_android.cc b/content/browser/web_contents/web_contents_android.cc
 --- a/content/browser/web_contents/web_contents_android.cc
 +++ b/content/browser/web_contents/web_contents_android.cc
-@@ -912,6 +912,22 @@ void WebContentsAndroid::SetFocus(JNIEnv* env, bool focused) {
+@@ -914,6 +914,22 @@ void WebContentsAndroid::SetFocus(JNIEnv* env, bool focused) {
    view->SetFocus(focused);
  }
  
@@ -603,7 +603,7 @@ diff --git a/content/browser/web_contents/web_contents_android.h b/content/brows
 diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
 --- a/content/browser/web_contents/web_contents_impl.cc
 +++ b/content/browser/web_contents/web_contents_impl.cc
-@@ -4328,8 +4328,10 @@ void WebContentsImpl::Stop() {
+@@ -4450,8 +4450,10 @@ void WebContentsImpl::Stop() {
  void WebContentsImpl::SetPageFrozen(bool frozen) {
    TRACE_EVENT1("content", "WebContentsImpl::SetPageFrozen", "frozen", frozen);
  
@@ -630,7 +630,7 @@ diff --git a/content/public/android/java/src/org/chromium/content/browser/webcon
      @Override
      public void setDisplayCutoutSafeArea(Rect insets) {
          if (mNativeWebContentsAndroid == 0) return;
-@@ -1527,6 +1533,8 @@ public class WebContentsImpl
+@@ -1533,6 +1539,8 @@ public class WebContentsImpl
  
          void setFocus(long nativeWebContentsAndroid, boolean focused);
  
@@ -699,7 +699,7 @@ new file mode 100644
 diff --git a/third_party/blink/renderer/core/dom/document.cc b/third_party/blink/renderer/core/dom/document.cc
 --- a/third_party/blink/renderer/core/dom/document.cc
 +++ b/third_party/blink/renderer/core/dom/document.cc
-@@ -4659,6 +4659,7 @@ void Document::DispatchUnloadEvents(UnloadEventTimingInfo* unload_timing_info) {
+@@ -4748,6 +4748,7 @@ void Document::DispatchUnloadEvents(
  }
  
  void Document::DispatchFreezeEvent() {
@@ -710,7 +710,7 @@ diff --git a/third_party/blink/renderer/core/dom/document.cc b/third_party/blink
 diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/blink/renderer/core/frame/local_frame.cc
 --- a/third_party/blink/renderer/core/frame/local_frame.cc
 +++ b/third_party/blink/renderer/core/frame/local_frame.cc
-@@ -3478,6 +3478,7 @@ void LocalFrame::DidFreeze() {
+@@ -3515,6 +3515,7 @@ void LocalFrame::DidFreeze() {
    LoaderFreezeMode freeze_mode = GetLoaderFreezeMode();
    GetDocument()->Fetcher()->SetDefersLoading(freeze_mode);
    Loader().SetDefersLoading(freeze_mode);
@@ -718,7 +718,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/
  }
  
  void LocalFrame::DidResume() {
-@@ -3492,6 +3493,7 @@ void LocalFrame::DidResume() {
+@@ -3529,6 +3530,7 @@ void LocalFrame::DidResume() {
    GetDocument()->Fetcher()->SetDefersLoading(LoaderFreezeMode::kNone);
    Loader().SetDefersLoading(LoaderFreezeMode::kNone);
  
@@ -729,7 +729,7 @@ diff --git a/third_party/blink/renderer/core/frame/local_frame.cc b/third_party/
 diff --git a/third_party/blink/renderer/platform/scheduler/main_thread/frame_scheduler_impl.cc b/third_party/blink/renderer/platform/scheduler/main_thread/frame_scheduler_impl.cc
 --- a/third_party/blink/renderer/platform/scheduler/main_thread/frame_scheduler_impl.cc
 +++ b/third_party/blink/renderer/platform/scheduler/main_thread/frame_scheduler_impl.cc
-@@ -1022,7 +1022,9 @@ SchedulingLifecycleState FrameSchedulerImpl::CalculateLifecycleState(
+@@ -1021,7 +1021,9 @@ SchedulingLifecycleState FrameSchedulerImpl::CalculateLifecycleState(
    if (!parent_page_scheduler_)
      return SchedulingLifecycleState::kNotThrottled;
    if (parent_page_scheduler_->IsFrozen()) {

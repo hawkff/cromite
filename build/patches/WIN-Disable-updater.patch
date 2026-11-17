@@ -3,8 +3,8 @@ Date: Sun, 7 May 2023 14:03:55 +0000
 Subject: WIN Disable updater
 
 ---
- chrome/browser/active_use_util.h              |  2 +-
- chrome/browser/updater/BUILD.gn               | 14 ------
+ chrome/browser/active_use_util.h |  2 +-
+ chrome/browser/updater/BUILD.gn  | 14 --------------
  2 files changed, 1 insertion(+), 15 deletions(-)
 
 diff --git a/chrome/browser/active_use_util.h b/chrome/browser/active_use_util.h
@@ -21,8 +21,8 @@ diff --git a/chrome/browser/active_use_util.h b/chrome/browser/active_use_util.h
 diff --git a/chrome/browser/updater/BUILD.gn b/chrome/browser/updater/BUILD.gn
 --- a/chrome/browser/updater/BUILD.gn
 +++ b/chrome/browser/updater/BUILD.gn
-@@ -40,20 +40,6 @@ source_set("updater") {
-       "//chrome/updater:browser_sources",
+@@ -41,20 +41,6 @@ source_set("updater") {
+       "//components/version_info",
      ]
  
 -    if (is_win) {

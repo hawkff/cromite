@@ -47,17 +47,16 @@ new file mode 100644
 diff --git a/third_party/blink/renderer/core/timing/time_clamper.cc b/third_party/blink/renderer/core/timing/time_clamper.cc
 --- a/third_party/blink/renderer/core/timing/time_clamper.cc
 +++ b/third_party/blink/renderer/core/timing/time_clamper.cc
-@@ -7,6 +7,9 @@
+@@ -9,13 +9,19 @@
  #include "base/bit_cast.h"
  #include "base/rand_util.h"
  
 +#include "third_party/blink/public/common/features.h"
 +#include "third_party/blink/renderer/platform/runtime_enabled_features.h"
 +
- #include <cmath>
- 
  namespace blink {
-@@ -15,7 +18,10 @@ namespace {
+ 
+ namespace {
  const int64_t kTenLowerDigitsMod = 10000000000;
  }  // namespace
  

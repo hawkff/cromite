@@ -4,15 +4,15 @@ Subject: Disable Real Box
 
 Real-box is search box in ntp
 ---
- chrome/browser/prefs/browser_prefs.cc         |  2 +-
- .../searchbox/searchbox_handler.cc            |  2 ++
- components/search/ntp_features.cc             | 11 +++------
+ chrome/browser/prefs/browser_prefs.cc                 |  2 +-
+ .../cr_components/searchbox/searchbox_handler.cc      |  2 ++
+ components/search/ntp_features.cc                     | 11 +++--------
  3 files changed, 6 insertions(+), 9 deletions(-)
 
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
-@@ -2197,7 +2197,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+@@ -2504,7 +2504,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
        user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
  #endif
  #if BUILDFLAG(ENABLE_LENS_DESKTOP) || BUILDFLAG(ENABLE_WEBUI_NTP)
@@ -24,10 +24,10 @@ diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browse
 diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 --- a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
 +++ b/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.cc
-@@ -337,6 +337,8 @@ bool SearchboxHandler::GetVoiceSearchCoherenceAnySearchboxExperimentEnabled() {
- base::DictValue SearchboxHandler::GetWebUIDataSourceDict(
-     Profile* profile,
-     WebUIDataSourceOptions options) {
+@@ -376,6 +376,8 @@ base::DictValue SearchboxHandler::GetWebUIDataSourceDict(
+ // static
+ base::DictValue SearchboxHandler::GetProfileIndependentWebUIDataSourceDict(
+     ProfileIndependentWebUIDataSourceOptions options) {
 +  options.enable_lens_search = false;
 +  options.enable_voice_search = false;
    base::DictValue dict;
@@ -36,7 +36,7 @@ diff --git a/chrome/browser/ui/webui/cr_components/searchbox/searchbox_handler.c
 diff --git a/components/search/ntp_features.cc b/components/search/ntp_features.cc
 --- a/components/search/ntp_features.cc
 +++ b/components/search/ntp_features.cc
-@@ -142,7 +142,7 @@ BASE_FEATURE(kNtpGoogleLogo26, base::FEATURE_DISABLED_BY_DEFAULT);
+@@ -146,7 +146,7 @@ BASE_FEATURE(kNtpGoogleLogo26, base::FEATURE_DISABLED_BY_DEFAULT);
  
  // If enabled, logo will be shown.
  // This is a kill switch. Keep indefinitely.
@@ -45,7 +45,7 @@ diff --git a/components/search/ntp_features.cc b/components/search/ntp_features.
  
  // If enabled, middle slot promo will be shown.
  // This is a kill switch. Keep indefinitely.
-@@ -179,14 +179,9 @@ BASE_FEATURE(kNtpModulesLoad, base::FEATURE_DISABLED_BY_DEFAULT);
+@@ -174,14 +174,9 @@ BASE_FEATURE(kNtpModulesLoadedWithOtherModulesMaxInstanceCount,
  // requirement for all modules.
  BASE_FEATURE(kNtpModuleSignInRequirement, base::FEATURE_ENABLED_BY_DEFAULT);
  

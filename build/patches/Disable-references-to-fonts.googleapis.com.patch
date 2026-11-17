@@ -119,7 +119,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/fonts/FontPrelo
 diff --git a/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc b/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc
 --- a/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc
 +++ b/components/dom_distiller/content/browser/dom_distiller_viewer_source.cc
-@@ -308,7 +308,7 @@ bool DomDistillerViewerSource::ShouldServiceRequest(
+@@ -310,7 +310,7 @@ bool DomDistillerViewerSource::ShouldServiceRequest(
  std::string DomDistillerViewerSource::GetContentSecurityPolicy(
      network::mojom::CSPDirectiveName directive) {
    if (directive == network::mojom::CSPDirectiveName::StyleSrc) {
@@ -161,7 +161,7 @@ diff --git a/components/dom_distiller/core/html/preview.html b/components/dom_di
 diff --git a/content/public/android/java/src/org/chromium/content/browser/font/AndroidFontLookupImpl.java b/content/public/android/java/src/org/chromium/content/browser/font/AndroidFontLookupImpl.java
 --- a/content/public/android/java/src/org/chromium/content/browser/font/AndroidFontLookupImpl.java
 +++ b/content/public/android/java/src/org/chromium/content/browser/font/AndroidFontLookupImpl.java
-@@ -208,6 +208,7 @@ public class AndroidFontLookupImpl implements AndroidFontLookup {
+@@ -196,6 +196,7 @@ public class AndroidFontLookupImpl implements AndroidFontLookup {
       * @return An opened font file descriptor, or null if the font file is not available.
       */
      private @Nullable ParcelFileDescriptor tryFetchFont(String fontUniqueName) {
