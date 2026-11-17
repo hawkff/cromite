@@ -329,5 +329,7 @@ Download-filter-lists-and-components-from-the-project-site.patch
 Point-document-links-at-the-hawkff-cromite-repository.patch
 Add-an-executable-memory-rule-to-the-Android-seccomp-policy.patch
 Restrict-executable-memory-in-JIT-less-renderers.patch
+Do-not-leave-a-dangling-active-tab-pointer-in-ActiveTabTracker.patch
+Drop-the-SandboxStatusExtension-binder-when-its-frame-goes-away.patch
 
 # extension patches
