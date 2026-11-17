@@ -1,0 +1,92 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 21:21:04 +0000
+Subject: Add a flag to run WebAssembly in the interpreter when JIT is blocked
+
+A renderer for a site with JIT blocked gets --jitless. V8 then hides the
+WebAssembly object, so pages that need WebAssembly fail on those sites.
+
+Add the WebAssemblyInterpreterWithoutJit feature, off by default, with an
+entry on the flags page. When it is on, renderers with JIT blocked also
+get --wasm-jitless, except PDF renderers. V8 then keeps the WebAssembly
+object and runs every module in its WebAssembly interpreter. The
+interpreter translates modules into its own bytecode and executes it with
+handlers that are part of the browser binary, so the renderer still
+generates no machine code for WebAssembly. A V8 build without the
+interpreter ignores the flag, and WebAssembly stays unavailable there.
+With the feature off, nothing changes.
+
+The interpreter is much slower than compiled code, and compiling a module
+blocks the page while it runs. It supports a subset of WebAssembly:
+modules that use the newer exception handling instructions (exnref) fail
+to compile, and JavaScript Promise Integration is not available. V8
+treats the interpreter as an experimental feature.
+
+Also remove commented-out code that would have kept the JIT compilers for
+WebAssembly on these sites.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../renderer_host/render_process_host_impl.cc        | 12 +++++++++---
+ ...sembly-in-the-interpreter-when-JIT-is-blocked.inc | 12 ++++++++++++
+ ...sembly-in-the-interpreter-when-JIT-is-blocked.inc |  4 ++++
+ ...sembly-in-the-interpreter-when-JIT-is-blocked.inc |  1 +
+ 4 files changed, 26 insertions(+), 3 deletions(-)
+ create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+ create mode 100644 cromite_flags/content/public/common/content_features_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+ create mode 100644 cromite_flags/content/public/common/content_features_h/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+
+diff --git a/content/browser/renderer_host/render_process_host_impl.cc b/content/browser/renderer_host/render_process_host_impl.cc
+--- a/content/browser/renderer_host/render_process_host_impl.cc
++++ b/content/browser/renderer_host/render_process_host_impl.cc
+@@ -3858,9 +3858,15 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
+   if (IsJitDisabled()) {
+     AppendToCommaSeparatedSwitch(
+         command_line, blink::switches::kJavaScriptFlags, "--jitless");
+-    // disable jit but enable webassembly
+-    // command_line->AppendSwitchASCII(blink::switches::kJavaScriptFlags,
+-    //                                 "--no-maglev,--no-turbofan");
++    // Run WebAssembly in V8's interpreter, which generates no machine code.
++    // V8 builds without the interpreter ignore the flag and keep WebAssembly
++    // unavailable.
++    if (!IsPdf() &&
++        base::FeatureList::IsEnabled(
++            features::kWebAssemblyInterpreterWithoutJit)) {
++      AppendToCommaSeparatedSwitch(
++          command_line, blink::switches::kJavaScriptFlags, "--wasm-jitless");
++    }
+   } else if (AreV8OptimizationsDisabled()) {
+     AppendToCommaSeparatedSwitch(command_line,
+                                  blink::switches::kJavaScriptFlags,
+diff --git a/cromite_flags/chrome/browser/about_flags_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc b/cromite_flags/chrome/browser/about_flags_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/chrome/browser/about_flags_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+@@ -0,0 +1,12 @@
++#ifdef FLAG_SECTION
++
++    {"webassembly-interpreter-without-jit",
++     "WebAssembly on sites with JIT blocked",
++     "Sites with JIT blocked can use WebAssembly. It runs in V8's "
++     "interpreter, which generates no machine code. Without this flag "
++     "WebAssembly is not available on those sites. The interpreter is much "
++     "slower than compiled code and is experimental in V8; modules that use "
++     "the newer exception handling instructions do not load.", kOsAll,
++     FEATURE_VALUE_TYPE(features::kWebAssemblyInterpreterWithoutJit)},
++
++#endif
+diff --git a/cromite_flags/content/public/common/content_features_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc b/cromite_flags/content/public/common/content_features_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/content/public/common/content_features_cc/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+@@ -0,0 +1,4 @@
++// Runs WebAssembly in V8's interpreter in renderers that have JIT blocked.
++CROMITE_FEATURE(kWebAssemblyInterpreterWithoutJit,
++                "WebAssemblyInterpreterWithoutJit",
++                base::FEATURE_DISABLED_BY_DEFAULT);
+diff --git a/cromite_flags/content/public/common/content_features_h/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc b/cromite_flags/content/public/common/content_features_h/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/content/public/common/content_features_h/Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.inc
+@@ -0,0 +1 @@
++CONTENT_EXPORT BASE_DECLARE_FEATURE(kWebAssemblyInterpreterWithoutJit);
+--
