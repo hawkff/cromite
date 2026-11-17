@@ -248,7 +248,7 @@ python3 ~/depot_tools/siso.py ninja -C out/release-arm64 chrome_public_apk --off
 
 Use the same command with `out/fast-arm64` or `out/release-x64`. Run it in a shell where `PATH`, `DEPOT_TOOLS_UPDATE` and the environment file are set as above. `--offline` runs every step locally.
 
-The APK is written to `out/<dir>/apks/ChromePublic.apk`, with package name `org.cromite.cromite`.
+The APK is written to `out/<dir>/apks/ChromePublic.apk`, with package name `xyz.serenitty.browser`.
 
 ## Steps of upstream's build to skip
 
