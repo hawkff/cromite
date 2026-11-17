@@ -9,7 +9,7 @@ The feature is controlled by a feature flag (default enabled)
 
 Require: Content-settings-infrastructure.patch
 ---
- .../impl/BromiteViewportContentSetting.java   |  94 ++++++++++++++
+ .../impl/BromiteViewportContentSetting.java   |  94 +++++++++++++
  .../bromite_content_settings/viewport.grdp    |  27 ++++
  .../bromite_content_settings/viewport.inc     |  22 ++++
  .../bromite_content_settings/VIEWPORT.inc     |   1 +
@@ -29,14 +29,14 @@ Require: Content-settings-infrastructure.patch
  .../blink/renderer/core/frame/local_frame.h   |   6 +-
  .../core/frame/local_frame_mojo_handler.cc    |   5 +-
  .../core/frame/screen_metrics_emulator.cc     |  18 ++-
- .../core/frame/screen_metrics_emulator.h      |  14 +++
+ .../core/frame/screen_metrics_emulator.h      |  14 ++
  .../core/frame/web_frame_widget_impl.cc       |   9 ++
  .../core/frame/web_remote_frame_impl.cc       |   3 +-
  .../blink/renderer/core/input/touch.cc        |  17 ++-
- third_party/blink/renderer/core/page/page.cc  | 117 ++++++++++++++++++
+ third_party/blink/renderer/core/page/page.cc  | 123 ++++++++++++++++++
  third_party/blink/renderer/core/page/page.h   |  10 ++
  .../renderer/core/style/computed_style.h      |   6 +
- 27 files changed, 479 insertions(+), 22 deletions(-)
+ 27 files changed, 485 insertions(+), 22 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteViewportContentSetting.java
  create mode 100644 components/browser_ui/strings/bromite_content_settings/viewport.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/viewport.inc
@@ -787,7 +787,7 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
  namespace blink {
  
  namespace {
-@@ -1270,7 +1277,117 @@ void Page::UpdateAcceleratedCompositingSettings() {
+@@ -1270,7 +1277,123 @@ void Page::UpdateAcceleratedCompositingSettings() {
    }
  }
  
@@ -877,7 +877,13 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
 +      frame->SetPageZoomFactorBaseValue(zoom_factor);
 +    }
 +    is_screen_emulated_ = true;
-+  } else {
++  } else if (main_frame_ == frame ||
++             (!main_frame_->IsLocalFrame() && frame->IsLocalRoot())) {
++    // Only the main frame turns the emulation off for the page, or, when the
++    // main frame is in another process, the local root of this process. A
++    // local root inside a local main frame shares this page. A subframe can
++    // commit without content setting rules, for example a synchronous
++    // about:blank, and must not undo the main frame's emulation.
 +    if (is_screen_emulated_ && main_frame_ == frame) {
 +      GetChromeClient().GetWebView()->DisableDeviceEmulation();
 +      frame->SetPageZoomFactorBaseValue(0);

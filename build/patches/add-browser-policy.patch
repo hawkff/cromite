@@ -31,10 +31,10 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  components/policy_strings.grdp                |   4 +-
  components/search/ntp_features.cc             |   1 +
  components/signin/features.gni                |   2 +-
- .../gaia_cookie_manager_service.cc            |   4 +
+ .../gaia_cookie_manager_service.cc            |  11 +-
  google_apis/gaia/gaia_auth_fetcher.cc         |   1 +
  net/socket/ssl_client_socket_impl.cc          |   1 +
- 30 files changed, 310 insertions(+), 89 deletions(-)
+ 30 files changed, 315 insertions(+), 91 deletions(-)
 
 diff --git a/chrome/android/java/AndroidManifest.xml b/chrome/android/java/AndroidManifest.xml
 --- a/chrome/android/java/AndroidManifest.xml
@@ -830,15 +830,22 @@ diff --git a/components/signin/internal/identity_manager/gaia_cookie_manager_ser
    DCHECK(!cookie_listener_receiver_.is_bound());
  
    network::mojom::CookieManager* cookie_manager =
-@@ -956,6 +958,8 @@ void GaiaCookieManagerService::OnSetAccountsFinished(
+@@ -956,8 +958,13 @@ void GaiaCookieManagerService::OnSetAccountsFinished(
  }
  
  void GaiaCookieManagerService::HandleNextRequest() {
+-  // Pop the completed request.
+-  requests_.pop_front();
 +  // Make GaiaCookieManagerService compliant to SigninAllowed policy
-+  if (!signin_client_->AreSigninCookiesAllowed()) requests_.clear();
-   // Pop the completed request.
-   requests_.pop_front();
++  if (!signin_client_->AreSigninCookiesAllowed()) {
++    requests_.clear();
++  } else {
++    // Pop the completed request.
++    requests_.pop_front();
++  }
    OptimizeListAccounts();
+ 
+   gaia_auth_fetcher_.reset();
 diff --git a/google_apis/gaia/gaia_auth_fetcher.cc b/google_apis/gaia/gaia_auth_fetcher.cc
 --- a/google_apis/gaia/gaia_auth_fetcher.cc
 +++ b/google_apis/gaia/gaia_auth_fetcher.cc

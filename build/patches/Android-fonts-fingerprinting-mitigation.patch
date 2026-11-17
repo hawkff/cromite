@@ -28,7 +28,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  ...der_process_host_impl_receiver_bindings.cc |   12 +
  content/child/BUILD.gn                        |    7 +
  content/renderer/BUILD.gn                     |    4 +
- .../renderer/renderer_blink_platform_impl.cc  |   55 +-
+ .../renderer/renderer_blink_platform_impl.cc  |   57 +-
  content/renderer/renderer_main.cc             |    2 -
  ...ndroid-fonts-fingerprinting-mitigation.inc |   12 +
  ...ndroid-fonts-fingerprinting-mitigation.inc |    7 +
@@ -44,7 +44,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../skia/src/ports/SkFontMgr_android_ndk.cpp  |    2 +-
  .../src/ports/SkFontMgr_android_parser.cpp    |   69 +-
  .../skia/src/ports/SkFontMgr_android_parser.h |    5 +-
- 38 files changed, 2436 insertions(+), 89 deletions(-)
+ 38 files changed, 2438 insertions(+), 89 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Android-fonts-fingerprinting-mitigation.grdp
  create mode 100644 components/component_updater/installer_policies/fonts_pack_component_installer.cc
  create mode 100644 components/component_updater/installer_policies/fonts_pack_component_installer.h
@@ -754,7 +754,7 @@ diff --git a/content/renderer/renderer_blink_platform_impl.cc b/content/renderer
  using blink::Platform;
  using blink::WebAudioDevice;
  using blink::WebAudioLatencyHint;
-@@ -193,6 +210,37 @@ viz::command_buffer_metrics::ContextType ToVizContextType(
+@@ -193,6 +210,39 @@ viz::command_buffer_metrics::ContextType ToVizContextType(
    NOTREACHED();
  }
  
@@ -765,7 +765,9 @@ diff --git a/content/renderer/renderer_blink_platform_impl.cc b/content/renderer
 +  }
 +  std::string font_config = "cromite_fonts.xml";
 +  sk_sp<SkFontConfigInterface> fci(SkFontConfigInterface::RefGlobal());
-+  SkStreamAsset* asset = fci->openStreamFromName(font_config.c_str());
++  // Only checks that the font configuration can be opened.
++  std::unique_ptr<SkStreamAsset> asset(
++      fci->openStreamFromName(font_config.c_str()));
 +  if (!asset) {
 +    LOG(ERROR) << "Unable to activate custom fonts.";
 +    return;
@@ -792,7 +794,7 @@ diff --git a/content/renderer/renderer_blink_platform_impl.cc b/content/renderer
  }  // namespace
  
  //------------------------------------------------------------------------------
-@@ -204,18 +252,21 @@ RendererBlinkPlatformImpl::RendererBlinkPlatformImpl(
+@@ -204,18 +254,21 @@ RendererBlinkPlatformImpl::RendererBlinkPlatformImpl(
        is_locked_to_site_(false),
        main_thread_scheduler_(main_thread_scheduler),
        next_frame_sink_id_(uint32_t{std::numeric_limits<int32_t>::max()} + 1) {
@@ -1154,7 +1156,7 @@ diff --git a/third_party/skia/src/ports/SkFontMgr_android.cpp b/third_party/skia
 +            const int ttcIndex = fontFile.fIndex;
 +            SkString familyName;
 +            SkFontStyle fontStyle;
-+            bool isFixedWidth;
++            bool isFixedWidth = false;
 +            SkFontScanner::AxisDefinitions axisDefinitions;
 +            SkFontScanner::VariationPosition current;
 +            SkFontArguments::VariationPosition position;

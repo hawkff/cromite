@@ -25,14 +25,14 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../core/browser/expire_history_backend.h     |  2 +
  .../history/core/browser/history_backend.cc   | 17 +++++
  .../history/core/browser/history_backend.h    |  7 +--
- .../history/core/browser/history_service.cc   | 33 ++++++++++
+ .../history/core/browser/history_service.cc   | 37 +++++++++++
  .../history/core/browser/history_service.h    |  8 +++
  components/history/core/common/pref_names.cc  |  4 ++
  components/history/core/common/pref_names.h   |  1 +
  .../history_embeddings/core/sql_database.cc   |  2 +-
  .../omnibox/browser/shortcuts_backend.cc      |  4 +-
  .../utility/safari_data_importer.cc           |  2 +-
- 22 files changed, 228 insertions(+), 18 deletions(-)
+ 22 files changed, 232 insertions(+), 18 deletions(-)
  create mode 100644 components/cromite_components_strings_grd/History-number-of-days-privacy-setting.grdp
 
 diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
@@ -465,7 +465,7 @@ diff --git a/components/history/core/browser/history_service.cc b/components/his
  #include "components/history/core/browser/download_row.h"
  #include "components/history/core/browser/features.h"
  #include "components/history/core/browser/history_backend.h"
-@@ -564,6 +567,33 @@ base::CancelableTaskTracker::TaskId HistoryService::ScheduleDBTask(
+@@ -564,6 +567,37 @@ base::CancelableTaskTracker::TaskId HistoryService::ScheduleDBTask(
    return task_id;
  }
  
@@ -493,13 +493,17 @@ diff --git a/components/history/core/browser/history_service.cc b/components/his
 +  // the current history records are truncated elsewhere
 +  active_user_pref_service_->SetBoolean(prefs::kSavingBrowserHistoryDisabled,
 +                                (kExpireDaysThreshold == 0));
-+  history_backend_->SetExpireDaysThreshold(kExpireDaysThreshold);
++  // HistoryBackend runs on its own sequence; this also orders the call after
++  // HistoryBackend::Init.
++  ScheduleTask(PRIORITY_NORMAL,
++               base::BindOnce(&HistoryBackend::SetExpireDaysThreshold,
++                              history_backend_, kExpireDaysThreshold));
 +}
 +
  void HistoryService::ScheduleDBTaskForUI(
      base::OnceCallback<void(HistoryBackend*, URLDatabase*)> callback) {
    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-@@ -1484,6 +1514,9 @@ void HistoryService::Cleanup() {
+@@ -1484,6 +1518,9 @@ void HistoryService::Cleanup() {
      return;
    }
  

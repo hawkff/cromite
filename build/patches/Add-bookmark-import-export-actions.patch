@@ -15,7 +15,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../menu/bookmark_toolbar_menu_improved.xml   |  14 +
  .../browser/TabbedModeTabDelegateFactory.java |   7 +-
  .../app/bookmarks/BookmarkActivity.java       |  20 ++
- .../browser/bookmarks/BookmarkOpenerImpl.java |  23 ++
+ .../browser/bookmarks/BookmarkOpenerImpl.java |  24 ++
  .../native_page/NativePageFactory.java        |   9 +-
  chrome/browser/BUILD.gn                       |   7 +
  chrome/browser/bookmarks/android/BUILD.gn     |   2 +
@@ -46,7 +46,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../add-bookmark-import-export-actions.inc    |  12 +
  .../add-bookmark-import-export-actions.inc    |   4 +
  .../add-bookmark-import-export-actions.inc    |   1 +
- .../chromium/ui/base/SelectFileDialog.java    |  24 +-
+ .../chromium/ui/base/SelectFileDialog.java    |  23 +-
  .../java/strings/android_ui_strings.grd       |   3 +
  ui/shell_dialogs/select_file_dialog.h         |   2 +
  .../select_file_dialog_android.cc             |   6 +
@@ -182,7 +182,15 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/bookmarks/Bookm
  import org.chromium.base.ContextUtils;
  import org.chromium.base.IntentUtils;
  import org.chromium.base.metrics.RecordHistogram;
-@@ -64,6 +65,28 @@ public class BookmarkOpenerImpl implements BookmarkOpener {
+@@ -34,6 +35,7 @@ import org.chromium.components.bookmarks.BookmarkItem;
+ import org.chromium.components.bookmarks.BookmarkType;
+ import org.chromium.ui.base.PageTransition;
+ 
++import java.io.File;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.function.Supplier;
+@@ -64,6 +66,28 @@ public class BookmarkOpenerImpl implements BookmarkOpener {
          mMultiInstanceManager = multiInstanceManager;
      }
  
@@ -195,7 +203,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/bookmarks/Bookm
 +                        Intent.ACTION_VIEW,
 +                        ContentUriUtils.isContentUri(path)
 +                                ? Uri.parse(path)
-+                                : Uri.parse("file://" + path));
++                                : Uri.fromFile(new File(path)));
 +        intent.putExtra(Browser.EXTRA_APPLICATION_ID, context.getPackageName());
 +        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 +        intent.putExtra(IntentHandler.EXTRA_PAGE_TRANSITION_TYPE, PageTransition.AUTO_BOOKMARK);
@@ -399,7 +407,7 @@ diff --git a/chrome/browser/bookmarks/android/bookmark_bridge.cc b/chrome/browse
 +                                        ui::WindowAndroid* window,
 +                                        bookmark_html_writer::Result result) const
 +{
-+  auto export_path = export_path_.MaybeAsASCII();
++  const std::string& export_path = export_path_.value();
 +  if (result == bookmark_html_writer::Result::kSuccess) {
 +    LOG(INFO) << "Bookmarks exported successfully to " << export_path;
 +  } else if (result == bookmark_html_writer::Result::kCouldNotCreateFile) {
@@ -1505,15 +1513,7 @@ diff --git a/ui/android/java/src/org/chromium/ui/base/SelectFileDialog.java b/ui
                                      if (permissions[i].equals(storagePermission)
                                              || permissions[i].equals(
                                                      Manifest.permission.READ_MEDIA_IMAGES)
-@@ -861,6 +874,7 @@ public class SelectFileDialog implements WindowAndroid.IntentCallback, PhotoPick
-                 mimeTypes.add(mimeType);
-             }
-         }
-+        if (mimeTypes.size() == 0) return null;
-         return mimeTypes;
-     }
- 
-@@ -1284,6 +1298,10 @@ public class SelectFileDialog implements WindowAndroid.IntentCallback, PhotoPick
+@@ -1284,6 +1297,10 @@ public class SelectFileDialog implements WindowAndroid.IntentCallback, PhotoPick
          return countAcceptTypesFor(superType) == mMimeTypes.size();
      }
  
