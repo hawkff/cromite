@@ -1,0 +1,54 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 17 Nov 2026 11:51:04 +0000
+Subject: Check for updates in the hawkff/cromite releases
+
+The update check sent a HEAD request for the arm64_ChromePublic.apk file of
+the latest uazo/cromite release, read the version from the redirect, and
+offered that file in the menu when it was newer. Those builds have another
+package name and signing key, so they cannot update this browser: installing
+one adds a second browser next to it. The check and the download now use the
+latest hawkff/cromite release, with the same file names.
+
+When no release is found, the check is meant to wait one hour before it tries
+again, but the stored time made it due at once, so the request was sent again
+each time the browser returned to the foreground. It now waits one hour. The
+check still runs only when "Allow checking for updates" is on in About.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../omaha/inline/BromiteInlineUpdateController.java       | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java b/chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/omaha/inline/BromiteInlineUpdateController.java
+@@ -62,8 +62,8 @@ import org.chromium.chrome.browser.endpoint_fetcher.EndpointResponse;
+ public class BromiteInlineUpdateController implements InlineUpdateController {
+ 
+     private static final String TAG = "BromiteInlineUpdateController";
+-    private final String REDIRECT_URL_PREFIX = "https://github.com/uazo/cromite/releases/download/";
+-    private static final String UPDATE_VERSION_URL = "https://github.com/uazo/cromite/releases/latest/download/";
++    private final String REDIRECT_URL_PREFIX = "https://github.com/hawkff/cromite/releases/download/";
++    private static final String UPDATE_VERSION_URL = "https://github.com/hawkff/cromite/releases/latest/download/";
+     private final String UPSTREAM_VERSION_URL = "";
+     public static final String VULNERABLE_VERSION_DOC_URL = "";
+ 
+@@ -224,7 +224,7 @@ public class BromiteInlineUpdateController implements InlineUpdateController {
+                         if (redirectURL.indexOf(REDIRECT_URL_PREFIX) == 0) {
+                             redirectURL = redirectURL.substring(REDIRECT_URL_PREFIX.length());
+                             // adapt url
+-                            // example https://github.com/uazo/cromite/releases/download/v114.0.5735.199-af55aa0ddfc47fbaffafd60c385d4c43c7c5ad0c
++                            // example https://github.com/hawkff/cromite/releases/download/v114.0.5735.199-af55aa0ddfc47fbaffafd60c385d4c43c7c5ad0c
+                             String[] url_parts = redirectURL.split(Pattern.quote("-"));
+                             if (url_parts.length > 0) {
+                                 redirectURL = url_parts[0].substring(1);
+@@ -247,7 +247,7 @@ public class BromiteInlineUpdateController implements InlineUpdateController {
+                     if (!versionFound) {
+                         // retry after 1 hour
+                         OmahaPrefUtils.updateLastPushedTimeStamp(
+-                            System.currentTimeMillis() - getUpdateNotificationInterval() -
++                            System.currentTimeMillis() - getUpdateNotificationInterval() +
+                             DateUtils.HOUR_IN_MILLIS);
+                         Log.e(TAG, "BromiteUpdater: failed, will retry in 1 hour");
+                     }
+--
