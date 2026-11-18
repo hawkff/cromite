@@ -79,7 +79,9 @@ size=$(stat -c %s "$zip")
 grep -qi "\"sha256\": \"$sha\"" "$manifest" || fail "fonts_component.zip does not match the sha256 in query4_0.json"
 grep -q "\"size\": $size\b" "$manifest" || fail "fonts_component.zip does not match the size in query4_0.json"
 cp "$zip" "$tmp/components/"
-sed -E "s#\"url\": \"[^\"]*fonts_component\.zip\"#\"url\": \"$FONTS_URL\"#" "$manifest" > "$tmp/components/query4_0.json"
+# Escape the characters that are special in a sed replacement.
+fonts_url_escaped=$(printf '%s' "$FONTS_URL" | sed -e 's/[&#\\]/\\&/g')
+sed -E "s#\"url\": \"[^\"]*fonts_component\.zip\"#\"url\": \"$fonts_url_escaped\"#" "$manifest" > "$tmp/components/query4_0.json"
 grep -qF "\"url\": \"$FONTS_URL\"" "$tmp/components/query4_0.json" || fail "could not set the fonts URL in query4_0.json"
 
 # GitHub Pages would otherwise run the files through Jekyll.
