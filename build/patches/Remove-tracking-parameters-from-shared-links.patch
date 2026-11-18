@@ -34,13 +34,13 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../bookmarks/BookmarkToolbarMediator.java    |   3 +-
  .../download/home/list/ShareUtils.java        |   3 +-
  .../browser/omnibox/UrlBarMediator.java       |   7 +-
- ...tracking-parameters-from-shared-links.grdp |   9 ++
+ ...tracking-parameters-from-shared-links.grdp |   9 +
  .../browser_ui/share/ShareParams.java         |   4 +-
  ui/android/BUILD.gn                           |   2 +
  .../org/chromium/ui/base/ClipboardImpl.java   |   2 +-
- .../src/org/chromium/ui/base/LinkCleaner.java | 138 ++++++++++++++++++
- .../org/chromium/ui/base/LinkCleanerTest.java | 117 +++++++++++++++
- 16 files changed, 308 insertions(+), 10 deletions(-)
+ .../src/org/chromium/ui/base/LinkCleaner.java | 175 ++++++++++++++++++
+ .../org/chromium/ui/base/LinkCleanerTest.java | 143 ++++++++++++++
+ 16 files changed, 371 insertions(+), 10 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
  create mode 100644 ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
  create mode 100644 ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
@@ -338,13 +338,14 @@ diff --git a/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java b/ui/andr
 new file mode 100644
 --- /dev/null
 +++ b/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
-@@ -0,0 +1,138 @@
+@@ -0,0 +1,175 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +
 +package org.chromium.ui.base;
 +
 +import org.chromium.base.ContextUtils;
 +import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
 +
 +import java.util.ArrayList;
 +import java.util.Arrays;
@@ -407,7 +408,9 @@ new file mode 100644
 +    /**
 +     * Returns the http or https URL without known tracking parameters. The other parameters keep
 +     * their order and bytes, and the fragment is kept. The "?" goes only when nothing is left of
-+     * the query. Anything that is not a single http or https URL with a host is returned unchanged.
++     * the query. A parameter name is compared after decoding its percent escapes, so "%66bclid"
++     * counts as "fbclid"; a name with an invalid or incomplete escape is kept. Anything that is not
++     * a single http or https URL with a host is returned unchanged.
 +     */
 +    public static String clean(String url) {
 +        int schemeEnd = url.indexOf("://");
@@ -435,8 +438,8 @@ new file mode 100644
 +        List<String> kept = new ArrayList<>();
 +        for (String param : params) {
 +            int nameEnd = param.indexOf('=');
-+            String name = nameEnd < 0 ? param : param.substring(0, nameEnd);
-+            if (!isTrackingParam(name, host)) kept.add(param);
++            String name = decodeName(nameEnd < 0 ? param : param.substring(0, nameEnd));
++            if (name == null || !isTrackingParam(name, host)) kept.add(param);
 +        }
 +        if (kept.size() == params.length) return url;
 +
@@ -447,15 +450,49 @@ new file mode 100644
 +        return beforeQuery + "?" + query + fragment;
 +    }
 +
-+    /** Returns the lower case host of an authority, without user info, port and final dot. */
++    /**
++     * Returns the lower case host of an authority, without user info, port and final dot, or an
++     * empty string if an IPv6 host has no closing bracket or is followed by anything but a port.
++     */
 +    private static String getHost(String authority) {
 +        String host = authority.substring(authority.lastIndexOf('@') + 1);
++        if (host.startsWith("[")) {
++            int bracketEnd = host.indexOf(']');
++            if (bracketEnd < 0 || !host.substring(bracketEnd + 1).matches("(:[0-9]*)?")) return "";
++        }
 +        int portStart = host.lastIndexOf(':');
 +        // A colon inside the brackets of an IPv6 address is not a port separator.
 +        if (portStart > host.lastIndexOf(']')) host = host.substring(0, portStart);
 +        // "youtube.com." names the same site as "youtube.com".
 +        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
 +        return host.toLowerCase(Locale.ROOT);
++    }
++
++    /**
++     * Returns the name with its percent escapes decoded, each escape as one char of that byte
++     * value, or null if an escape is invalid or incomplete. A "+" stays as it is.
++     */
++    private static @Nullable String decodeName(String name) {
++        if (name.indexOf('%') < 0) return name;
++        StringBuilder decoded = new StringBuilder(name.length());
++        for (int i = 0; i < name.length(); i++) {
++            char c = name.charAt(i);
++            if (c == '%') {
++                if (i + 2 >= name.length()) return null;
++                int high = hexDigit(name.charAt(i + 1));
++                int low = hexDigit(name.charAt(i + 2));
++                if (high < 0 || low < 0) return null;
++                c = (char) (high * 16 + low);
++                i += 2;
++            }
++            decoded.append(c);
++        }
++        return decoded.toString();
++    }
++
++    /** Returns the value of an ASCII hex digit, or -1. */
++    private static int hexDigit(char c) {
++        return c < 0x80 ? Character.digit(c, 16) : -1;
 +    }
 +
 +    private static boolean isTrackingParam(String name, String host) {
@@ -481,7 +518,7 @@ diff --git a/ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java b/ui
 new file mode 100644
 --- /dev/null
 +++ b/ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,143 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +
 +package org.chromium.ui.base;
@@ -561,6 +598,32 @@ new file mode 100644
 +        assertUnchanged("https://example.com/?a=1\nhttps://example.org/?utm_source=x");
 +        assertUnchanged("https:///?utm_source=x");
 +        assertUnchanged("https://example.com\\@evil.example/?utm_source=x");
++    }
++
++    @Test
++    public void testDecodesPercentEscapesInNamesOnly() {
++        assertCleaned("https://example.com/?a=%2F", "https://example.com/?%66bclid=x&a=%2F");
++        assertCleaned(
++                "https://example.com/?a=1", "https://example.com/?a=1&utm%5Fsource=x&%67clid");
++        assertCleaned("https://x.com/u?lang=en", "https://x.com/u?%73=1&%74=2&lang=en");
++        // Names are matched case-sensitively after decoding.
++        assertUnchanged("https://example.com/?%55TM_source=x");
++        assertUnchanged("https://example.com/?%61=1&b%3D=2&fb%2Bclid=3");
++        assertUnchanged("https://example.com/?fb+clid=1&a=%66bclid");
++        assertUnchanged("https://example.com/?%zzfbclid=1&utm_%zz=2&utm_%4=3&utm_%=4");
++        assertUnchanged("https://example.com/?%\u0666\u0666bclid=1");
++    }
++
++    @Test
++    public void testIpv6Hosts() {
++        assertCleaned("https://[2001:db8::1]/?a=1", "https://[2001:db8::1]/?a=1&utm_source=x");
++        assertCleaned("https://[2001:db8::1]:8080/p#f", "https://[2001:db8::1]:8080/p?fbclid=x#f");
++        assertCleaned("https://[2001:db8::1]?a", "https://[2001:db8::1]?a&fbclid=x");
++        assertUnchanged("https://[/?utm_source=x");
++        assertUnchanged("https://[2001:db8::1/?utm_source=x");
++        assertUnchanged("https://user@[2001:db8::1?utm_source=x");
++        assertUnchanged("https://[2001:db8::1]x/?utm_source=x");
++        assertUnchanged("https://[2001:db8::1]:80x/?utm_source=x");
 +    }
 +
 +    @Test
