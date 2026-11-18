@@ -1,0 +1,602 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Wed, 18 Nov 2026 00:19:08 +0000
+Subject: Remove tracking parameters from shared links
+
+Links that leave the browser through the clipboard or the share sheet
+lose known tracking parameters: the utm_ campaign tags, ad click
+identifiers such as fbclid, gclid and msclkid, email campaign
+identifiers, and the share identifiers that some sites add to their
+own links (si on YouTube and Spotify, s and t on X). The other
+parameters keep their order and encoding, the fragment is kept, and
+the "?" is dropped only when nothing is left of the query. Text that
+is not a single http or https URL is not changed. Links the user opens
+are not changed.
+
+The cleaning runs where share requests are built (ShareParams) and
+where a URL is copied (Clipboard.copyUrlToClipboard), and at the copy
+and share actions that write a URL directly: Copy link address in the
+context menu, Copy link in the app menu, in history and in bookmarks,
+copying or cutting the whole address bar, sharing several tabs from
+the tab switcher, the custom tab share button, and sharing a download
+that has no file. Copying selected page text is not changed.
+
+A switch in Privacy and security, on by default, turns it off.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../TabListEditorShareAction.java             |   6 +-
+ .../res/xml/privacy_preferences_cromite.xml   |   5 +
+ .../chrome/browser/ChromeTabbedActivity.java  |   3 +-
+ .../ChromeContextMenuPopulator.java           |   4 +-
+ .../CustomTabsShareBroadcastReceiver.java     |   2 +
+ .../browser/history/HistoryManager.java       |   9 +-
+ .../bookmarks/BookmarkManagerMediator.java    |   4 +-
+ .../bookmarks/BookmarkToolbarMediator.java    |   3 +-
+ .../download/home/list/ShareUtils.java        |   3 +-
+ .../browser/omnibox/UrlBarMediator.java       |   7 +-
+ ...tracking-parameters-from-shared-links.grdp |   9 ++
+ .../browser_ui/share/ShareParams.java         |   4 +-
+ ui/android/BUILD.gn                           |   2 +
+ .../org/chromium/ui/base/ClipboardImpl.java   |   2 +-
+ .../src/org/chromium/ui/base/LinkCleaner.java | 138 ++++++++++++++++++
+ .../org/chromium/ui/base/LinkCleanerTest.java | 117 +++++++++++++++
+ 16 files changed, 308 insertions(+), 10 deletions(-)
+ create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
+ create mode 100644 ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
+ create mode 100644 ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
+
+diff --git a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabListEditorShareAction.java b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabListEditorShareAction.java
+--- a/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabListEditorShareAction.java
++++ b/chrome/android/features/tab_ui/java/src/org/chromium/chrome/browser/tasks/tab_management/TabListEditorShareAction.java
+@@ -35,6 +35,7 @@ import org.chromium.components.browser_ui.share.ShareImageFileUtils;
+ import org.chromium.components.browser_ui.share.ShareParams;
+ import org.chromium.components.browser_ui.util.motion.MotionEventInfo;
+ import org.chromium.components.embedder_support.util.UrlUtilities;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.url.GURL;
+ 
+ import java.lang.annotation.Retention;
+@@ -291,7 +292,10 @@ public class TabListEditorShareAction extends TabListEditorAction {
+         for (int i = 0; i < sortedTabList.size(); i++) {
+             Tab tab = sortedTabList.get(i);
+             assumeNonNull(tab);
+-            sb.append(i + 1).append(". ").append(tab.getUrl().getSpec()).append("\n");
++            sb.append(i + 1)
++                    .append(". ")
++                    .append(LinkCleaner.cleanIfEnabled(tab.getUrl().getSpec()))
++                    .append("\n");
+         }
+         return sb.toString();
+     }
+diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrome/android/java/res/xml/privacy_preferences_cromite.xml
+--- a/chrome/android/java/res/xml/privacy_preferences_cromite.xml
++++ b/chrome/android/java/res/xml/privacy_preferences_cromite.xml
+@@ -49,6 +49,11 @@ found in the LICENSE file.
+         android:key="referers_policy"
+         android:title="@string/referers_policy_title"
+         android:fragment="org.chromium.chrome.browser.privacy.settings.RefererSettingsFragment"/>
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="clean_links"
++        android:title="@string/clean_links_title"
++        android:summary="@string/clean_links_summary"
++        android:defaultValue="true" />
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+         android:key="can_make_payment"
+         android:title="@string/can_make_payment_title"
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -424,6 +424,7 @@ import org.chromium.content_public.common.ContentSwitches;
+ import org.chromium.ui.base.ActivityWindowAndroid;
+ import org.chromium.ui.base.Clipboard;
+ import org.chromium.ui.base.DeviceFormFactor;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.base.PageTransition;
+ import org.chromium.ui.base.SelectFileDialog;
+ import org.chromium.ui.base.WindowAndroid;
+@@ -4593,7 +4594,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+             Clipboard.getInstance()
+                     .setText(
+                             currentTab.getTitle(),
+-                            currentTab.getUrl().getSpec(),
++                            LinkCleaner.cleanIfEnabled(currentTab.getUrl().getSpec()),
+                             /* notifyOnSuccess= */ true);
+             RecordUserAction.record("MobileMenuCopyLink");
+             return true;
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java b/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/contextmenu/ChromeContextMenuPopulator.java
+@@ -111,6 +111,7 @@ import org.chromium.content_public.browser.BrowserStartupController;
+ import org.chromium.content_public.browser.ContentFeatureMap;
+ import org.chromium.content_public.browser.WebContents;
+ import org.chromium.content_public.common.ContentUrlConstants;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.listmenu.ListItemType;
+ import org.chromium.ui.listmenu.ListMenuItemProperties;
+@@ -1127,7 +1128,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
+             copyLinkUrlIfAllowedByPolicy(
+                     () ->
+                             mItemDelegate.onSaveToClipboard(
+-                                    mParams.getUnfilteredLinkUrl().getSpec(),
++                                    LinkCleaner.cleanIfEnabled(
++                                            mParams.getUnfilteredLinkUrl().getSpec()),
+                                     TabContextMenuItemDelegate.ClipboardType.LINK_URL));
+         } else if (itemId == R.id.contextmenu_call) {
+             recordContextMenuSelection(ContextMenuUma.Action.CALL);
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabsShareBroadcastReceiver.java b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabsShareBroadcastReceiver.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabsShareBroadcastReceiver.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabsShareBroadcastReceiver.java
+@@ -12,6 +12,7 @@ import org.chromium.base.metrics.RecordUserAction;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.chrome.browser.share.ShareDelegate;
+ import org.chromium.components.browser_ui.share.ShareParams;
++import org.chromium.ui.base.LinkCleaner;
+ 
+ /**
+  * Receives shared content broadcast from Chrome Custom Tabs and shows a share sheet to share the
+@@ -23,6 +24,7 @@ public final class CustomTabsShareBroadcastReceiver extends BroadcastReceiver {
+     public void onReceive(Context context, Intent intent) {
+         RecordUserAction.record("MobileTopToolbarShareButton");
+         String url = intent.getDataString();
++        if (url != null) url = LinkCleaner.cleanIfEnabled(url);
+         Intent shareIntent = new Intent(Intent.ACTION_SEND);
+         shareIntent.setType("text/plain");
+         shareIntent.putExtra(Intent.EXTRA_TEXT, url);
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/history/HistoryManager.java b/chrome/android/java/src/org/chromium/chrome/browser/history/HistoryManager.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/history/HistoryManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/history/HistoryManager.java
+@@ -59,6 +59,7 @@ import org.chromium.ui.base.ActivityResultTracker;
+ import org.chromium.ui.base.Clipboard;
+ import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.ui.base.DeviceInput;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
+ import org.chromium.ui.modaldialog.ModalDialogManager;
+@@ -398,7 +399,13 @@ public class HistoryManager
+         } else if (item.getItemId() == R.id.selection_mode_copy_link) {
+             mUmaRecorder.recordCopyLink(mIsSearching);
+             Clipboard.getInstance()
+-                    .setText(mSelectionDelegate.getSelectedItemsAsList().get(0).getUrl().getSpec());
++                    .setText(
++                            LinkCleaner.cleanIfEnabled(
++                                    mSelectionDelegate
++                                            .getSelectedItemsAsList()
++                                            .get(0)
++                                            .getUrl()
++                                            .getSpec()));
+             mSelectionDelegate.clearSelection();
+             Snackbar snackbar =
+                     Snackbar.make(
+diff --git a/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkManagerMediator.java b/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkManagerMediator.java
+--- a/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkManagerMediator.java
++++ b/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkManagerMediator.java
+@@ -77,6 +77,7 @@ import org.chromium.ui.accessibility.AccessibilityState;
+ import org.chromium.ui.base.Clipboard;
+ import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.ui.base.DeviceInput;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.listmenu.ListMenu;
+ import org.chromium.ui.listmenu.ListMenuItemProperties;
+ import org.chromium.ui.modaldialog.ModalDialogManager;
+@@ -1980,7 +1981,8 @@ class BookmarkManagerMediator
+                         BookmarkItem bookmarkItem = mBookmarkModel.getBookmarkById(bookmarkId);
+                         assumeNonNull(bookmarkItem);
+                         if (!bookmarkItem.isFolder()) {
+-                            mClipboard.setText(bookmarkItem.getUrl().getSpec());
++                            mClipboard.setText(
++                                    LinkCleaner.cleanIfEnabled(bookmarkItem.getUrl().getSpec()));
+                             Snackbar snackbar =
+                                     Snackbar.make(
+                                             mContext.getString(R.string.copied),
+diff --git a/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkToolbarMediator.java b/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkToolbarMediator.java
+--- a/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkToolbarMediator.java
++++ b/chrome/browser/bookmarks/android/java/src/org/chromium/chrome/browser/bookmarks/BookmarkToolbarMediator.java
+@@ -35,6 +35,7 @@ import org.chromium.components.browser_ui.widget.dragreorder.DragTouchHandler.Dr
+ import org.chromium.components.browser_ui.widget.selectable_list.SelectableListToolbar.NavigationButton;
+ import org.chromium.components.browser_ui.widget.selectable_list.SelectionDelegate;
+ import org.chromium.ui.base.Clipboard;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.modelutil.PropertyModel;
+ 
+ import java.util.List;
+@@ -268,7 +269,7 @@ class BookmarkToolbarMediator
+             assert selectedItems.size() == 1;
+             BookmarkItem bookmarkItem = mBookmarkModel.getBookmarkById(selectedItems.get(0));
+             assumeNonNull(bookmarkItem);
+-            mClipboard.setText(bookmarkItem.getUrl().getSpec());
++            mClipboard.setText(LinkCleaner.cleanIfEnabled(bookmarkItem.getUrl().getSpec()));
+             mSelectionDelegate.clearSelection();
+             Snackbar snackbar =
+                     Snackbar.make(
+diff --git a/chrome/browser/download/internal/android/java/src/org/chromium/chrome/browser/download/home/list/ShareUtils.java b/chrome/browser/download/internal/android/java/src/org/chromium/chrome/browser/download/home/list/ShareUtils.java
+--- a/chrome/browser/download/internal/android/java/src/org/chromium/chrome/browser/download/home/list/ShareUtils.java
++++ b/chrome/browser/download/internal/android/java/src/org/chromium/chrome/browser/download/home/list/ShareUtils.java
+@@ -13,6 +13,7 @@ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.components.offline_items_collection.OfflineItem;
+ import org.chromium.components.offline_items_collection.OfflineItemShareInfo;
++import org.chromium.ui.base.LinkCleaner;
+ 
+ import java.util.ArrayList;
+ import java.util.Collection;
+@@ -53,7 +54,7 @@ public class ShareUtils {
+                 uris.add(uri);
+             } else if (item.first.url != null && !item.first.url.isEmpty()) {
+                 if (urls.length() > 0) urls.append("\n");
+-                urls.append(item.first.url.getSpec());
++                urls.append(LinkCleaner.cleanIfEnabled(item.first.url.getSpec()));
+             }
+         }
+ 
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java
+@@ -34,6 +34,7 @@ import org.chromium.components.omnibox.OmniboxUrlEmphasizer.UrlEmphasisSpan;
+ import org.chromium.components.omnibox.TextSelection;
+ import org.chromium.ui.base.Clipboard;
+ import org.chromium.ui.base.DeviceFormFactor;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.modelutil.PropertyModel;
+ import org.chromium.url.GURL;
+ 
+@@ -423,6 +424,7 @@ class UrlBarMediator implements UrlBarTextContextMenuDelegate {
+         int maxSel = selection.getUpper();
+ 
+         if (minSel != 0) return null;
++        boolean isWholeText = maxSel == currentText.length();
+ 
+         // Trim to just the currently selected text as that is the only text we are replacing.
+         currentText = currentText.substring(minSel, maxSel);
+@@ -458,7 +460,10 @@ class UrlBarMediator implements UrlBarTextContextMenuDelegate {
+             return null;
+         }
+ 
+-        return originalUrlLocation + currentText.substring(formattedUrlLocation.length());
++        String copyText =
++                originalUrlLocation + currentText.substring(formattedUrlLocation.length());
++        // Copying the whole field copies a link; a partial selection stays as selected.
++        return isWholeText ? LinkCleaner.cleanIfEnabled(copyText) : copyText;
+     }
+ 
+     @Override
+diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<grit-part>
++    <message name="IDS_CLEAN_LINKS_TITLE" desc="Title of the privacy setting that removes tracking parameters from links that are copied or shared.">
++        Remove tracking from copied and shared links
++    </message>
++    <message name="IDS_CLEAN_LINKS_SUMMARY" desc="Summary of the privacy setting that removes tracking parameters from links that are copied or shared.">
++        When you copy or share a link, known tracking parts such as utm_source or fbclid are removed. Links you open are not changed.
++    </message>
++</grit-part>
+diff --git a/components/browser_ui/share/android/java/src/org/chromium/components/browser_ui/share/ShareParams.java b/components/browser_ui/share/android/java/src/org/chromium/components/browser_ui/share/ShareParams.java
+--- a/components/browser_ui/share/android/java/src/org/chromium/components/browser_ui/share/ShareParams.java
++++ b/components/browser_ui/share/android/java/src/org/chromium/components/browser_ui/share/ShareParams.java
+@@ -15,6 +15,7 @@ import org.chromium.base.TriState;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.base.WindowAndroid;
+ 
+ import java.util.ArrayList;
+@@ -164,7 +165,7 @@ public class ShareParams {
+ 
+     /** @param url set URL to be shared. */
+     public void setUrl(@Nullable String url) {
+-        mUrl = url;
++        mUrl = url != null ? LinkCleaner.cleanIfEnabled(url) : null;
+     }
+ 
+     /**
+@@ -390,6 +391,7 @@ public class ShareParams {
+             if (!TextUtils.isEmpty(mUrl) && !mBypassFixingDomDistillerUrl) {
+                 mUrl = DomDistillerUrlUtils.getOriginalUrlFromDistillerUrl(mUrl);
+             }
++            if (!TextUtils.isEmpty(mUrl)) mUrl = LinkCleaner.cleanIfEnabled(mUrl);
+             return new ShareParams(
+                     mWindow,
+                     mTitle,
+diff --git a/ui/android/BUILD.gn b/ui/android/BUILD.gn
+--- a/ui/android/BUILD.gn
++++ b/ui/android/BUILD.gn
+@@ -418,6 +418,7 @@ android_library("ui_no_recycler_view_java") {
+     "java/src/org/chromium/ui/base/IntentRequestTracker.java",
+     "java/src/org/chromium/ui/base/IntentRequestTrackerImpl.java",
+     "java/src/org/chromium/ui/base/KeyNavigationUtil.java",
++    "java/src/org/chromium/ui/base/LinkCleaner.java",
+     "java/src/org/chromium/ui/base/LocalizationUtils.java",
+     "java/src/org/chromium/ui/base/MaterialDatePickerProvider.java",
+     "java/src/org/chromium/ui/base/MimeTypeUtils.java",
+@@ -803,6 +804,7 @@ robolectric_library("ui_android_junit_tests") {
+     "junit/src/org/chromium/ui/base/DeviceInputTest.java",
+     "junit/src/org/chromium/ui/base/EventForwarderTest.java",
+     "junit/src/org/chromium/ui/base/EventOffsetHandlerTest.java",
++    "junit/src/org/chromium/ui/base/LinkCleanerTest.java",
+     "junit/src/org/chromium/ui/base/LocalizationUtilsTest.java",
+     "junit/src/org/chromium/ui/base/MimeTypeUtilsTest.java",
+     "junit/src/org/chromium/ui/base/PointerLockEventHelperTest.java",
+diff --git a/ui/android/java/src/org/chromium/ui/base/ClipboardImpl.java b/ui/android/java/src/org/chromium/ui/base/ClipboardImpl.java
+--- a/ui/android/java/src/org/chromium/ui/base/ClipboardImpl.java
++++ b/ui/android/java/src/org/chromium/ui/base/ClipboardImpl.java
+@@ -850,7 +850,7 @@ public class ClipboardImpl extends Clipboard
+                 new ClipData(
+                         "url",
+                         new String[] {URL_MIME_TYPE, PLAIN_TEXT_MIME_TYPE},
+-                        new ClipData.Item(url.getSpec()));
++                        new ClipData.Item(LinkCleaner.cleanIfEnabled(url.getSpec())));
+         if (setPrimaryClipNoException(clip)) {
+             showToastIfNeeded(R.string.link_copied);
+         } else {
+diff --git a/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java b/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
+new file mode 100644
+--- /dev/null
++++ b/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
+@@ -0,0 +1,138 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++package org.chromium.ui.base;
++
++import org.chromium.base.ContextUtils;
++import org.chromium.build.annotations.NullMarked;
++
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.List;
++import java.util.Locale;
++
++/**
++ * Removes known tracking parameters from links that leave the browser through the clipboard or
++ * the share sheet. Links the user opens are not changed.
++ */
++@NullMarked
++public final class LinkCleaner {
++    /**
++     * App preference, on by default, that turns link cleaning on or off. The privacy settings
++     * switch writes it under the same key.
++     */
++    public static final String PREF_CLEAN_LINKS = "clean_links";
++
++    // Campaign tags of the utm_ family: utm_source, utm_medium, utm_campaign, utm_term, ...
++    private static final String CAMPAIGN_TAG_PREFIX = "utm_";
++
++    // Ad click identifiers, share identifiers and email campaign tokens.
++    private static final List<String> TRACKING_PARAMS =
++            Arrays.asList(
++                    "fbclid", // Meta (Facebook, Instagram) click identifier.
++                    "gclid", // Google Ads click identifier.
++                    "gclsrc", // Google Ads, source of the gclid.
++                    "dclid", // Google display ads (Campaign Manager) click identifier.
++                    "gbraid", // Google Ads click identifier, app to web.
++                    "wbraid", // Google Ads click identifier, web to app.
++                    "gad_source", // Google Ads, ad source marker.
++                    "srsltid", // Google Merchant Center click identifier.
++                    "_gl", // Google Analytics cross-domain client identifier.
++                    "msclkid", // Microsoft Advertising click identifier.
++                    "yclid", // Yandex Direct click identifier.
++                    "ysclid", // Yandex Search click identifier.
++                    "twclid", // X (Twitter) Ads click identifier.
++                    "ttclid", // TikTok Ads click identifier.
++                    "li_fat_id", // LinkedIn ads member identifier.
++                    "epik", // Pinterest Ads click identifier.
++                    "igshid", // Instagram share identifier.
++                    "igsh", // Instagram share identifier, newer form.
++                    "mibextid", // Facebook app share identifier.
++                    "mc_cid", // Mailchimp campaign identifier.
++                    "mc_eid", // Mailchimp recipient identifier.
++                    "_hsenc", // HubSpot email tracking token.
++                    "_hsmi", // HubSpot email message identifier.
++                    "mkt_tok"); // Marketo email tracking token.
++
++    private LinkCleaner() {}
++
++    /** Returns {@link #clean(String)} of the link, or the link itself if the switch is off. */
++    public static String cleanIfEnabled(String url) {
++        if (!ContextUtils.getAppSharedPreferences().getBoolean(PREF_CLEAN_LINKS, true)) {
++            return url;
++        }
++        return clean(url);
++    }
++
++    /**
++     * Returns the http or https URL without known tracking parameters. The other parameters keep
++     * their order and bytes, and the fragment is kept. The "?" goes only when nothing is left of
++     * the query. Anything that is not a single http or https URL with a host is returned unchanged.
++     */
++    public static String clean(String url) {
++        int schemeEnd = url.indexOf("://");
++        if (schemeEnd < 0) return url;
++        String scheme = url.substring(0, schemeEnd);
++        if (!scheme.equalsIgnoreCase("http") && !scheme.equalsIgnoreCase("https")) return url;
++        for (int i = 0; i < url.length(); i++) {
++            char c = url.charAt(i);
++            // Spaces, line breaks and backslashes: text around a URL, or a URL we do not parse.
++            if (c <= ' ' || c == 0x7f || c == '\\') return url;
++        }
++
++        int queryEnd = url.indexOf('#');
++        if (queryEnd < 0) queryEnd = url.length();
++        int queryStart = url.indexOf('?');
++        if (queryStart < 0 || queryStart > queryEnd) return url;
++
++        int authorityStart = schemeEnd + 3;
++        int authorityEnd = url.indexOf('/', authorityStart);
++        if (authorityEnd < 0 || authorityEnd > queryStart) authorityEnd = queryStart;
++        String host = getHost(url.substring(authorityStart, authorityEnd));
++        if (host.isEmpty()) return url;
++
++        String[] params = url.substring(queryStart + 1, queryEnd).split("&", -1);
++        List<String> kept = new ArrayList<>();
++        for (String param : params) {
++            int nameEnd = param.indexOf('=');
++            String name = nameEnd < 0 ? param : param.substring(0, nameEnd);
++            if (!isTrackingParam(name, host)) kept.add(param);
++        }
++        if (kept.size() == params.length) return url;
++
++        String beforeQuery = url.substring(0, queryStart);
++        String query = String.join("&", kept);
++        String fragment = url.substring(queryEnd);
++        if (query.isEmpty()) return beforeQuery + fragment;
++        return beforeQuery + "?" + query + fragment;
++    }
++
++    /** Returns the lower case host of an authority, without user info, port and final dot. */
++    private static String getHost(String authority) {
++        String host = authority.substring(authority.lastIndexOf('@') + 1);
++        int portStart = host.lastIndexOf(':');
++        // A colon inside the brackets of an IPv6 address is not a port separator.
++        if (portStart > host.lastIndexOf(']')) host = host.substring(0, portStart);
++        // "youtube.com." names the same site as "youtube.com".
++        if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
++        return host.toLowerCase(Locale.ROOT);
++    }
++
++    private static boolean isTrackingParam(String name, String host) {
++        if (name.startsWith(CAMPAIGN_TAG_PREFIX) || TRACKING_PARAMS.contains(name)) return true;
++        switch (name) {
++            case "si": // YouTube and Spotify share identifier.
++                return isOnSite(host, "youtube.com")
++                        || isOnSite(host, "youtu.be")
++                        || isOnSite(host, "spotify.com");
++            case "s": // X (Twitter) share source.
++            case "t": // X (Twitter) share token.
++                return isOnSite(host, "x.com") || isOnSite(host, "twitter.com");
++            default:
++                return false;
++        }
++    }
++
++    private static boolean isOnSite(String host, String site) {
++        return host.equals(site) || host.endsWith("." + site);
++    }
++}
+diff --git a/ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java b/ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
+new file mode 100644
+--- /dev/null
++++ b/ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
+@@ -0,0 +1,117 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++package org.chromium.ui.base;
++
++import static org.junit.Assert.assertEquals;
++
++import org.junit.Test;
++import org.junit.runner.RunWith;
++
++import org.chromium.base.ContextUtils;
++import org.chromium.base.test.BaseRobolectricTestRunner;
++
++/** Tests for {@link LinkCleaner}. */
++@RunWith(BaseRobolectricTestRunner.class)
++public class LinkCleanerTest {
++    private static void assertCleaned(String expected, String url) {
++        assertEquals(expected, LinkCleaner.clean(url));
++    }
++
++    private static void assertUnchanged(String url) {
++        assertEquals(url, LinkCleaner.clean(url));
++    }
++
++    @Test
++    public void testRemovesTrackingParamsAndKeepsTheRest() {
++        assertCleaned(
++                "https://example.com/p?a=1&b=2#frag",
++                "https://example.com/p?a=1&utm_source=news&b=2&fbclid=XYZ#frag");
++        assertCleaned(
++                "https://example.com/?id=7",
++                "https://example.com/?gclid=1&id=7&utm_campaign_name=x&msclkid=2");
++        assertCleaned("http://example.com/a?b", "http://example.com/a?b&mc_eid=1&mc_cid=2");
++    }
++
++    @Test
++    public void testKeepsOrderAndEncodingOfOtherParams() {
++        assertCleaned(
++                "https://example.com/s?z=%E2%9C%93&a=b+c&q=x%26y",
++                "https://example.com/s?z=%E2%9C%93&utm_medium=m&a=b+c&yclid=1&q=x%26y");
++    }
++
++    @Test
++    public void testRemovesQuestionMarkOnlyWhenNothingIsLeft() {
++        assertCleaned("https://example.com/p", "https://example.com/p?utm_source=a&ttclid=b");
++        assertCleaned("https://example.com/p#top", "https://example.com/p?twclid=1#top");
++        assertCleaned("https://example.com/p", "https://example.com/p?fbclid=1&");
++        assertCleaned("https://example.com/p?a=1&", "https://example.com/p?a=1&fbclid=1&");
++        assertCleaned("https://example.com/?a", "https://example.com/?fbclid&a");
++        assertCleaned("https://example.com/p?&&#frag", "https://example.com/p?&fbclid=x&&#frag");
++        assertUnchanged("https://example.com/?");
++        assertUnchanged("https://example.com/?a=1&&b=2");
++    }
++
++    @Test
++    public void testLeavesUrlsWithoutTrackingParamsAlone() {
++        assertUnchanged("https://example.com/");
++        assertUnchanged("https://example.com/search?q=utm_source&next=%3Ffbclid%3D1");
++        assertUnchanged("https://example.com/?gclid_extra=1&xfbclid=2&UTM_SOURCE=3");
++        assertUnchanged("https://example.com/page#section?utm_source=x");
++        assertUnchanged("https://example.com/#/route?fbclid=1");
++    }
++
++    @Test
++    public void testLeavesOtherSchemesAlone() {
++        assertUnchanged("mailto:a@example.com?subject=hi&utm_source=x");
++        assertUnchanged("ftp://example.com/f?utm_source=x");
++        assertUnchanged("file:///sdcard/page.html?utm_source=x");
++        assertUnchanged("chrome://history/?utm_source=x");
++        assertUnchanged("intent://example.com/?utm_source=x#Intent;scheme=https;end");
++        assertUnchanged("example.com/?utm_source=x");
++        assertUnchanged("");
++    }
++
++    @Test
++    public void testLeavesTextAndMalformedUrlsAlone() {
++        assertUnchanged("https://example.com/?utm_source=x and more text");
++        assertUnchanged("https://example.com/?a=1\nhttps://example.org/?utm_source=x");
++        assertUnchanged("https:///?utm_source=x");
++        assertUnchanged("https://example.com\\@evil.example/?utm_source=x");
++    }
++
++    @Test
++    public void testSchemeAndHostAreCaseInsensitive() {
++        assertCleaned("HTTPS://WWW.YOUTUBE.COM/watch?v=a", "HTTPS://WWW.YOUTUBE.COM/watch?v=a&si=b");
++        assertCleaned("Http://example.com/", "Http://example.com/?utm_source=x");
++    }
++
++    @Test
++    public void testSiteSpecificParams() {
++        assertCleaned("https://youtu.be/abc?t=42", "https://youtu.be/abc?si=XYZ&t=42");
++        assertCleaned(
++                "https://www.youtube.com/watch?v=abc", "https://www.youtube.com/watch?v=abc&si=Q");
++        assertCleaned("https://open.spotify.com/track/1", "https://open.spotify.com/track/1?si=Z");
++        assertCleaned("https://x.com/u/status/1", "https://x.com/u/status/1?s=20&t=abc");
++        assertCleaned(
++                "https://user@mobile.twitter.com:8443/u?lang=en",
++                "https://user@mobile.twitter.com:8443/u?s=46&lang=en");
++        assertUnchanged("https://example.com/?si=1&s=search&t=2");
++        assertUnchanged("https://notx.com/?s=1&t=2");
++        assertCleaned(
++                "https://www.youtube.com./watch?v=abc",
++                "https://www.youtube.com./watch?v=abc&si=Q");
++        assertUnchanged("https://x.com.example.org/?s=1");
++        assertUnchanged("https://[2001:db8::1]:8080/?s=1&t=2");
++    }
++
++    @Test
++    public void testSwitch() {
++        String url = "https://example.com/?utm_source=x";
++        assertEquals("https://example.com/", LinkCleaner.cleanIfEnabled(url));
++        ContextUtils.getAppSharedPreferences()
++                .edit()
++                .putBoolean(LinkCleaner.PREF_CLEAN_LINKS, false)
++                .apply();
++        assertEquals(url, LinkCleaner.cleanIfEnabled(url));
++    }
++}
+--
