@@ -1,0 +1,123 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Fri, 20 Nov 2026 19:53:42 +0000
+Subject: Destroy the incognito profile after its tab model
+
+When the last incognito tab is closed, IncognitoTabModelImpl notifies its
+IncognitoTabModelObservers and then destroys its delegate tab model. One of
+these observers, IncognitoProfileDestroyer, asked for the incognito profile
+to be destroyed during that notification, and when no renderer process of
+that profile was left, the profile was deleted right away. The delegate
+TabCollectionTabModelImpl and its native objects were destroyed only after
+that, while they still pointed at the deleted profile: the native
+TabCollectionTabModelImpl holds a raw_ptr<Profile>. With dangling pointer
+detection in crash mode, this can end the browser process.
+
+IncognitoTabModelObserver gets onEmptyModelDestroyed(), which
+IncognitoTabModelImpl calls after it has destroyed the emptied tab model and
+replaced it with the empty stub. IncognitoProfileDestroyer decides in
+didBecomeEmpty() as before, but destroys the profile in
+onEmptyModelDestroyed(), in the same call stack. The existing notifications
+and the tab model teardown keep their order, and nothing is deferred to a
+later task, so no new incognito tab can start on the old profile in between.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../incognito/IncognitoProfileDestroyer.java     | 16 +++++++++++++++-
+ .../browser/tabmodel/TabModelSelectorBase.java   |  7 +++++++
+ .../browser/tabmodel/IncognitoTabModelImpl.java  |  4 ++++
+ .../tabmodel/IncognitoTabModelObserver.java      |  6 ++++++
+ 4 files changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/incognito/IncognitoProfileDestroyer.java b/chrome/android/java/src/org/chromium/chrome/browser/incognito/IncognitoProfileDestroyer.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/incognito/IncognitoProfileDestroyer.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/incognito/IncognitoProfileDestroyer.java
+@@ -5,6 +5,7 @@
+ package org.chromium.chrome.browser.incognito;
+ 
+ import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.browser.profiles.Profile;
+ import org.chromium.chrome.browser.profiles.ProfileManager;
+ import org.chromium.chrome.browser.tabmodel.IncognitoTabHostUtils;
+@@ -19,6 +20,7 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+ @NullMarked
+ public class IncognitoProfileDestroyer implements IncognitoTabModelObserver {
+     private final TabModelSelector mTabModelSelector;
++    private @Nullable Profile mProfileToDestroy;
+ 
+     /**
+      * Creates an {@link IncognitoProfileDestroyer} that reacts to incognito tabs in a
+@@ -36,14 +38,26 @@ public class IncognitoProfileDestroyer implements IncognitoTabModelObserver {
+ 
+     @Override
+     public void didBecomeEmpty() {
++        mProfileToDestroy = null;
+         if (!IncognitoTabHostUtils.doIncognitoTabsExist()
+                 && !IncognitoTabHostUtils.isIncognitoTabModelActive()) {
+             // Only delete the incognito profile if there are no incognito tabs open in any tab
+             // model selector as the profile is shared between them.
+             Profile profile = mTabModelSelector.getModel(true).getProfile();
+             if (profile != null && !profile.shutdownStarted()) {
+-                ProfileManager.destroyWhenAppropriate(profile);
++                // The tab model still points to the profile. Destroy the profile once the tab
++                // model is gone, in onEmptyModelDestroyed().
++                mProfileToDestroy = profile;
+             }
+         }
+     }
++
++    @Override
++    public void onEmptyModelDestroyed() {
++        Profile profile = mProfileToDestroy;
++        mProfileToDestroy = null;
++        if (profile != null && profile.isNativeInitialized() && !profile.shutdownStarted()) {
++            ProfileManager.destroyWhenAppropriate(profile);
++        }
++    }
+ }
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java b/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tabmodel/TabModelSelectorBase.java
+@@ -460,6 +460,13 @@ public abstract class TabModelSelectorBase
+         }
+     }
+ 
++    @Override
++    public void onEmptyModelDestroyed() {
++        for (IncognitoTabModelObserver observer : mIncognitoObservers) {
++            observer.onEmptyModelDestroyed();
++        }
++    }
++
+     @Override
+     public void setIncognitoReauthDialogDelegate(
+             IncognitoReauthDialogDelegate incognitoReauthDialogDelegate) {
+diff --git a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelImpl.java b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelImpl.java
+--- a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelImpl.java
++++ b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelImpl.java
+@@ -163,6 +163,10 @@ class IncognitoTabModelImpl implements IncognitoTabModelInternal {
+         mTabCountSupplier.set(0);
+ 
+         mDelegateModel = EmptyTabModel.getInstance(true);
++
++        for (IncognitoTabModelObserver observer : mIncognitoObservers) {
++            observer.onEmptyModelDestroyed();
++        }
+     }
+ 
+     private boolean isEmpty() {
+diff --git a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelObserver.java b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelObserver.java
+--- a/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelObserver.java
++++ b/chrome/browser/tabmodel/android/java/src/org/chromium/chrome/browser/tabmodel/IncognitoTabModelObserver.java
+@@ -33,4 +33,10 @@ public interface IncognitoTabModelObserver {
+ 
+     /** Called when the last tab of the {@link IncognitoTabModel} is closed. */
+     default void didBecomeEmpty() {}
++
++    /**
++     * Called after {@link #didBecomeEmpty()}, once the emptied {@link IncognitoTabModel} has
++     * destroyed its tab model, including the native objects that point to the incognito profile.
++     */
++    default void onEmptyModelDestroyed() {}
+ }
+--
