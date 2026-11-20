@@ -62,7 +62,7 @@ diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/j
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -1238,7 +1238,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -1237,7 +1237,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
              ActionConfirmationManager actionConfirmationManager =
                      new ActionConfirmationManager(profile, this, modalDialogManager);
  

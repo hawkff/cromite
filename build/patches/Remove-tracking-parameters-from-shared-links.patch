@@ -94,7 +94,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.ui.base.PageTransition;
  import org.chromium.ui.base.SelectFileDialog;
  import org.chromium.ui.base.WindowAndroid;
-@@ -4593,7 +4594,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4592,7 +4593,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
              Clipboard.getInstance()
                      .setText(
                              currentTab.getTitle(),

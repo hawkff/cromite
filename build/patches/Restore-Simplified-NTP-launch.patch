@@ -580,7 +580,7 @@ diff --git a/chrome/android/java/res/values/dimens.xml b/chrome/android/java/res
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -4149,7 +4149,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4148,7 +4148,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                              startupMetricsTracker,
                              mRootUiCoordinator.getExclusiveAccessManager(),
                              mBackPressManager,
