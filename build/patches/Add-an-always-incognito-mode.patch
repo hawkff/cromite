@@ -13,6 +13,12 @@ flag turned on.
 IncognitoPlaceholder is also deactivated, both in the phone and tablet version.
 The relative tests are also present.
 
+Turning the mode on asks for confirmation first, because tabs that are not
+incognito are closed at the next start and cannot be restored.
+Recent tabs saves closures of normal tabs only: closed incognito tabs are
+not saved there, because the native tab restore code needs a regular tab
+model.
+
 based on the original work by Ryan Archer <ryan.bradley.archer@gmail.com>
 Major contributions by uazo.
 See also: https://github.com/bromite/bromite/pull/1427
@@ -21,10 +27,10 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  chrome/android/chrome_java_resources.gni      |   1 +
  chrome/android/chrome_java_sources.gni        |   2 +
- .../java/res/xml/incognito_preferences.xml    |  37 ++++
+ .../java/res/xml/incognito_preferences.xml    |  37 +++
  .../java/res/xml/privacy_preferences.xml      |   5 +
- .../AlwaysIncognitoLinkInterceptor.java       |  54 ++++++
- .../chrome/browser/ChromeTabbedActivity.java  |  37 ++--
+ .../AlwaysIncognitoLinkInterceptor.java       |  54 +++++
+ .../chrome/browser/ChromeTabbedActivity.java  |  36 ++-
  .../chrome/browser/app/ChromeActivity.java    |   4 +
  .../AppMenuPropertiesDelegateImpl.java        |   5 +-
  .../ChromeContextMenuPopulator.java           |   5 +-
@@ -37,23 +43,23 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../chrome/browser/history/HistoryPage.java   |  16 ++
  .../chrome/browser/hub/HubProvider.java       |   4 +-
  .../native_page/NativePageFactory.java        |   5 +-
- .../privacy/settings/IncognitoSettings.java   | 177 ++++++++++++++++++
+ .../privacy/settings/IncognitoSettings.java   | 217 ++++++++++++++++++
  .../recent_tabs/RecentTabsManager.java        |  29 ++-
  .../settings/FragmentDependencyProvider.java  |   4 +
  .../HistoricalTabModelObserver.java           |   5 +-
  .../tab/tab_restore/HistoricalTabSaver.java   |   2 +-
- .../tab_restore/HistoricalTabSaverImpl.java   |  23 ++-
+ .../tab_restore/HistoricalTabSaverImpl.java   |  23 +-
  .../TabbedAppMenuPropertiesDelegate.java      |   7 +-
  .../browser/tabmodel/ChromeTabCreator.java    |   2 -
  .../tabmodel/TabModelSelectorImpl.java        |   3 +
  .../tabmodel/TabPersistentStoreImpl.java      |   5 +
  .../browser/toolbar/ToolbarManager.java       |   1 +
  .../webapps/WebappIntentDataProvider.java     |  16 ++
- .../browser/android/historical_tab_saver.cc   |  25 ++-
+ .../browser/android/historical_tab_saver.cc   |  25 +-
  .../chrome_autocomplete_provider_client.cc    |   9 +
  .../chrome_autocomplete_provider_client.h     |   1 +
  .../remote_suggestions_service_factory.cc     |   5 +
- .../host_content_settings_map_factory.cc      |  22 ++-
+ .../host_content_settings_map_factory.cc      |  22 +-
  chrome/browser/history/history_tab_helper.cc  |  20 ++
  chrome/browser/history/history_tab_helper.h   |  10 +-
  .../hub/DefaultPaneOrderController.java       |  14 +-
@@ -63,7 +69,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../browser/hub/HubPaneHostCoordinator.java   |   5 +-
  .../android/offline_page_bridge.cc            |  11 +-
  .../android/offline_page_model_factory.cc     |  20 +-
- .../android/request_coordinator_factory.cc    |  33 +++-
+ .../android/request_coordinator_factory.cc    |  33 ++-
  .../offline_page_model_factory.h              |   1 +
  .../offline_pages/recent_tab_helper.cc        |  31 ++-
  .../browser/offline_pages/recent_tab_helper.h |   5 +
@@ -71,10 +77,10 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  chrome/browser/prefs/browser_prefs.cc         |   5 +
  chrome/browser/profiles/profile_selections.cc |  10 +
  chrome/browser/profiles/profile_selections.h  |   6 +
- .../signin/services/ProfileDataCache.java     |  88 ++-------
- .../browser/ui/native_page/NativePage.java    |  25 ++-
+ .../signin/services/ProfileDataCache.java     |  88 ++-----
+ .../browser/ui/native_page/NativePage.java    |  25 +-
  .../browser/omnibox/LocationBarMediator.java  |   8 +
- .../strings/android_chrome_strings.grd        |  25 +++
+ .../strings/android_chrome_strings.grd        |  34 +++
  chrome/browser/ui/messages/android/BUILD.gn   |   1 +
  .../snackbar/INeedSnackbarManager.java        |  28 +++
  .../search_engine_tab_helper.cc               |   6 +
@@ -92,7 +98,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../add-an-always-incognito-mode.inc          |   3 +
  .../add-an-always-incognito-mode.inc          |   1 +
  .../webstore_private/webstore_private_api.cc  |  41 +++-
- 73 files changed, 872 insertions(+), 182 deletions(-)
+ 73 files changed, 920 insertions(+), 182 deletions(-)
  create mode 100644 chrome/android/java/res/xml/incognito_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/AlwaysIncognitoLinkInterceptor.java
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/IncognitoSettings.java
@@ -267,7 +273,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.components.user_prefs.UserPrefs;
  import org.chromium.components.webapps.ShortcutSource;
  import org.chromium.content_public.browser.LoadUrlParams;
-@@ -944,16 +946,26 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -944,16 +946,25 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                      mSupportedProfileType,
                      mMultiInstanceManager);
  
@@ -281,17 +287,16 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
 -                                ArchivedTabModelOrchestrator.getIfInstantiatedForProfile(profile);
 -                        return orchestrator != null ? orchestrator.getTabModel() : null;
 -                    });
-+            // Save tab closures for Recent Tabs when regular history is active, or when Cromite's
-+            // incognito history preference explicitly enables it in always-incognito mode.
++            // Save normal tab closures for Recent Tabs when regular history is active, or when
++            // Cromite's incognito history preference enables it in always-incognito mode. Closures
++            // of incognito tabs are not saved.
 +            boolean alwaysIncognito = AlwaysIncognitoLinkInterceptor.isAlwaysIncognito();
 +            PrefService prefService = UserPrefs.get(ProfileManager.getLastUsedRegularProfile());
 +            boolean historyEnabledInIncognito =
 +                    prefService.getBoolean(Pref.INCOGNITO_TAB_HISTORY_ENABLED);
 +            if (!alwaysIncognito || historyEnabledInIncognito) {
 +                TabModel regularTabModel = mTabModelSelector.getModel(/* incognito= */ false);
-+                mHistoricalTabModelObserver =
-+                        new HistoricalTabModelObserver(
-+                                mTabModelSelector.getModel(alwaysIncognito));
++                mHistoricalTabModelObserver = new HistoricalTabModelObserver(regularTabModel);
 +                Profile profile = regularTabModel.getProfile();
 +                mHistoricalTabModelObserver.addSecondaryTabModelSupplier(
 +                        () -> {
@@ -304,7 +309,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  
              // Defer creation of this helper so it triggers after TabModel observers.
              mUndoRefocusHelper =
-@@ -1275,7 +1287,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -1275,7 +1286,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                  new HubProvider(
                          this,
                          getProfileProviderSupplier(),
@@ -313,7 +318,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
                          mBackPressManager,
                          getMenuOrKeyboardActionController(),
                          this::getSnackbarManager,
-@@ -3986,7 +3998,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3986,7 +3997,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          && persistentState != null
                          && persistentState.getBoolean(IS_INCOGNITO_SELECTED, false);
          boolean startIncognito =
@@ -685,7 +690,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/IncognitoSettings.java
-@@ -0,0 +1,177 @@
+@@ -0,0 +1,217 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -706,6 +711,7 @@ new file mode 100644
 +package org.chromium.chrome.browser.privacy.settings;
 +
 +import android.os.Bundle;
++import android.app.Dialog;
 +import android.content.Context;
 +import android.content.Intent;
 +import android.provider.Browser;
@@ -714,6 +720,7 @@ new file mode 100644
 +import android.view.MenuInflater;
 +import android.view.MenuItem;
 +
++import androidx.appcompat.app.AlertDialog;
 +import androidx.preference.Preference;
 +import androidx.preference.PreferenceFragmentCompat;
 +import androidx.vectordrawable.graphics.drawable.VectorDrawableCompat;
@@ -748,6 +755,7 @@ new file mode 100644
 +                                                      INeedSnackbarManager {
 +    private Supplier<SnackbarManager> mSnackbarManagerSupplier;
 +    private Snackbar mSnackbar;
++    private Dialog mTurnOnDialog;
 +
 +    private static final String PREF_ALWAYS_INCOGNITO = "always_incognito";
 +    private static final String PREF_INCOGNITO_TAB_HISTORY = "incognito_history";
@@ -779,6 +787,13 @@ new file mode 100644
 +    public void onResume() {
 +        super.onResume();
 +        updatePreferences();
++    }
++
++    @Override
++    public void onDestroyView() {
++        super.onDestroyView();
++        // An open confirmation counts as Cancel: the switch stays off and nothing is written.
++        if (mTurnOnDialog != null) mTurnOnDialog.dismiss();
 +    }
 +
 +    public void updatePreferences() {
@@ -820,16 +835,46 @@ new file mode 100644
 +    public boolean onPreferenceChange(Preference preference, Object newValue) {
 +        String key = preference.getKey();
 +        if (PREF_ALWAYS_INCOGNITO.equals(key)) {
-+            AlwaysIncognitoLinkInterceptor.setAlwaysIncognito((boolean) newValue);
++            if ((boolean) newValue) {
++                // The next start closes the open tabs, so the switch turns on only after a
++                // confirmation.
++                showTurnOnDialog((ChromeSwitchPreference) preference);
++                return false;
++            }
++            AlwaysIncognitoLinkInterceptor.setAlwaysIncognito(false);
 +        } else if (PREF_INCOGNITO_TAB_HISTORY.equals(key)) {
 +            prefService.setBoolean(Pref.INCOGNITO_TAB_HISTORY_ENABLED, (boolean) newValue);
 +        } else if (PREF_INCOGNITO_SAVE_SITE_SETTING.equals(key)) {
 +            prefService.setBoolean(Pref.INCOGNITO_SAVE_SITE_SETTING_ENABLED, (boolean) newValue);
 +        }
++        showRelaunchSnackbar();
++        return true;
++    }
++
++    private void showRelaunchSnackbar() {
 +        if (!mSnackbarManagerSupplier.get().isShowing()) {
 +            mSnackbarManagerSupplier.get().showSnackbar(mSnackbar);
 +        }
-+        return true;
++    }
++
++    private void showTurnOnDialog(ChromeSwitchPreference preference) {
++        if (mTurnOnDialog != null) return;
++        mTurnOnDialog =
++                new AlertDialog.Builder(getContext(), R.style.ThemeOverlay_BrowserUI_AlertDialog)
++                        .setTitle(R.string.always_incognito_turn_on_title)
++                        .setMessage(R.string.always_incognito_turn_on_message)
++                        .setPositiveButton(
++                                R.string.always_incognito_turn_on_confirm,
++                                (dialog, which) -> {
++                                    // The click can arrive after the page went away.
++                                    if (getView() == null) return;
++                                    AlwaysIncognitoLinkInterceptor.setAlwaysIncognito(true);
++                                    preference.setChecked(true);
++                                    showRelaunchSnackbar();
++                                })
++                        .setNegativeButton(R.string.cancel, null)
++                        .setOnDismissListener(dialog -> mTurnOnDialog = null)
++                        .show();
 +    }
 +
 +    @Override
@@ -2246,7 +2291,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
-@@ -7403,6 +7403,31 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
+@@ -7403,6 +7403,40 @@ To change this setting, <ph name="BEGIN_LINK">BEGIN_LINK</ph>delete the Chrome d
        <message name="IDS_QUICK_DELETE_DIALOG_COOKIES_CACHE_AND_OTHER_SITE_DATA_TEXT" desc="Text indicating that browsing data like cookies, cache, and other site data would be deleted.">
          Cookies, cache, and other site data
        </message>
@@ -2274,6 +2319,15 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 +      </message>
 +      <message name="IDS_INCOGNITO_SAVE_SITE_SETTING_ENABLED_SUMMARY" desc="Summary for save site setting flag in incognito mode">
 +        Remember site settings changes in incognito mode
++      </message>
++      <message name="IDS_ALWAYS_INCOGNITO_TURN_ON_TITLE" desc="Title of the dialog shown before always incognito mode is turned on.">
++        Turn on always incognito?
++      </message>
++      <message name="IDS_ALWAYS_INCOGNITO_TURN_ON_MESSAGE" desc="Message of the dialog shown before always incognito mode is turned on. Open normal tabs are closed at the next start of the browser.">
++        Any open tabs that aren't incognito will be closed the next time the browser starts. They can't be restored.
++      </message>
++      <message name="IDS_ALWAYS_INCOGNITO_TURN_ON_CONFIRM" desc="Button that confirms turning on always incognito mode.">
++        Turn on
 +      </message>
        <message name="IDS_QUICK_DELETE_DIALOG_SEARCH_HISTORY_DISAMBIGUATION_TEXT" desc="Text for signed in users only in the Quick Delete dialog, that is shown when the user clicks on 'Clear browsing data' option in the three dots menu, informing signed in users that search history and other forms of Activity saved in their Google account will not be deleted.">
          <ph name="BEGIN_LINK1">&lt;link1&gt;</ph>Search history<ph name="END_LINK1">&lt;/link1&gt;</ph> and <ph name="BEGIN_LINK2">&lt;link2&gt;</ph>other forms of activity<ph name="END_LINK2">&lt;/link2&gt;</ph> may be saved in your Google Account
