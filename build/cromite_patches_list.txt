@@ -332,5 +332,6 @@ Restrict-executable-memory-in-JIT-less-renderers.patch
 Do-not-leave-a-dangling-active-tab-pointer-in-ActiveTabTracker.patch
 Drop-the-SandboxStatusExtension-binder-when-its-frame-goes-away.patch
 Remove-tracking-parameters-from-shared-links.patch
+Destroy-the-incognito-profile-after-its-tab-model.patch
 
 # extension patches
