@@ -27,7 +27,7 @@ diff --git a/chrome/android/java/res/values/ids.xml b/chrome/android/java/res/va
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -4898,6 +4898,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4897,6 +4897,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                  NewTabPageUma.recordAction(NewTabPageUma.ACTION_OPENED_DOWNLOADS_MANAGER);
              }
              RecordUserAction.record("MobileMenuDownloadManager");

@@ -64,7 +64,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.components.browser_ui.share.ShareParams;
  import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
  import org.chromium.components.browser_ui.util.ComposedBrowserControlsVisibilityDelegate;
-@@ -4857,6 +4861,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4856,6 +4860,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                      closeAllTabsCallback,
                      /* isIncognitoOnly= */ false);
              RecordUserAction.record("MobileMenuCloseAllTabs");
@@ -73,7 +73,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
          } else if (id == R.id.close_all_incognito_tabs_menu_id) {
              boolean allowUndo = TabClosureParamsUtils.shouldAllowUndo(triggeringMotion);
  
-@@ -5166,6 +5172,41 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -5165,6 +5171,41 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
          assumeNonNull(getTabModalLifetimeHandler()).onOmniboxFocusChanged(hasFocus);
      }
  
