@@ -276,7 +276,7 @@ diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/j
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/download/DownloadUtils.java b/chrome/android/java/src/org/chromium/chrome/browser/download/DownloadUtils.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/download/DownloadUtils.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/download/DownloadUtils.java
-@@ -91,6 +91,7 @@ import org.chromium.ui.base.DeviceFormFactor;
+@@ -90,6 +90,7 @@ import org.chromium.ui.base.DeviceFormFactor;
  import org.chromium.ui.base.MimeTypeUtils;
  import org.chromium.ui.widget.Toast;
  import org.chromium.url.GURL;
@@ -284,7 +284,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/download/Downlo
  
  import java.io.File;
  import java.util.Locale;
-@@ -489,6 +490,12 @@ public class DownloadUtils {
+@@ -478,6 +479,12 @@ public class DownloadUtils {
       * @param req The {@link DownloadOpenRequest} with all open-file parameters.
       */
      private static boolean doOpenFile(DownloadOpenRequest req) {
@@ -364,7 +364,7 @@ diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
 diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browser_prefs.cc
 --- a/chrome/browser/prefs/browser_prefs.cc
 +++ b/chrome/browser/prefs/browser_prefs.cc
-@@ -306,6 +306,7 @@
+@@ -305,6 +305,7 @@
  #include "components/feed/core/v2/ios_shared_prefs.h"      // nogncheck
  #include "components/ntp_tiles/popular_sites_impl.h"
  #include "components/permissions/contexts/geolocation_permission_context_android.h"
@@ -372,7 +372,7 @@ diff --git a/chrome/browser/prefs/browser_prefs.cc b/chrome/browser/prefs/browse
  #include "components/webapps/browser/android/install_prompt_prefs.h"
  #endif  // BUILDFLAG(IS_ANDROID)
  
-@@ -2210,6 +2211,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
+@@ -2209,6 +2210,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry,
  #endif
    ZeroSuggestProvider::RegisterProfilePrefs(registry);
    NtpCustomBackgroundService::RegisterProfilePrefs(registry);

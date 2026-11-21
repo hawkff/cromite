@@ -37,7 +37,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.base.CommandLine;
  import org.chromium.base.DeviceInfo;
  import org.chromium.base.IntentUtils;
-@@ -2609,8 +2610,10 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -2599,8 +2600,10 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          ActivityRestoreState.NUM_ENTRIES);
              }
  

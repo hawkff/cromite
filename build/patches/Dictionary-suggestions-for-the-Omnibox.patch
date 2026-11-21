@@ -29,7 +29,7 @@ diff --git a/chrome/android/java/res/layout/url_bar.xml b/chrome/android/java/re
 diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/LocationBarMediator.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/LocationBarMediator.java
 --- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/LocationBarMediator.java
 +++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/LocationBarMediator.java
-@@ -905,7 +905,7 @@ public class LocationBarMediator
+@@ -897,7 +897,7 @@ public class LocationBarMediator
              // a new session. Ensure all components bind to the active session and UrlBar requests
              // focus.
              if (session.isSessionActive()) {
@@ -38,7 +38,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
                  if (!mUrlCoordinator.hasFocus()) {
                      mUrlFocusedWithoutAnimations = true;
                      mUrlCoordinator.requestFocus();
-@@ -1378,7 +1378,7 @@ public class LocationBarMediator
+@@ -1370,7 +1370,7 @@ public class LocationBarMediator
                  // Existing text (e.g. if the user pasted via the fakebox) from the fake box
                  // should be restored after toggling the focus.
                  if (mCurrentInput != null && !mCurrentInput.getUserText().isEmpty()) {
@@ -47,7 +47,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
                  }
              }
  
-@@ -1422,7 +1422,7 @@ public class LocationBarMediator
+@@ -1414,7 +1414,7 @@ public class LocationBarMediator
       */
      @EnsuresNonNullIf("mCurrentInput")
      @VisibleForTesting
@@ -56,7 +56,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
          // Do not instantiate a new ephemeral session unless we're activating it as well.
          var session = FuseboxSessionState.from(mLocationBarDataProvider);
  
-@@ -1445,6 +1445,18 @@ public class LocationBarMediator
+@@ -1437,6 +1437,18 @@ public class LocationBarMediator
          // mCurrentInput instance.
          mCurrentInput = session.getAutocompleteInput();
  
@@ -75,7 +75,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
          // See if there's any existing user selection that we can pick and work with.
          var displayTextSelection =
                  new TextSelection(
-@@ -1758,7 +1770,7 @@ public class LocationBarMediator
+@@ -1750,7 +1762,7 @@ public class LocationBarMediator
          if (hasFocus) {
              // Session may be pre-focused from the NTP.
              if (mCurrentInput == null) {
@@ -84,7 +84,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
              }
              // TODO(b/548102274): See about removing this special casing for the DisplayState. I
              // think we should aim to remove all end/begin/suspend calls from the focus sequence,
-@@ -2349,7 +2361,7 @@ public class LocationBarMediator
+@@ -2341,7 +2353,7 @@ public class LocationBarMediator
          if (actionTaken) {
              currentInput.setAutocompleteState(AutocompleteState.ENABLED);
              currentInput.setFocusReason(OmniboxFocusReason.FAKE_BOX_TAP);
@@ -93,7 +93,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
              mUrlCoordinator.requestFocus();
          } else {
              // When no action is taken, just end the input session since the omnibox won't be
-@@ -3141,9 +3153,9 @@ public class LocationBarMediator
+@@ -3133,9 +3145,9 @@ public class LocationBarMediator
          // mCurrentInput here to avoid double-initializing the session if it was
          // already started synchronously.
          if (hadCurrentInput) {
