@@ -33,14 +33,15 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../bookmarks/BookmarkManagerMediator.java    |   4 +-
  .../bookmarks/BookmarkToolbarMediator.java    |   3 +-
  .../download/home/list/ShareUtils.java        |   3 +-
- .../browser/omnibox/UrlBarMediator.java       |   7 +-
+ .../browser/omnibox/UrlBarMediator.java       |  31 +++-
+ .../omnibox/UrlBarMediatorUnitTest.java       |  43 +++++
  ...tracking-parameters-from-shared-links.grdp |   9 +
  .../browser_ui/share/ShareParams.java         |   4 +-
  ui/android/BUILD.gn                           |   2 +
  .../org/chromium/ui/base/ClipboardImpl.java   |   2 +-
  .../src/org/chromium/ui/base/LinkCleaner.java | 175 ++++++++++++++++++
  .../org/chromium/ui/base/LinkCleanerTest.java | 143 ++++++++++++++
- 16 files changed, 371 insertions(+), 10 deletions(-)
+ 17 files changed, 435 insertions(+), 13 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
  create mode 100644 ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
  create mode 100644 ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
@@ -86,7 +87,7 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrom
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -424,6 +424,7 @@ import org.chromium.content_public.common.ContentSwitches;
+@@ -423,6 +423,7 @@ import org.chromium.content_public.common.ContentSwitches;
  import org.chromium.ui.base.ActivityWindowAndroid;
  import org.chromium.ui.base.Clipboard;
  import org.chromium.ui.base.DeviceFormFactor;
@@ -94,7 +95,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.ui.base.PageTransition;
  import org.chromium.ui.base.SelectFileDialog;
  import org.chromium.ui.base.WindowAndroid;
-@@ -4592,7 +4593,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4582,7 +4583,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
              Clipboard.getInstance()
                      .setText(
                              currentTab.getTitle(),
@@ -154,7 +155,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/history/History
  import org.chromium.ui.base.WindowAndroid;
  import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
  import org.chromium.ui.modaldialog.ModalDialogManager;
-@@ -398,7 +399,13 @@ public class HistoryManager
+@@ -390,7 +391,13 @@ public class HistoryManager
          } else if (item.getItemId() == R.id.selection_mode_copy_link) {
              mUmaRecorder.recordCopyLink(mIsSearching);
              Clipboard.getInstance()
@@ -233,7 +234,15 @@ diff --git a/chrome/browser/download/internal/android/java/src/org/chromium/chro
 diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java
 --- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java
 +++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediator.java
-@@ -34,6 +34,7 @@ import org.chromium.components.omnibox.OmniboxUrlEmphasizer.UrlEmphasisSpan;
+@@ -27,6 +27,7 @@ import org.chromium.chrome.browser.search_engines.settings.SiteSearchSettings;
+ import org.chromium.chrome.browser.settings.SettingsNavigationFactory;
+ import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
++import org.chromium.components.embedder_support.util.UrlUtilities;
+ import org.chromium.components.omnibox.AutocompleteInput;
+ import org.chromium.components.omnibox.AutocompleteInput.DisplayState;
+ import org.chromium.components.omnibox.OmniboxFeatures;
+@@ -34,6 +35,7 @@ import org.chromium.components.omnibox.OmniboxUrlEmphasizer.UrlEmphasisSpan;
  import org.chromium.components.omnibox.TextSelection;
  import org.chromium.ui.base.Clipboard;
  import org.chromium.ui.base.DeviceFormFactor;
@@ -241,16 +250,30 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
  import org.chromium.ui.modelutil.PropertyModel;
  import org.chromium.url.GURL;
  
-@@ -423,6 +424,7 @@ class UrlBarMediator implements UrlBarTextContextMenuDelegate {
+@@ -415,12 +417,15 @@ class UrlBarMediator implements UrlBarTextContextMenuDelegate {
+ 
+     @Override
+     public @Nullable String getReplacementCutCopyText(String currentText, TextSelection selection) {
+-        if (mUrlBarData.url == null) return null;
+-
+         // Replace the cut/copy text only applies if the user selected from the beginning of the
+         // display text.
+         int minSel = selection.getLower();
          int maxSel = selection.getUpper();
++        boolean isWholeText = minSel == 0 && maxSel == currentText.length();
++
++        // Text that is not the page's display text, such as an edited URL, is copied as
++        // selected, except that a whole field holding one link loses its tracking parameters.
++        if (mUrlBarData.url == null) return isWholeText ? getCleanedLink(currentText) : null;
  
          if (minSel != 0) return null;
-+        boolean isWholeText = maxSel == currentText.length();
  
-         // Trim to just the currently selected text as that is the only text we are replacing.
-         currentText = currentText.substring(minSel, maxSel);
-@@ -458,7 +460,10 @@ class UrlBarMediator implements UrlBarTextContextMenuDelegate {
-             return null;
+@@ -455,10 +460,28 @@ class UrlBarMediator implements UrlBarTextContextMenuDelegate {
+         // URL and keep any further modifications by the user.
+         if (!currentText.startsWith(formattedUrlLocation)
+                 || maxSel < formattedUrlLocation.length()) {
+-            return null;
++            return isWholeText ? getCleanedLink(currentText) : null;
          }
  
 -        return originalUrlLocation + currentText.substring(formattedUrlLocation.length());
@@ -258,9 +281,84 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
 +                originalUrlLocation + currentText.substring(formattedUrlLocation.length());
 +        // Copying the whole field copies a link; a partial selection stays as selected.
 +        return isWholeText ? LinkCleaner.cleanIfEnabled(copyText) : copyText;
++    }
++
++    /**
++     * Returns the text without tracking parameters if it is one valid http or https URL with a host
++     * that has some and cleaning is on, or null so that the text is copied as it is.
++     */
++    private static @Nullable String getCleanedLink(String text) {
++        String cleaned = LinkCleaner.cleanIfEnabled(text);
++        if (cleaned.equals(text)) return null;
++        // The parsed URL only decides whether to clean; the cleaning keeps the text as typed.
++        GURL url = new GURL(text);
++        if (!url.isValid() || !UrlUtilities.isHttpOrHttps(url) || url.getHost().isEmpty()) {
++            return null;
++        }
++        return cleaned;
      }
  
      @Override
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediatorUnitTest.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediatorUnitTest.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediatorUnitTest.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarMediatorUnitTest.java
+@@ -53,6 +53,7 @@ import org.chromium.components.omnibox.OmniboxUrlEmphasizer;
+ import org.chromium.components.omnibox.OmniboxUrlEmphasizer.UrlEmphasisColorSpan;
+ import org.chromium.components.omnibox.TextSelection;
+ import org.chromium.ui.base.Clipboard;
++import org.chromium.ui.base.LinkCleaner;
+ import org.chromium.ui.modelutil.PropertyModel;
+ import org.chromium.ui.modelutil.PropertyObservable.PropertyObserver;
+ import org.chromium.url.GURL;
+@@ -533,6 +534,48 @@ public class UrlBarMediatorUnitTest {
+                 mMediator.getReplacementCutCopyText(editingText, new TextSelection(12, 0)));
+     }
+ 
++    @Test
++    public void cutCopyReplacementText_EditedLink() {
++        String link = "https://example.com/?id=7&utm_source=test&fbclid=abc#top";
++        mMediator.setUrlBarData(
++                UrlBarData.forNonUrlText(link),
++                UrlBar.ScrollType.NO_SCROLL,
++                TextSelection.SELECT_ALL);
++
++        // A whole field that holds one link loses its tracking parameters.
++        assertEquals(
++                "https://example.com/?id=7#top",
++                mMediator.getReplacementCutCopyText(link, new TextSelection(0, link.length())));
++        assertEquals(
++                "https://example.com/?id=7#top",
++                mMediator.getReplacementCutCopyText(link, new TextSelection(link.length(), 0)));
++
++        // A partial selection is copied as selected.
++        assertNull(mMediator.getReplacementCutCopyText(link, new TextSelection(0, 30)));
++
++        // Text that is not one link, and a link without tracking parameters, are copied as
++        // selected.
++        String text = "see " + link;
++        assertNull(mMediator.getReplacementCutCopyText(text, new TextSelection(0, text.length())));
++        String cleanLink = "https://example.com/?id=7";
++        assertNull(
++                mMediator.getReplacementCutCopyText(
++                        cleanLink, new TextSelection(0, cleanLink.length())));
++
++        // Text that is not a valid URL is copied as selected, even if it looks like one.
++        String invalidPort = "https://example.com:abc/?utm_source=keep";
++        assertNull(
++                mMediator.getReplacementCutCopyText(
++                        invalidPort, new TextSelection(0, invalidPort.length())));
++
++        // With link cleaning off, the whole field is copied as selected.
++        ContextUtils.getAppSharedPreferences()
++                .edit()
++                .putBoolean(LinkCleaner.PREF_CLEAN_LINKS, false)
++                .apply();
++        assertNull(mMediator.getReplacementCutCopyText(link, new TextSelection(0, link.length())));
++    }
++
+     @Test
+     public void setUrlBarHintText() {
+         mMediator.setUrlBarHintText("Hint 1");
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
 new file mode 100644
 --- /dev/null
