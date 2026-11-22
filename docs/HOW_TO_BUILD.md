@@ -113,24 +113,6 @@ git config user.email builder@localhost
 git config user.name builder
 ```
 
-## Fetch the profile data
-
-The release arguments enable PGO (`chrome_pgo_phase = 2`) and use AFDO profiles. Download them:
-
-```
-cd ~/chromium/src
-python3 tools/update_pgo_profiles.py --target=android-desktop-arm64 update --gs-url-base=chromium-optimization-profiles/pgo_profiles
-python3 tools/update_pgo_profiles.py --target=android-desktop-x64 update --gs-url-base=chromium-optimization-profiles/pgo_profiles
-python3 tools/update_pgo_profiles.py --target=android-arm32 update --gs-url-base=chromium-optimization-profiles/pgo_profiles
-python3 v8/tools/builtins-pgo/download_profiles.py download --depot-tools third_party/depot_tools --check-v8-revision
-python3 tools/download_optimization_profile.py --newest_state=chrome/android/profiles/newest.txt --local_state=chrome/android/profiles/local.txt --output_name=chrome/android/profiles/afdo.prof --gs_url_base=chromeos-prebuilt/afdo-job/llvm
-python3 tools/download_optimization_profile.py --newest_state=chrome/android/profiles/arm.newest.txt --local_state=chrome/android/profiles/arm.local.txt --output_name=chrome/android/profiles/arm.afdo.prof --gs_url_base=chromeos-prebuilt/afdo-job/llvm
-```
-
-The arm64 build reads its PGO profile from `chrome/android/orderfiles/arm64/`, which `gclient sync` already fetched. The x64 build uses the `android-arm32` profile, because a Cromite patch changes how Chromium selects the profile for x64.
-
-You can delete `third_party/angle/third_party/VK-GL-CTS/` to save space. The build does not use it.
-
 ## Apply the patches
 
 Create a branch, then turn five sub-repositories into ordinary tracked directories so that patches can change files inside them. Each one gets its own commit whose message starts with `:NOEXPORT:`, and the export scripts in `tools/` skip those commits.
@@ -180,6 +162,26 @@ done
 Do not run other git commands in `~/chromium/src` while the loop runs. Two git processes writing the index at once make `git am` fail with `fatal: unable to write index file`. If a patch fails, run `git am --abort`, check that the working tree is clean, and run the loop again.
 
 When the loop finishes, `git rev-list --count $VERSION..HEAD` equals the number of `.patch` lines in the list plus 5.
+
+## Fetch the profile data
+
+The release arguments enable PGO (`chrome_pgo_phase = 2`) and use AFDO profiles. Download them after the patches are applied:
+
+```
+cd ~/chromium/src
+python3 tools/update_pgo_profiles.py --target=android-desktop-arm64 update --gs-url-base=chromium-optimization-profiles/pgo_profiles
+python3 tools/update_pgo_profiles.py --target=android-desktop-x64 update --gs-url-base=chromium-optimization-profiles/pgo_profiles
+python3 tools/update_pgo_profiles.py --target=android-arm32 update --gs-url-base=chromium-optimization-profiles/pgo_profiles
+python3 v8/tools/builtins-pgo/download_profiles.py download --depot-tools third_party/depot_tools --check-v8-revision
+python3 tools/download_optimization_profile.py --newest_state=chrome/android/profiles/newest.txt --local_state=chrome/android/profiles/local.txt --output_name=chrome/android/profiles/afdo.prof --gs_url_base=chromeos-prebuilt/afdo-job/llvm
+python3 tools/download_optimization_profile.py --newest_state=chrome/android/profiles/arm.newest.txt --local_state=chrome/android/profiles/arm.local.txt --output_name=chrome/android/profiles/arm.afdo.prof --gs_url_base=chromeos-prebuilt/afdo-job/llvm
+```
+
+The V8 download writes files into `v8/tools/builtins-pgo/profiles/`. The flatten step commits every file under `v8`, ignored files included, so a download before the flatten puts these files into the `:NOEXPORT:` commit and the resulting tree no longer matches other checkouts of the same series.
+
+The arm64 build reads its PGO profile from `chrome/android/orderfiles/arm64/`, which `gclient sync` already fetched. The x64 build uses the `android-arm32` profile, because a Cromite patch changes how Chromium selects the profile for x64.
+
+You can delete `third_party/angle/third_party/VK-GL-CTS/` to save space. The build does not use it.
 
 ## Environment variables
 
