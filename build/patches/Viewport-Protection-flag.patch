@@ -97,7 +97,7 @@ new file mode 100644
 +    @Override
 +    public ContentSettingsResources.ResourceItem getResourceItem() {
 +        return new ContentSettingsResources.ResourceItem(
-+            /*icon*/ R.drawable.web_asset,
++            /*icon*/ R.drawable.smartphone_24px,
 +            /*title*/ R.string.viewport_permission_title,
 +            /*defaultEnabledValue*/ getDefaultEnabledValue(),
 +            /*defaultDisabledValue*/ getDefaultDisabledValue(),
@@ -152,16 +152,16 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +  <message name="IDS_SITE_SETTINGS_TYPE_VIEWPORT" desc="The label used for viewport size change site settings controls." formatter_data="android_java">
-+    Viewport Size Protection
++    Viewport size protection
 +  </message>
 +  <message name="IDS_VIEWPORT_PERMISSION_TITLE" desc="Title of the permission to use viewport size change [CHAR-LIMIT=32]" formatter_data="android_java">
-+    Viewport Size Protection
++    Viewport size protection
 +  </message>
 +  <message name="IDS_SITE_SETTINGS_TYPE_VIEWPORT_MID_SENTENCE" desc="The label used for viewport size change site settings controls when used mid-sentence." formatter_data="android_java">
-+    Viewport Size Protection
++    Viewport size protection
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_VIEWPORT_PROTECTION_DESCRIPTION" desc="Description of the viewport protection content setting." formatter_data="android_java">
-+    Hides the screen size by randomly changing the values for each website
++    Hides your screen size from sites by reporting a slightly different size on each page load
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_VIEWPORT_ENABLED" desc="Summary text explaining that viewport size change is full enabled." formatter_data="android_java">
 +    Enabled
@@ -170,10 +170,10 @@ new file mode 100644
 +    Disabled
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_VIEWPORT_PROTECTION_ALLOWED_EXCEPTIONS" desc="Label for the allowed exceptions site list of the viewport protection setting.">
-+    Viewport Protection is enabled with these websites
++    Protected on these sites
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_VIEWPORT_PROTECTION_BLOCKED_EXCEPTIONS" desc="Label for the blocked exceptions site list of the viewport protection setting.">
-+    Not allowed to use Viewport Protection
++    Not protected on these sites
 +  </message>
 +</grit-part>
 diff --git a/components/content_settings/core/browser/bromite_content_settings/viewport.inc b/components/content_settings/core/browser/bromite_content_settings/viewport.inc

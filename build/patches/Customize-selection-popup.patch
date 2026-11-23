@@ -265,35 +265,35 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_CUSTOMIZE_SELECTON_POPUP_TITLE" desc="">
-+        Customize selection popup
++        Text selection menu
 +    </message>
 +
 +    <message name="IDS_SELECTION_POPUP_TABS_FOREGROUND_TITLE" desc="">
-+        Opens tabs in foreground
++        Switch to new tabs
 +    </message>
 +    <message name="IDS_SELECTION_POPUP_TABS_FOREGROUND_SUMMARY" desc="">
-+        Immediately brings new open tabs to the foreground
++        Tabs opened from the menu come to the front right away
 +    </message>
 +
 +    <message name="IDS_SELECTION_POPUP_WEB_SEARCH_TO_TOP_TITLE" desc="">
-+        Move web search to the top of items
++        Show web search first
 +    </message>
 +    <message name="IDS_SELECTION_POPUP_WEB_SEARCH_TO_TOP_SUMMARY" desc="">
-+        Web search as first choice
++        Puts web search at the top of the menu
 +    </message>
 +
 +    <message name="IDS_SELECTION_POPUP_WEB_SEARCH_TO_GROUP_TITLE" desc="">
-+        Web search in tab group
++        Search in the current tab group
 +    </message>
 +    <message name="IDS_SELECTION_POPUP_WEB_SEARCH_TO_GROUP_SUMMARY" desc="">
-+        Opens the search in a tab in the current group, if deactivated opens a new group
++        When off, each search opens in a new tab
 +    </message>
 +
 +    <message name="IDS_SELECTION_POPUP_SMART_TEXT_TITLE" desc="">
-+        Enable smart text selection
++        Smart text selection
 +    </message>
 +    <message name="IDS_SELECTION_POPUP_SMART_TEXT_SUMMARY" desc="">
-+        Smart Text selection automatically augments the selected boundaries and classifies the selected text based on the context by sending selection together with its surrounding text
++        Adjusts what you select and suggests actions for it. Sends the selected text and the text around it to the text classifier of Android.
 +    </message>
 +</grit-part>
 diff --git a/components/android_autofill/browser/java/src/org/chromium/components/autofill/AutofillSelectionMenuItemHelper.java b/components/android_autofill/browser/java/src/org/chromium/components/autofill/AutofillSelectionMenuItemHelper.java

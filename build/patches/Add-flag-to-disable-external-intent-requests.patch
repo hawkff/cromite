@@ -141,10 +141,10 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_ALLOW_EXTERNAL_INTENT_REQUESTS_TITLE" desc="">
-+        Allow forward URL requests to external intents
++        Let sites open apps
 +    </message>
 +    <message name="IDS_ALLOW_EXTERNAL_INTENT_REQUESTS_SUMMARY" desc="">
-+        If disabled, URL requests will never allow redirection to an external intent, such as open application. Caution: since no verification is possible on the information, allows linkage between browser browsing and activity on the application.
++        When off, links and redirects on sites cannot open another app, except for phone links. When on, an app that a site opens can link what you do in the browser to what you do in the app.
 +    </message>
 +</grit-part>
 diff --git a/components/external_intents/android/external_intents_features.cc b/components/external_intents/android/external_intents_features.cc

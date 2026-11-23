@@ -15,17 +15,16 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  chrome/android/java/AndroidManifest.xml       |  28 ++-
  .../res/layout/sharing_intent_content.xml     |  88 ++++++++++
  .../chrome/browser/IntentHandler.java         |  16 +-
- .../browser/LaunchIntentDispatcher.java       |   2 +-
  .../document/ChromeLauncherActivity.java      |  13 +-
  .../init/ProcessInitializationHandler.java    |   2 +
- .../SharedIntentShareActivity.java            | 159 ++++++++++++++++++
+ .../SharedIntentShareActivity.java            | 166 ++++++++++++++++++
  .../flags/android/chrome_feature_list.cc      |   1 +
  .../browser/flags/ChromeFeatureList.java      |   1 +
  .../strings/android_chrome_strings.grd        |  14 ++
  .../about_flags_cc/Enable-share-intent.inc    |  12 ++
  .../Enable-share-intent.inc                   |   3 +
  .../Enable-share-intent.inc                   |   1 +
- 15 files changed, 333 insertions(+), 9 deletions(-)
+ 14 files changed, 339 insertions(+), 8 deletions(-)
  create mode 100644 chrome/android/java/res/layout/sharing_intent_content.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/sharing/shared_intent/SharedIntentShareActivity.java
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/Enable-share-intent.inc
@@ -239,19 +238,6 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/IntentHandler.j
              // Handle post data case.
              String postDataType =
                      IntentUtils.safeGetStringExtra(intent, IntentHandler.EXTRA_POST_DATA_TYPE);
-diff --git a/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java b/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
---- a/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
-+++ b/chrome/android/java/src/org/chromium/chrome/browser/LaunchIntentDispatcher.java
-@@ -593,8 +593,8 @@ public class LaunchIntentDispatcher {
-                     /*incognito*/true);
-                 newIntent.setData(mIntent.getData());
-                 newIntent.setPackage(applicationContext.getPackageName());
--                IntentHandler.setTabLaunchType(newIntent, TabLaunchType.FROM_EXTERNAL_APP);
-                 newIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-+                IntentHandler.setForceIncognitoMode(newIntent);
-             }
-             if (!chromeTabbedTaskExists(mActivity)) {
-                 newIntent.putExtra(IntentHandler.EXTRA_STARTED_TABBED_CHROME_TASK, true);
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/document/ChromeLauncherActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/document/ChromeLauncherActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/document/ChromeLauncherActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/document/ChromeLauncherActivity.java
@@ -310,7 +296,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/sharing/shared_
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/sharing/shared_intent/SharedIntentShareActivity.java
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,166 @@
 +// Copyright 2019 The Chromium Authors. All rights reserved.
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -452,6 +438,13 @@ new file mode 100644
 +    }
 +
 +    private void OpenLinkInIncognito() {
++        // The shared text comes from another app. Check it like a link from another app before
++        // it is put into a trusted intent, which skips those checks.
++        if (IntentHandler.shouldIgnoreIntent(
++                new Intent(Intent.ACTION_VIEW, Uri.parse(linkUrl)), this)) {
++            finish();
++            return;
++        }
 +        Context applicationContext = ContextUtils.getApplicationContext();
 +        Intent chromeIntent = IntentHandler.createTrustedOpenNewTabIntent(applicationContext,
 +            /*incognito*/true);

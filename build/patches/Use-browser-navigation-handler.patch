@@ -283,7 +283,7 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_CUSTOMIZE_NAVIGATION_MODE" desc="">
-+        Customising the navigation manager
++        Navigation gestures
 +    </message>
 +    <message name="IDS_USE_BROWSER_NAVIGATION_HANDLER_TITLE" desc="">
 +        Disable system gestures for web browsing

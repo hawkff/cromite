@@ -224,10 +224,10 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
          Force Tablet Mode
        </message>
 +      <message name="IDS_ALWAYS_SHOW_CONTEXTMENU_ON_LINKS_TITLE" desc="Title of the preference that open the context menu in links.">
-+        Always open the context menu in the links
++        Tap a link to open its menu
 +      </message>
 +      <message name="IDS_ALWAYS_SHOW_CONTEXTMENU_ON_LINKS_SUMMARY" desc="Summary of the preference that open the context menu in links.">
-+        Allows the context menu to be opened with a tap and follow the link with long press
++        Touch and hold a link to open it
 +      </message>
  
        <!-- Safety check -->

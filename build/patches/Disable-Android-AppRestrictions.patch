@@ -8,11 +8,13 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/browser/flags/BUILD.gn                 |  1 +
  .../cromite/sEnableAndroidAppRestriction.java | 39 +++++++++++++++++++
  .../policy/AppRestrictionsProvider.java       | 12 ++++++
+ .../policy/CombinedPolicyProvider.java        |  7 +++-
  .../components/policy/EnterpriseInfoImpl.java |  4 ++
+ .../policy/CombinedPolicyProviderTest.java    |  2 +
  .../DisableAndroidAppRestriction.inc          | 13 +++++++
  .../disable-android-app-restriction.inc       |  3 ++
  .../disable-android-app-restriction.inc       |  1 +
- 8 files changed, 75 insertions(+), 2 deletions(-)
+ 10 files changed, 82 insertions(+), 4 deletions(-)
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sEnableAndroidAppRestriction.java
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/DisableAndroidAppRestriction.inc
  create mode 100644 cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/disable-android-app-restriction.inc
@@ -116,6 +118,30 @@ diff --git a/components/policy/android/java/src/org/chromium/components/policy/A
          try {
              Bundle bundle = userManager.getApplicationRestrictions(packageName);
              Log.i(TAG, "#getApplicationRestrictionsFromUserManager() " + bundle);
+diff --git a/components/policy/android/java/src/org/chromium/components/policy/CombinedPolicyProvider.java b/components/policy/android/java/src/org/chromium/components/policy/CombinedPolicyProvider.java
+--- a/components/policy/android/java/src/org/chromium/components/policy/CombinedPolicyProvider.java
++++ b/components/policy/android/java/src/org/chromium/components/policy/CombinedPolicyProvider.java
+@@ -20,7 +20,7 @@ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ 
+ import java.util.ArrayList;
+-import java.util.Arrays;
++import java.util.Collections;
+ import java.util.List;
+ 
+ /**
+@@ -121,7 +121,10 @@ public class CombinedPolicyProvider {
+ 
+         List<Bundle> policies;
+         if (isPolicyCacheEnabled()) {
+-            policies = Arrays.asList(newSettings);
++            // This build registers no policy provider, so the cache holds only the browser's own
++            // command line policies. They must not become platform policies, which would report
++            // the browser as managed. The flush still completes policy initialization.
++            policies = Collections.emptyList();
+         } else {
+             mCachedPolicies.set(source, newSettings);
+             // Check if we have policies from all the providers before applying them.
 diff --git a/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java b/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java
 --- a/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java
 +++ b/components/policy/android/java/src/org/chromium/components/policy/EnterpriseInfoImpl.java
@@ -130,6 +156,19 @@ diff --git a/components/policy/android/java/src/org/chromium/components/policy/E
                      boolean hasProfileOwnerApp = false;
                      boolean hasDeviceOwnerApp = false;
                      DevicePolicyManager devicePolicyManager =
+diff --git a/components/policy/android/junit/src/org/chromium/components/policy/CombinedPolicyProviderTest.java b/components/policy/android/junit/src/org/chromium/components/policy/CombinedPolicyProviderTest.java
+--- a/components/policy/android/junit/src/org/chromium/components/policy/CombinedPolicyProviderTest.java
++++ b/components/policy/android/junit/src/org/chromium/components/policy/CombinedPolicyProviderTest.java
+@@ -148,7 +148,9 @@ public class CombinedPolicyProviderTest {
+         CombinedPolicyProvider.linkNative(NATIVE_POINTER, mPolicyConverter);
+         Assert.assertEquals(0, CombinedPolicyProvider.get().getPolicyProvidersForTesting().size());
+         Assert.assertTrue(CombinedPolicyProvider.get().isPolicyCacheEnabled());
++        // The cache still completes initialization, but its values are not replayed.
+         verify(mCombinedPolicyConverterJniMock).flushPolicies(NATIVE_POINTER);
++        verify(mPolicyConverter, never()).setPolicy(anyString(), any());
+ 
+         CombinedPolicyProvider.get().registerProvider(new DummyPolicyProvider());
+         Assert.assertEquals(1, CombinedPolicyProvider.get().getPolicyProvidersForTesting().size());
 diff --git a/cromite_flags/chrome/browser/about_flags_cc/DisableAndroidAppRestriction.inc b/cromite_flags/chrome/browser/about_flags_cc/DisableAndroidAppRestriction.inc
 new file mode 100644
 --- /dev/null

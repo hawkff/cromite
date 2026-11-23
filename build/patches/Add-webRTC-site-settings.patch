@@ -72,7 +72,7 @@ new file mode 100644
 +    @Override
 +    public ContentSettingsResources.ResourceItem getResourceItem() {
 +        return new ContentSettingsResources.ResourceItem(
-+            /*icon*/ R.drawable.web_asset,
++            /*icon*/ R.drawable.gm_filled_devices_24,
 +            /*title*/ R.string.webrtc_permission_title,
 +            /*defaultEnabledValue*/ getDefaultEnabledValue(),
 +            /*defaultDisabledValue*/ getDefaultDisabledValue(),
@@ -130,25 +130,25 @@ new file mode 100644
 +    WebRTC
 +  </message>
 +  <message name="IDS_SITE_SETTINGS_TYPE_WEBRTC_MID_SENTENCE" desc="The label used for webrtc site settings controls when used mid-sentence." formatter_data="android_java">
-+    webRTC
++    WebRTC
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_WEBRTC_DESCRIPTION" desc="Description of the WebRTC content setting." formatter_data="android_java">
-+    Enable WebRTC, a JavaScript API for real-time communication and direct peer-to-peer communication
++    When restricted, WebRTC makes no direct UDP connections, which can show your IP address, and blocks the capability lists that tell sites which media formats your device supports. Some calls may not connect.
 +  </message>
 +  <message name="IDS_WEBRTC_PERMISSION_TITLE" desc="Title of the permission to use webrtc [CHAR-LIMIT=32]" formatter_data="android_java">
 +    WebRTC
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_WEBRTC_ENABLED" desc="Summary text explaining that webrtc is full enabled." formatter_data="android_java">
-+    Enabled
++    Unrestricted
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_WEBRTC_DISABLED" desc="Summary text explaining that webrtc is full disabled." formatter_data="android_java">
-+    Disabled
++    Restricted
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_WEBRTC_ALLOWED_EXCEPTIONS" desc="Label for the allowed exceptions site list of the WebRTC setting.">
-+    Allowed to use WebRTC
++    Unrestricted on these sites
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_WEBRTC_BLOCKED_EXCEPTIONS" desc="Label for the blocked exceptions site list of the WebRTC setting.">
-+    Not allowed to use WebRTC
++    Restricted on these sites
 +  </message>
 +</grit-part>
 diff --git a/components/content_settings/core/browser/bromite_content_settings/webrtc.inc b/components/content_settings/core/browser/bromite_content_settings/webrtc.inc

@@ -183,7 +183,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
          Browsing history
        </message>
 +      <message name="IDS_HISTORY_EXPIRE_DAYS_THRESHOLD_TITLE" desc="Title for history expire days threshold">
-+        Expire history days threshold
++        Days of history to keep
 +      </message>
 +      <message name="IDS_HISTORY_EXPIRE_DAYS_NO_HISTORY" desc="Title for history expire days option to keep no navigation history">
 +        No history
@@ -192,7 +192,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 +        Forever
 +      </message>
 +      <message name="IDS_HISTORY_EXPIRE_DAYS_THRESHOLD_SUMMARY" desc="Summary for history expire days threshold">
-+        Number of days to keep navigation history
++        Choose how long to keep browsing history
 +      </message>
        <message name="IDS_CLEAR_COOKIES_AND_SITE_DATA_TITLE" desc="Title for Clear Cookies and site data in Clear Browsing Data dialog">
          Cookies and site data
@@ -306,7 +306,7 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_SETTINGS_EXPIRE_HISTORY" desc="">
-+        Expire history days threshold
++        Days of history to keep
 +    </message>
 +    <message name="IDS_SETTINGS_NO_HISTORY" desc="">
 +        No history
@@ -416,9 +416,9 @@ diff --git a/components/history/core/browser/history_backend.cc b/components/his
 +  // they are stored as-is
 +  kExpireDaysThreshold = days;
 +  expirer_.SetExpireDaysThreshold(base::Days(days));
-+  if (days == 0) {
-+    task_runner_->PostTask(
-+        FROM_HERE, base::BindOnce(&HistoryBackend::DeleteAllHistory, this));
++  // `db_` is null when the database could not be opened.
++  if (days == 0 && db_) {
++    DeleteAllHistory();
 +  }
 +}
 +

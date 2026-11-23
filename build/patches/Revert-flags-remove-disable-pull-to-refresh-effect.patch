@@ -40,10 +40,10 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_DISABLE_PULL_TO_REFRESH_TITLE" desc="Text for 'Disable pull to refresh' settings option.">
-+        Disable pull to refresh
++        Turn off pull to refresh
 +    </message>
 +    <message name="IDS_DISABLE_PULL_TO_REFRESH_SUMMARY" desc="Summary text for 'Disable pull to refresh' settings option.">
-+        Page reloads triggered by vertically overscrolling content.
++        Pulling down at the top of a page does not reload it
 +    </message>
 +</grit-part>
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml

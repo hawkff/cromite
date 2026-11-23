@@ -181,11 +181,11 @@ new file mode 100644
 @@ -0,0 +1,9 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
-+    <message name="IDS_THROTTLE_MAIN_THREAD_TO_60HZ_TITLE" desc="Text for 'Allow custom tab intents' settings-privacy option.">
-+        Throttle frame rate to 60hz
++    <message name="IDS_THROTTLE_MAIN_THREAD_TO_60HZ_TITLE" desc="Title of the privacy setting that limits the frame rate to 60 frames per second.">
++        Limit frame rate to 60 Hz
 +    </message>
-+    <message name="IDS_THROTTLE_MAIN_THREAD_TO_60HZ_SUMMARY" desc="Summary text for 'Allow custom tab intents' settings-privacy option.">
-+        Throttle compositor frame rate to 60fps, even when VSync rate is higher.
++    <message name="IDS_THROTTLE_MAIN_THREAD_TO_60HZ_SUMMARY" desc="Summary of the privacy setting that limits the frame rate to 60 frames per second.">
++        Draws pages at no more than 60 frames per second, even on screens with a higher refresh rate
 +    </message>
 +</grit-part>
 diff --git a/components/viz/common/features.cc b/components/viz/common/features.cc

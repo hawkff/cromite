@@ -1,0 +1,200 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Mon, 23 Nov 2026 00:14:25 +0000
+Subject: Move settings rows to their pages
+
+Some settings rows that this browser adds are on pages that do not match
+what they do. Move them:
+- "Android fonts fingerprinting mitigation" from Developer options to
+  Privacy and security, because it is a privacy protection and Developer
+  options stays hidden until it is unlocked.
+- "Extra memory checks" from Privacy and security to Developer options,
+  because it is a debugging aid, not a privacy setting.
+- "Turn off pull to refresh" and "Always show toolbar" from Accessibility
+  to Appearance, because they change how pages scroll and look.
+- The "Text selection menu" section from Accessibility to Appearance,
+  because it sets which actions the menu shows.
+- The "Navigation gestures" section from Accessibility to Appearance,
+  because it sets how the browser responds to gestures.
+
+No existing preference key, feature name, default or stored value
+changes. The moved switches that had no preference key get one, so that
+settings search finds them on their new pages.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../java/res/xml/appearance_preferences.xml   | 57 +++++++++++++++++++
+ .../java/res/xml/developer_preferences.xml    |  7 ++-
+ .../java/res/xml/privacy_preferences.xml      |  7 ++-
+ .../res/xml/privacy_preferences_cromite.xml   |  6 ++
+ .../res/xml/accessibility_preferences.xml     | 46 ---------------
+ 5 files changed, 71 insertions(+), 52 deletions(-)
+
+diff --git a/chrome/android/java/res/xml/appearance_preferences.xml b/chrome/android/java/res/xml/appearance_preferences.xml
+--- a/chrome/android/java/res/xml/appearance_preferences.xml
++++ b/chrome/android/java/res/xml/appearance_preferences.xml
+@@ -59,4 +59,61 @@ exclusive options. -->
+         android:order="6"
+         android:title="@string/tab_position_settings_title" />
+ 
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="7"
++        android:title="@string/disable_pull_to_refresh_title"
++        android:summary="@string/disable_pull_to_refresh_summary"
++        android:key="disable_pull_to_refresh_effect"
++        app:featureName="disable-pull-to-refresh-effect"
++        app:needRestart="true" />
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="8"
++        android:title="@string/lock_toolbar_title"
++        android:summary="@string/lock_toolbar_summary"
++        android:key="android_toolbar_scroll_ablation"
++        app:featureName="android-toolbar-scroll-ablation"
++        app:needRestart="true" />
++
++    <PreferenceCategory
++        android:order="9"
++        android:key="customize_selecton_popup_section"
++        android:title="@string/customize_selecton_popup_title" />
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="10"
++        android:key="selection_popup_tabs_foreground"
++        android:summary="@string/selection_popup_tabs_foreground_summary"
++        android:title="@string/selection_popup_tabs_foreground_title" />
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="11"
++        android:key="selection_popup_web_search_to_top"
++        android:summary="@string/selection_popup_web_search_to_top_summary"
++        android:title="@string/selection_popup_web_search_to_top_title" />
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="12"
++        android:key="selection_popup_web_search_to_group"
++        android:summary="@string/selection_popup_web_search_to_group_summary"
++        android:title="@string/selection_popup_web_search_to_group_title" />
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="13"
++        android:key="selection_popup_smart_text"
++        android:summary="@string/selection_popup_smart_text_summary"
++        android:title="@string/selection_popup_smart_text_title" />
++
++    <PreferenceCategory
++        android:order="14"
++        android:key="customize_navigation_mode"
++        android:title="@string/customize_navigation_mode" />
++
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:order="15"
++        android:title="@string/use_browser_navigation_handler_title"
++        android:summary="@string/use_browser_navigation_handler_summary"
++        android:key="use_browser_navigation_handler"
++        app:featureName="UseBrowserNavigationHandler"
++        app:needRestart="true" />
+ </PreferenceScreen>
+diff --git a/chrome/android/java/res/xml/developer_preferences.xml b/chrome/android/java/res/xml/developer_preferences.xml
+--- a/chrome/android/java/res/xml/developer_preferences.xml
++++ b/chrome/android/java/res/xml/developer_preferences.xml
+@@ -41,8 +41,9 @@ found in the LICENSE file.
+         app:featureName="android-gpu-sandbox"
+         app:needRestart="true" />
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:title="@string/android_fonts_fingerprinting_mitigation_title"
+-        android:summary="@string/android_fonts_fingerprinting_mitigation_summary"
+-        app:featureName="android-fonts-fingerprinting-mitigation"
++        android:title="@string/dangling_pointer_detector_title"
++        android:summary="@string/dangling_pointer_detector_summary"
++        android:key="enable_dangling_pointer_detector"
++        app:featureName="enable-dangling-pointer-detector"
+         app:needRestart="true" />
+ </PreferenceScreen>
+diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
+--- a/chrome/android/java/res/xml/privacy_preferences.xml
++++ b/chrome/android/java/res/xml/privacy_preferences.xml
+@@ -93,9 +93,10 @@ found in the LICENSE file.
+         app:featureName="throttle-main-thread-to-60hz"
+         app:needRestart="true" />
+     <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:title="@string/dangling_pointer_detector_title"
+-        android:summary="@string/dangling_pointer_detector_summary"
+-        app:featureName="enable-dangling-pointer-detector"
++        android:title="@string/android_fonts_fingerprinting_mitigation_title"
++        android:summary="@string/android_fonts_fingerprinting_mitigation_summary"
++        android:key="android_fonts_fingerprinting_mitigation"
++        app:featureName="android-fonts-fingerprinting-mitigation"
+         app:needRestart="true" />
+     <org.chromium.components.browser_ui.settings.ChromeBasePreferenceCategory
+         android:key="security_section"
+diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrome/android/java/res/xml/privacy_preferences_cromite.xml
+--- a/chrome/android/java/res/xml/privacy_preferences_cromite.xml
++++ b/chrome/android/java/res/xml/privacy_preferences_cromite.xml
+@@ -64,6 +64,12 @@ found in the LICENSE file.
+         android:summary="@string/throttle_main_thread_to_60hz_summary"
+         app:featureName="throttle-main-thread-to-60hz"
+         app:needRestart="true" />
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:title="@string/android_fonts_fingerprinting_mitigation_title"
++        android:summary="@string/android_fonts_fingerprinting_mitigation_summary"
++        android:key="android_fonts_fingerprinting_mitigation"
++        app:featureName="android-fonts-fingerprinting-mitigation"
++        app:needRestart="true" />
+ 
+     <PreferenceCategory
+         android:title="@string/data_exposed_to_device_section_title"/>
+diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
+--- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
++++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
+@@ -72,50 +72,4 @@ found in the LICENSE file.
+         android:key="touchpad_overscroll_history_navigation"
+         android:summary="@string/touchpad_overscroll_history_navigation_summary"
+         android:title="@string/touchpad_overscroll_history_navigation_title"/>
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:title="@string/disable_pull_to_refresh_title"
+-        android:summary="@string/disable_pull_to_refresh_summary"
+-        app:featureName="disable-pull-to-refresh-effect"
+-        app:needRestart="true" />
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:title="@string/lock_toolbar_title"
+-        android:summary="@string/lock_toolbar_summary"
+-        app:featureName="android-toolbar-scroll-ablation"
+-        app:needRestart="true" />
+-
+-    <PreferenceCategory
+-        android:key="customize_selecton_popup_section"
+-        android:title="@string/customize_selecton_popup_title" />
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:key="selection_popup_tabs_foreground"
+-        android:summary="@string/selection_popup_tabs_foreground_summary"
+-        android:title="@string/selection_popup_tabs_foreground_title" />
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:key="selection_popup_web_search_to_top"
+-        android:summary="@string/selection_popup_web_search_to_top_summary"
+-        android:title="@string/selection_popup_web_search_to_top_title" />
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:key="selection_popup_web_search_to_group"
+-        android:summary="@string/selection_popup_web_search_to_group_summary"
+-        android:title="@string/selection_popup_web_search_to_group_title" />
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:key="selection_popup_smart_text"
+-        android:summary="@string/selection_popup_smart_text_summary"
+-        android:title="@string/selection_popup_smart_text_title" />
+-
+-    <PreferenceCategory
+-        android:key="customize_navigation_mode"
+-        android:title="@string/customize_navigation_mode" />
+-
+-    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
+-        android:title="@string/use_browser_navigation_handler_title"
+-        android:summary="@string/use_browser_navigation_handler_summary"
+-        app:featureName="UseBrowserNavigationHandler"
+-        app:needRestart="true" />
+ </PreferenceScreen>
+--

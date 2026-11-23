@@ -14,8 +14,10 @@ Turning the mode on asks for confirmation first, because tabs that are not
 incognito are closed at the next start and cannot be restored.
 The mode has no history option. Incognito tabs do not add history or
 Recent tabs entries, offline pages, snapshots or new search engines to the
-normal profile. When "Remember site settings" is on, site settings changed
-in incognito tabs are saved in the normal profile.
+normal profile. When always-incognito mode and "Remember site settings"
+are both on, site settings changed in incognito tabs are saved in the
+normal profile; with the mode off, incognito tabs keep site settings
+changes to themselves, as usual.
 
 based on the original work by Ryan Archer <ryan.bradley.archer@gmail.com>
 Major contributions by uazo.
@@ -25,9 +27,9 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  chrome/android/chrome_java_resources.gni      |   1 +
  chrome/android/chrome_java_sources.gni        |   2 +
- .../java/res/xml/incognito_preferences.xml    |  32 +++
+ .../java/res/xml/incognito_preferences.xml    |  32 ++++
  .../java/res/xml/privacy_preferences.xml      |   5 +
- .../AlwaysIncognitoLinkInterceptor.java       |  54 +++++
+ .../AlwaysIncognitoLinkInterceptor.java       |  54 ++++++
  .../chrome/browser/ChromeTabbedActivity.java  |   6 +-
  .../chrome/browser/app/ChromeActivity.java    |   4 +
  .../AppMenuPropertiesDelegateImpl.java        |   5 +-
@@ -38,7 +40,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../history/HistoryContentManager.java        |   1 +
  .../chrome/browser/hub/HubProvider.java       |   4 +-
  .../native_page/NativePageFactory.java        |   5 +-
- .../privacy/settings/IncognitoSettings.java   | 208 ++++++++++++++++++
+ .../privacy/settings/IncognitoSettings.java   | 173 ++++++++++++++++++
  .../recent_tabs/RecentTabsManager.java        |  29 ++-
  .../settings/FragmentDependencyProvider.java  |   4 +
  .../TabbedAppMenuPropertiesDelegate.java      |   7 +-
@@ -51,7 +53,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../chrome_autocomplete_provider_client.cc    |   9 +
  .../chrome_autocomplete_provider_client.h     |   1 +
  .../remote_suggestions_service_factory.cc     |   5 +
- .../host_content_settings_map_factory.cc      |  22 +-
+ .../host_content_settings_map_factory.cc      |  24 ++-
  .../hub/DefaultPaneOrderController.java       |  14 +-
  .../chrome/browser/hub/HubCoordinator.java    |   5 +-
  .../chrome/browser/hub/HubManagerFactory.java |   6 +-
@@ -62,7 +64,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  chrome/browser/prefs/browser_prefs.cc         |   5 +
  chrome/browser/profiles/profile_selections.cc |  10 +
  chrome/browser/profiles/profile_selections.h  |   6 +
- .../signin/services/ProfileDataCache.java     |  88 ++------
+ .../signin/services/ProfileDataCache.java     |  88 ++-------
  .../browser/ui/native_page/NativePage.java    |  25 ++-
  .../strings/android_chrome_strings.grd        |  28 +++
  chrome/browser/ui/messages/android/BUILD.gn   |   1 +
@@ -80,8 +82,8 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../add-an-always-incognito-mode.inc          |   1 +
  .../add-an-always-incognito-mode.inc          |   3 +
  .../add-an-always-incognito-mode.inc          |   1 +
- .../webstore_private/webstore_private_api.cc  |  41 +++-
- 58 files changed, 670 insertions(+), 135 deletions(-)
+ .../webstore_private/webstore_private_api.cc  |  41 ++++-
+ 58 files changed, 637 insertions(+), 135 deletions(-)
  create mode 100644 chrome/android/java/res/xml/incognito_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/AlwaysIncognitoLinkInterceptor.java
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/IncognitoSettings.java
@@ -471,7 +473,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/IncognitoSettings.java
-@@ -0,0 +1,208 @@
+@@ -0,0 +1,173 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -493,18 +495,10 @@ new file mode 100644
 +
 +import android.os.Bundle;
 +import android.app.Dialog;
-+import android.content.Context;
-+import android.content.Intent;
-+import android.provider.Browser;
-+import android.net.Uri;
-+import android.view.Menu;
-+import android.view.MenuInflater;
-+import android.view.MenuItem;
 +
 +import androidx.appcompat.app.AlertDialog;
 +import androidx.preference.Preference;
 +import androidx.preference.PreferenceFragmentCompat;
-+import androidx.vectordrawable.graphics.drawable.VectorDrawableCompat;
 +
 +import org.chromium.base.supplier.MonotonicObservableSupplier;
 +import org.chromium.base.supplier.ObservableSuppliers;
@@ -559,7 +553,6 @@ new file mode 100644
 +    public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
 +        mPageTitle.set(getString(R.string.incognito_settings_title));
 +        SettingsUtils.addPreferencesFromResource(this, R.xml.incognito_preferences);
-+        setHasOptionsMenu(true);
 +        updatePreferences();
 +    }
 +
@@ -647,32 +640,6 @@ new file mode 100644
 +                        .setNegativeButton(R.string.cancel, null)
 +                        .setOnDismissListener(dialog -> mTurnOnDialog = null)
 +                        .show();
-+    }
-+
-+    @Override
-+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-+        menu.clear();
-+        MenuItem help =
-+                menu.add(Menu.NONE, R.id.menu_id_targeted_help, Menu.NONE, R.string.menu_help);
-+        help.setIcon(VectorDrawableCompat.create(
-+                getResources(), R.drawable.ic_help_24dp, getActivity().getTheme()));
-+    }
-+
-+    @Override
-+    public boolean onOptionsItemSelected(MenuItem item) {
-+        if (item.getItemId() == R.id.menu_id_targeted_help) {
-+            Context context = getContext();
-+
-+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/bromite/bromite/wiki/AlwaysIncognito"));
-+            // Let Chromium know that this intent is from Chromium, so that it does not close the app when
-+            // the user presses 'back' button.
-+            intent.putExtra(Browser.EXTRA_APPLICATION_ID, context.getPackageName());
-+            intent.putExtra(Browser.EXTRA_CREATE_NEW_TAB, true);
-+            intent.setPackage(context.getPackageName());
-+            context.startActivity(intent);
-+            return true;
-+        }
-+        return false;
 +    }
 +
 +    @Override
@@ -977,7 +944,7 @@ diff --git a/chrome/browser/content_settings/host_content_settings_map_factory.c
  #include "components/content_settings/core/browser/content_settings_pref_provider.h"
  #include "components/content_settings/core/browser/host_content_settings_map.h"
  #include "components/permissions/features.h"
-@@ -122,9 +123,25 @@ scoped_refptr<RefcountedKeyedService>
+@@ -122,9 +123,27 @@ scoped_refptr<RefcountedKeyedService>
      GetForProfile(original_profile);
  
    bool should_record_metrics = profiles::IsRegularUserProfile(profile);
@@ -990,7 +957,9 @@ diff --git a/chrome/browser/content_settings/host_content_settings_map_factory.c
 +    always_incognito_enabled = true;
 +  }
 +
-+  if (prefService->GetBoolean(prefs::kIncognitoSaveSiteSettingEnabled)) {
++  // "Remember site settings" applies only while always incognito mode is on.
++  if (always_incognito_enabled &&
++      prefService->GetBoolean(prefs::kIncognitoSaveSiteSettingEnabled)) {
 +    profile = original_profile;
 +    force_save_site_settings = true;
 +  }
@@ -1004,7 +973,7 @@ diff --git a/chrome/browser/content_settings/host_content_settings_map_factory.c
        /*store_last_modified=*/true, profile->ShouldRestoreOldSessionCookies(),
        should_record_metrics));
  
-@@ -142,6 +159,9 @@ scoped_refptr<RefcountedKeyedService>
+@@ -142,6 +161,9 @@ scoped_refptr<RefcountedKeyedService>
                                   std::move(component_extension_provider));
  #endif  // BUILDFLAG(IS_CHROMEOS)
  
@@ -1563,19 +1532,19 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 +        Always incognito mode
 +      </message>
 +      <message name="IDS_INCOGNITO_SETTINGS_SUMMARY" desc="Summary for incognito mode settings">
-+        Incognito navigation settings
++        Open every tab in incognito
 +      </message>
 +      <message name="IDS_ALWAYS_INCOGNITO_TITLE" desc="Title for always incognito mode">
 +        Always open links in incognito
 +      </message>
 +      <message name="IDS_ALWAYS_INCOGNITO_SUMMARY" desc="Summary for always incognito mode">
-+        Opens links in incognito tabs when you click on new tab or on a link
++        New tabs and links open in incognito, including links from other apps
 +      </message>
 +      <message name="IDS_INCOGNITO_SAVE_SITE_SETTING_ENABLED_TITLE" desc="Title for save site setting flag in incognito mode">
 +        Remember site settings
 +      </message>
 +      <message name="IDS_INCOGNITO_SAVE_SITE_SETTING_ENABLED_SUMMARY" desc="Summary for save site setting flag in incognito mode">
-+        Remember site settings changes in incognito mode
++        Works only while always incognito mode is on. Keeps the site settings you change in incognito tabs.
 +      </message>
 +      <message name="IDS_ALWAYS_INCOGNITO_TURN_ON_TITLE" desc="Title of the dialog shown before always incognito mode is turned on.">
 +        Turn on always incognito?

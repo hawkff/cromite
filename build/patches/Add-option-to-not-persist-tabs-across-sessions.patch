@@ -136,7 +136,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 +        Close all open tabs on exit
 +      </message>
 +      <message name="IDS_CLOSE_TABS_ON_EXIT_SUMMARY" desc="Summary text for 'Close tabs on exit' settings-privacy option.">
-+        Don't persist tabs between browsing sessions. Caution: parameters in urls allow linking between different sessions.
++        Tabs from the previous session are not reopened when the browser starts. Tabs kept between sessions let sites link your visits through their addresses.
 +      </message>
        <message name="IDS_TAB_LOADING_DEFAULT_TITLE" desc="The title of a tab when we are still waiting for either the URL or the real title. This generally shows when the page is first loading.">
          Loading…

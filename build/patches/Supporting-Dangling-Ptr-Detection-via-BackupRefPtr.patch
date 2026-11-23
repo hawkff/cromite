@@ -262,10 +262,10 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_DANGLING_POINTER_DETECTOR_TITLE" desc="Text for 'dangling pointer detector' settings option.">
-+        Enable Dangling Ptr Detection (DPD) via BackupRefPtr (BRP)
++        Extra memory checks
 +    </message>
 +    <message name="IDS_DANGLING_POINTER_DETECTOR_SUMMARY" desc="Summary text for 'dangling pointer detector' settings option.">
-+        Enable checking raw pointer do not become dangling during their lifetime to prevent UAF and write a fixed cookie pattern at the end of each allocation to ensure there is no OOB write.
++        Checks for memory errors that attackers can exploit, such as use after free and out-of-bounds writes. Uses Dangling Ptr Detection (DPD) via BackupRefPtr (BRP).
 +    </message>
 +</grit-part>
 diff --git a/components/viz/service/frame_sinks/frame_sink_manager_impl.cc b/components/viz/service/frame_sinks/frame_sink_manager_impl.cc

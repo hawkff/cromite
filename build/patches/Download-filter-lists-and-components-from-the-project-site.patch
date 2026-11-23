@@ -26,33 +26,16 @@ component update check, every five hours.
 
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
- chrome/browser/adblock/android/adblock_strings.grd     |  6 +++---
  components/adblock/core/subscription/BUILD.gn          |  1 +
  .../adblock/core/subscription/subscription_config.cc   |  5 +++--
  components/component_updater/BUILD.gn                  |  1 +
  .../component_updater_url_constants.cc                 |  4 +++-
  components/cromite/BUILD.gn                            |  3 +++
  components/cromite/static_files_url.h                  | 10 ++++++++++
- 7 files changed, 24 insertions(+), 6 deletions(-)
+ 6 files changed, 21 insertions(+), 3 deletions(-)
  create mode 100644 components/cromite/BUILD.gn
  create mode 100644 components/cromite/static_files_url.h
 
-diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser/adblock/android/adblock_strings.grd
---- a/chrome/browser/adblock/android/adblock_strings.grd
-+++ b/chrome/browser/adblock/android/adblock_strings.grd
-@@ -199,9 +199,9 @@
-       </message>
-       <message name="IDS_ADBLOCK_SETTINGS_PRIVILEGED_FILTERS_ENABLED_SUMMARY" desc="">
-         Snippets are pieces of JavaScript code, injected by the Adblock Plus, that execute within the context of a website and combat advanced ads that circumvent ordinary blocking.
--The functionality is ONLY allowed for the list
--https://uazo.github.io/cromite/filters/abp-filters-anti-cv.txt
--which is activated by this setting.
-+The functionality is ONLY allowed for the lists
-+"ABP filters" and "Cromite experimental filters",
-+which are activated by this setting.
-       </message>
-       <message name="IDS_ADBLOCK_SETTINGS_OPEN_REPO_URL_TEXT" desc="">
-         Open ABP anti-circumvention filter list repo
 diff --git a/components/adblock/core/subscription/BUILD.gn b/components/adblock/core/subscription/BUILD.gn
 --- a/components/adblock/core/subscription/BUILD.gn
 +++ b/components/adblock/core/subscription/BUILD.gn
