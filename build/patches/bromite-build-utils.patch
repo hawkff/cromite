@@ -3,25 +3,27 @@ Date: Fri, 9 Jun 2023 15:11:46 +0000
 Subject: bromite build utils
 
 ---
- build/android/gyp/java_cpp_enum.py            |  34 +++++-
+ build/android/gyp/java_cpp_enum.py            |  34 ++++-
  build/android/gyp/util/build_utils.py         |  25 +++-
- build/bromite/bromite_utils.gni               |  79 +++++++++++++
- build/bromite/gyp/cpp_bromite_include.py      |  35 ++++++
+ build/bromite/bromite_utils.gni               |  85 +++++++++++++
+ build/bromite/gyp/cpp_bromite_include.py      |  50 ++++++++
  build/bromite/gyp/cpp_bromite_include.pydeps  |   9 ++
- build/bromite/gyp/java_bromite_impl.py        | 107 ++++++++++++++++++
+ build/bromite/gyp/java_bromite_impl.py        | 119 ++++++++++++++++++
  build/bromite/gyp/java_bromite_impl.pydeps    |   9 ++
  build/config/BUILDCONFIG.gn                   |   2 +
  build/config/android/rules.gni                |   6 +-
  .../ChromeAccessibilitySettingsDelegate.java  |   5 +
  chrome/browser/flags/BUILD.gn                 |   8 +-
- .../flags/android/cromite_native_utils.cc     |  94 +++++++++++++++
+ .../flags/android/cromite_native_utils.cc     |  94 ++++++++++++++
  .../flags/android/cromite_native_utils.h      |  14 +++
- .../browser/flags/CromiteNativeUtils.java     |  46 ++++++++
- mojo/public/tools/mojom/mojom_parser.py       |  26 ++++-
- tools/grit/grit/grd_reader.py                 |  27 ++++-
+ .../browser/flags/CromiteNativeUtils.java     |  46 +++++++
+ mojo/public/tools/mojom/mojom_parser.py       |  26 +++-
+ tools/grit/grit/grd_reader.py                 |  31 ++++-
+ tools/grit/grit/node/misc.py                  |   3 +
+ tools/grit/grit/tool/build.py                 |   7 +-
  tools/grit/grit_rule.gni                      |   2 +-
- tools/grit/preprocess_if_expr.py              |  32 +++++-
- 18 files changed, 540 insertions(+), 20 deletions(-)
+ tools/grit/preprocess_if_expr.py              |  32 ++++-
+ 20 files changed, 585 insertions(+), 22 deletions(-)
  create mode 100644 build/bromite/bromite_utils.gni
  create mode 100644 build/bromite/gyp/cpp_bromite_include.py
  create mode 100644 build/bromite/gyp/cpp_bromite_include.pydeps
@@ -169,7 +171,7 @@ diff --git a/build/bromite/bromite_utils.gni b/build/bromite/bromite_utils.gni
 new file mode 100644
 --- /dev/null
 +++ b/build/bromite/bromite_utils.gni
-@@ -0,0 +1,79 @@
+@@ -0,0 +1,85 @@
 +import("//build/config/python.gni")
 +
 +# generates the file specified in ouput_file containing
@@ -201,10 +203,13 @@ new file mode 100644
 +
 +    _rebased_directories = rebase_path(invoker.inputs, root_build_dir)
 +    _output = "$target_gen_dir/" + invoker.output_file
-+    _output_rebased = rebase_path(_output)
++    _output_rebased = rebase_path(_output, root_build_dir)
++    depfile = "$_output.d"
 +
 +    args = [
 +      "--output=$_output_rebased",
++      "--depfile",
++      rebase_path(depfile, root_build_dir),
 +    ]
 +    args += _rebased_directories
 +
@@ -231,6 +236,7 @@ new file mode 100644
 +
 +    _srcjar_path = "${target_gen_dir}/${target_name}.srcjar"
 +    _rebased_srcjar_path = rebase_path(_srcjar_path, root_build_dir)
++    depfile = "${target_gen_dir}/${target_name}.d"
 +    _rebased_directories = rebase_path(invoker.inputs, root_build_dir)
 +    _rebased_template = rebase_path(invoker.template, root_build_dir)
 +    _namespace = invoker.namespace
@@ -240,6 +246,8 @@ new file mode 100644
 +      "--srcjar=$_rebased_srcjar_path",
 +      "--template=$_rebased_template",
 +      "--namespace=$_namespace",
++      "--depfile",
++      rebase_path(depfile, root_build_dir),
 +    ]
 +    if (_static_classes) {
 +      args += [ "--static_classes", ]
@@ -253,13 +261,16 @@ diff --git a/build/bromite/gyp/cpp_bromite_include.py b/build/bromite/gyp/cpp_br
 new file mode 100644
 --- /dev/null
 +++ b/build/bromite/gyp/cpp_bromite_include.py
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,50 @@
 +#!/usr/bin/env python3
 +
 +import argparse
 +import os
 +import re
 +import sys
++
++sys.path.insert(0, os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
++import action_helpers
 +
 +def _Main(argv):
 +  parser = argparse.ArgumentParser()
@@ -268,23 +279,35 @@ new file mode 100644
 +                      required=True,
 +                      help='The path at which to generate the .inc file')
 +
++  parser.add_argument('--depfile',
++                      required=True,
++                      help='The path at which to write the depfile')
++
 +  parser.add_argument(
 +      'inputs', nargs='+', help='Input folder(s)', metavar='INPUTFILE')
 +  args = parser.parse_args(argv)
 +
++  # Every walked directory is listed so that adding, removing or renaming a
++  # fragment at any depth reruns this action.
++  depfile_inputs = []
 +  for include_file in args.inputs:
 +    directory = os.path.dirname(include_file)
 +    files = []
 +    for root, dirs, directory_files in os.walk(directory):
++      dirs.sort()
++      depfile_inputs.append(root)
 +      for directory_file in sorted(directory_files):
-+        files.append(os.path.join(directory, directory_file))
++        files.append(os.path.join(root, directory_file))
 +
 +    files = [f for f in files if f.endswith('.inc')]
 +
-+  with open(args.output, 'w') as f:
++  with action_helpers.atomic_output(args.output, mode='w') as f:
 +    for file in files:
 +      f.write("#include \"" + file + "\"\n")
 +    f.write("\n")
++
++  action_helpers.write_depfile(args.depfile, args.output,
++                               depfile_inputs + files)
 +
 +
 +if __name__ == '__main__':
@@ -307,7 +330,7 @@ diff --git a/build/bromite/gyp/java_bromite_impl.py b/build/bromite/gyp/java_bro
 new file mode 100644
 --- /dev/null
 +++ b/build/bromite/gyp/java_bromite_impl.py
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,119 @@
 +#!/usr/bin/env python3
 +
 +import argparse
@@ -398,6 +421,9 @@ new file mode 100644
 +
 +  parser.add_argument(
 +      '--namespace', required=True, help='Output namespace')
++  parser.add_argument('--depfile',
++                      required=True,
++                      help='The path at which to write the depfile')
 +  parser.add_argument(
 +      '--static_classes', action="store_true",
 +      default=False,
@@ -411,6 +437,15 @@ new file mode 100644
 +      data, path = _Generate(args.inputs, args.template,
 +                             args.namespace, args.static_classes)
 +      zip_helpers.add_to_zip_hermetic(srcjar, path, data=data)
++
++  # The class list depends only on the file names, so every walked directory
++  # and the template are enough to rerun this action when a part is added or
++  # removed at any depth.
++  walked_directories = [
++      root for i in args.inputs for root, _, _ in os.walk(os.path.dirname(i))
++  ]
++  action_helpers.write_depfile(args.depfile, args.srcjar,
++                               walked_directories + [args.template])
 +
 +
 +if __name__ == '__main__':
@@ -736,7 +771,7 @@ diff --git a/mojo/public/tools/mojom/mojom_parser.py b/mojo/public/tools/mojom/m
 diff --git a/tools/grit/grit/grd_reader.py b/tools/grit/grit/grd_reader.py
 --- a/tools/grit/grit/grd_reader.py
 +++ b/tools/grit/grit/grd_reader.py
-@@ -106,11 +106,28 @@ class GrdContentHandler(xml.sax.handler.ContentHandler):
+@@ -106,11 +106,32 @@ class GrdContentHandler(xml.sax.handler.ContentHandler):
          raise exception.FileNotFound(partname)
        # Exceptions propagate to the handler in grd_reader.Parse().
        oldsource = self.source
@@ -753,9 +788,13 @@ diff --git a/tools/grit/grit/grd_reader.py b/tools/grit/grit/grd_reader.py
 +      if partname.endswith("/placeholder.txt"):
 +        partname = os.path.dirname(partname)
 +        for root, dirs, files in os.walk(partname):
++          # Every walked directory goes into the depfile so that adding or
++          # removing a grdp file at any depth reruns grit.
++          partnode.placeholder_inputs.append(root)
 +          for file in files:
-+            filepath = os.path.join(partname, file)
++            filepath = os.path.join(root, file)
 +            if filepath.endswith(".grdp"):
++              partnode.placeholder_inputs.append(filepath)
 +              try:
 +                self.source = partname
 +                xml.sax.parse(filepath, GrdPartContentHandler(self))
@@ -770,6 +809,48 @@ diff --git a/tools/grit/grit/grd_reader.py b/tools/grit/grit/grd_reader.py
  
      if self.debug:
        print("End parsing of element %s" % name)
+diff --git a/tools/grit/grit/node/misc.py b/tools/grit/grit/node/misc.py
+--- a/tools/grit/grit/node/misc.py
++++ b/tools/grit/grit/node/misc.py
+@@ -336,6 +336,8 @@ class PartNode(SplicingNode):
+   def __init__(self):
+     super().__init__()
+     self.started_inclusion = False
++    # The directory and the grdp files read for a placeholder.txt part.
++    self.placeholder_inputs = []
+ 
+   def MandatoryAttributes(self):
+     return ['file']
+@@ -541,6 +543,7 @@ class GritNode(base.Node):
+     for node in self:
+       if isinstance(node, misc.PartNode):
+         input_files.add(self.ToRealPath(node.GetInputPath()))
++        input_files.update(node.placeholder_inputs)
+ 
+     old_output_language = self.output_language
+     for lang, ctx, fallback in self.GetConfigurations():
+diff --git a/tools/grit/grit/tool/build.py b/tools/grit/grit/tool/build.py
+--- a/tools/grit/grit/tool/build.py
++++ b/tools/grit/grit/tool/build.py
+@@ -835,13 +835,16 @@ Duplicate actual output files:
+         self.output_directory, outputs[0].GetOutputFilename()
+       )
+ 
+-    output_file = os.path.relpath(output_file, depdir)
++    # Spaces are escaped as in action_helpers.write_depfile(), so that a path
++    # with a space stays one dependency.
++    output_file = os.path.relpath(output_file, depdir).replace(' ', '\\ ')
+ 
+     # List each dependency by its shortest path relative to depdir, so a
+     # generated file under the output dir becomes "gen/foo" instead of
+     # "../../out/<name>/gen/foo".
+     deps_text = ' '.join(
+-      os.path.relpath(os.path.abspath(i), depdir) for i in infiles
++      os.path.relpath(os.path.abspath(i), depdir).replace(' ', '\\ ')
++      for i in infiles
+     )
+ 
+     depfile_contents = output_file + ': ' + deps_text
 diff --git a/tools/grit/grit_rule.gni b/tools/grit/grit_rule.gni
 --- a/tools/grit/grit_rule.gni
 +++ b/tools/grit/grit_rule.gni

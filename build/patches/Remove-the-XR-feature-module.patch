@@ -1,0 +1,88 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Sun, 22 Nov 2026 23:32:44 +0000
+Subject: Remove the Android XR feature module
+
+The APK included Chromium's Android XR feature module. It brings the
+ARCore SDK client, the Jetpack XR and Impress libraries, and about
+20 MB of prebuilt native code. This browser targets phones, and WebXR
+is already turned off by the build arguments.
+
+The module is no longer added to the APK or the bundle. Code outside
+the module now checks that the module is installed before it calls
+into it. On an Android XR headset the browser then runs as a regular
+app, without full space mode and without immersive video playback.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../org/chromium/chrome/browser/ChromeTabbedActivity.java   | 6 ++----
+ .../ActivityTabWebContentsDelegateAndroid.java              | 2 ++
+ .../chrome/browser/xr/scenecore/XrModuleBridge.java         | 2 ++
+ chrome/android/modules/chrome_feature_modules.gni           | 1 -
+ 4 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -6182,8 +6182,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+     }
+ 
+     private void maybeInitializeXrSceneCoreSession() {
+-        if (DeviceInfo.isXr()) {
+-            assert XrModule.isInstalled() : "XR module must be installed on XR devices. ";
++        if (DeviceInfo.isXr() && XrModule.isInstalled()) {
+             var xrSceneCoreSessionManager = assertNonNull(mXrSceneCoreSessionManagerSupplier.get());
+             mXrSceneCoreSessionInitializer =
+                     XrModule.getImpl()
+@@ -6198,8 +6197,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+ 
+         XrSceneCoreSessionManager xrSceneCoreSessionManager = null;
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+-            if (DeviceInfo.isXr()) {
+-                assert XrModule.isInstalled() : "XR module must be installed on XR devices. ";
++            if (DeviceInfo.isXr() && XrModule.isInstalled()) {
+                 xrSceneCoreSessionManager = XrModule.getImpl().getXrSceneCoreSessionManager(this);
+                 xrSceneCoreSessionManager
+                         .getXrSpaceModeObservableSupplier()
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/tab_activity_glue/ActivityTabWebContentsDelegateAndroid.java b/chrome/android/java/src/org/chromium/chrome/browser/app/tab_activity_glue/ActivityTabWebContentsDelegateAndroid.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/app/tab_activity_glue/ActivityTabWebContentsDelegateAndroid.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/app/tab_activity_glue/ActivityTabWebContentsDelegateAndroid.java
+@@ -68,6 +68,7 @@ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+ import org.chromium.chrome.browser.util.AndroidTaskUtils;
+ import org.chromium.chrome.browser.util.PictureInPictureWindowOptions;
+ import org.chromium.chrome.browser.util.WindowFeatures;
++import org.chromium.chrome.browser.xr.scenecore.XrModule;
+ import org.chromium.components.embedder_support.contextmenu.ContextMenuUtils;
+ import org.chromium.components.embedder_support.delegate.WebContentsDelegateAndroid.ImmersivePlaybackConfirmationCallback;
+ import org.chromium.components.messages.MessageDispatcherProvider;
+@@ -756,6 +757,7 @@ public class ActivityTabWebContentsDelegateAndroid extends TabWebContentsDelegat
+     @Override
+     protected boolean isImmersivePlaybackEnabled() {
+         return DeviceInfo.isXr()
++                && XrModule.isInstalled()
+                 && ChromeFeatureList.isEnabled(ChromeFeatureList.ANDROID_XR_IMMERSIVE_PLAYER);
+     }
+ 
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/xr/scenecore/XrModuleBridge.java b/chrome/android/java/src/org/chromium/chrome/browser/xr/scenecore/XrModuleBridge.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/xr/scenecore/XrModuleBridge.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/xr/scenecore/XrModuleBridge.java
+@@ -21,6 +21,8 @@ public class XrModuleBridge {
+     @CalledByNative
+     public static void createImmersiveVideoPlaybackActivity(
+             UnguessableToken nativeToken, Object initiatorTab) {
++        // The XR module is not part of this build.
++        if (!XrModule.isInstalled()) return;
+         XrModule.getImpl().createImmersiveVideoPlaybackActivity(nativeToken, initiatorTab);
+     }
+ }
+diff --git a/chrome/android/modules/chrome_feature_modules.gni b/chrome/android/modules/chrome_feature_modules.gni
+--- a/chrome/android/modules/chrome_feature_modules.gni
++++ b/chrome/android/modules/chrome_feature_modules.gni
+@@ -30,7 +30,6 @@ import("//device/vr/buildflags/buildflags.gni")
+ chrome_module_descs = [
+   on_demand_module_desc,
+   stack_unwinder_module_desc,
+-  xr_module_desc,
+ ]
+ if (dfmify_dev_ui) {
+   chrome_module_descs += [ dev_ui_module_desc ]
+--
