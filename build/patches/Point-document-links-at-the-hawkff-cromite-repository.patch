@@ -34,7 +34,7 @@ diff --git a/chrome/android/java/res/values/values.xml b/chrome/android/java/res
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp
 --- a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp
 +++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Welcome-screen.grdp
-@@ -13,13 +13,13 @@ The following checkbox controls instead <ph name="BEGIN_PRIVACY_LINK3">&lt;PRIVA
+@@ -12,13 +12,13 @@
      </message>
  
      <message name="IDS_PRIVACY_LINK1" desc="URL for Bromite wiki page about ad blocking" translateable="false">
