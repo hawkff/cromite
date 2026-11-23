@@ -333,5 +333,6 @@ Do-not-leave-a-dangling-active-tab-pointer-in-ActiveTabTracker.patch
 Drop-the-SandboxStatusExtension-binder-when-its-frame-goes-away.patch
 Remove-tracking-parameters-from-shared-links.patch
 Destroy-the-incognito-profile-after-its-tab-model.patch
+Remove-the-XR-feature-module.patch
 
 # extension patches
