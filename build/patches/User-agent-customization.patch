@@ -13,7 +13,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  base/base_switches.h                          |   2 +
  chrome/android/chrome_java_resources.gni      |   2 +
  chrome/android/chrome_java_sources.gni        |   1 +
- .../layout/custom_useragent_preferences.xml   | 106 ++++++++++
+ .../layout/custom_useragent_preferences.xml   | 107 ++++++++++
  .../android/java/res/xml/main_preferences.xml |   5 +
  .../java/res/xml/useragent_preferences.xml    |  25 +++
  .../chrome/browser/app/ChromeActivity.java    |   5 +-
@@ -43,7 +43,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../browser/web_contents/web_contents_impl.cc |   6 +-
  .../framehost/NavigationControllerImpl.java   |   3 +-
  content/renderer/render_thread_impl.cc        |   1 -
- 33 files changed, 786 insertions(+), 17 deletions(-)
+ 33 files changed, 787 insertions(+), 17 deletions(-)
  create mode 100644 chrome/android/java/res/layout/custom_useragent_preferences.xml
  create mode 100644 chrome/android/java/res/xml/useragent_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/settings/UserAgentPreferences.java
@@ -89,7 +89,7 @@ diff --git a/chrome/android/java/res/layout/custom_useragent_preferences.xml b/c
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/res/layout/custom_useragent_preferences.xml
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,107 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<!--
 +    This file is part of Bromite.
@@ -189,6 +189,7 @@ new file mode 100644
 +            android:id="@+id/desktop_mode_viewportmeta"
 +            android:layout_width="wrap_content"
 +            android:layout_height="wrap_content"
++            android:minHeight="48dp"
 +            android:layout_centerVertical="true"
 +            android:layout_marginLeft="?android:attr/listPreferredItemPaddingStart"
 +            android:text="@string/desktop_mode_viewportmeta_checkbox" />

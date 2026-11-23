@@ -49,7 +49,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  components/components_strings.grd             |   1 +
  components/user_scripts/README.md             | 150 ++++
  components/user_scripts/android/BUILD.gn      | 104 +++
- .../java/res/layout/accept_script_item.xml    | 160 ++++
+ .../java/res/layout/accept_script_item.xml    | 162 ++++
  .../java/res/layout/accept_script_list.xml    |  10 +
  .../java/res/layout/scripts_preference.xml    |  40 +
  .../android/java/res/values/dimens.xml        |  11 +
@@ -58,7 +58,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../user_scripts/FragmentWindowAndroid.java   |  96 ++
  .../user_scripts/IUserScriptsUtils.java       |  22 +
  .../components/user_scripts/ScriptInfo.java   |  37 +
- .../user_scripts/ScriptListBaseAdapter.java   | 162 ++++
+ .../user_scripts/ScriptListBaseAdapter.java   | 165 ++++
  .../user_scripts/ScriptListPreference.java    | 171 ++++
  .../user_scripts/UserScriptsBridge.java       | 213 +++++
  .../user_scripts/UserScriptsPreferences.java  | 117 +++
@@ -136,7 +136,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../strings/userscripts_strings.grdp          |  55 ++
  .../Experimental-user-scripts-support.inc     |  13 +
  tools/gritsettings/resource_ids.spec          |   6 +
- 109 files changed, 10497 insertions(+), 7 deletions(-)
+ 109 files changed, 10502 insertions(+), 7 deletions(-)
  create mode 100644 components/user_scripts/README.md
  create mode 100755 components/user_scripts/android/BUILD.gn
  create mode 100644 components/user_scripts/android/java/res/layout/accept_script_item.xml
@@ -997,7 +997,7 @@ diff --git a/components/user_scripts/android/java/res/layout/accept_script_item.
 new file mode 100644
 --- /dev/null
 +++ b/components/user_scripts/android/java/res/layout/accept_script_item.xml
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,162 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<!-- Copyright 2017 The Chromium Authors. All rights reserved.
 +     Use of this source code is governed by a BSD-style license that can be
@@ -1022,6 +1022,7 @@ new file mode 100644
 +            android:id="@+id/switch_widget"
 +            android:layout_width="wrap_content"
 +            android:layout_height="wrap_content"
++            android:minHeight="48dp"
 +            android:paddingEnd="15dp"
 +            android:focusable="false"
 +            android:background="@null" />
@@ -1037,6 +1038,7 @@ new file mode 100644
 +                android:id="@+id/title"
 +                android:layout_width="match_parent"
 +                android:layout_height="wrap_content"
++                android:singleLine="false"
 +                style="@style/PreferenceTitle" />
 +
 +            <TextView
@@ -1543,7 +1545,7 @@ diff --git a/components/user_scripts/android/java/src/org/chromium/components/us
 new file mode 100644
 --- /dev/null
 +++ b/components/user_scripts/android/java/src/org/chromium/components/user_scripts/ScriptListBaseAdapter.java
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,165 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -1640,6 +1642,9 @@ new file mode 100644
 +            }
 +
 +            mTitle.setText(item.Name);
++            // The switch and the menu button stand apart from the title, so name them after it.
++            mSwitch.setContentDescription(item.Name);
++            mMoreButton.setContentDescriptionContext(item.Name);
 +            mDescription.setText(item.Description);
 +            mVersion.setText(item.Version);
 +            mFile.setText(item.Key);

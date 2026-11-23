@@ -13,11 +13,12 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  media/BUILD.gn                                        |  2 ++
  .../src/org/chromium/media/AudioManagerAndroid.java   |  2 ++
  media/base/android/media_codec_util.cc                |  4 ++++
+ media/filters/android/media_codec_audio_decoder.cc    |  6 +++++-
  media/filters/ffmpeg_audio_decoder.cc                 | 10 ++++++++++
  media/filters/ffmpeg_demuxer.cc                       |  1 +
  media/filters/ffmpeg_video_decoder.cc                 | 11 +++++++++++
  media/media_options.gni                               |  8 ++++++++
- 8 files changed, 45 insertions(+)
+ 9 files changed, 50 insertions(+), 1 deletion(-)
  create mode 100644 cromite_flags/media/base/media_switches_cc/Enable-platform-aac-audio-and-h264-video.inc
 
 diff --git a/cromite_flags/media/base/media_switches_cc/Enable-platform-aac-audio-and-h264-video.inc b/cromite_flags/media/base/media_switches_cc/Enable-platform-aac-audio-and-h264-video.inc
@@ -77,6 +78,22 @@ diff --git a/media/base/android/media_codec_util.cc b/media/base/android/media_c
    // Passthrough is possible for some bitstream formats.
    if (sample_format == kSampleFormatDts ||
        sample_format == kSampleFormatDtsxP2 ||
+diff --git a/media/filters/android/media_codec_audio_decoder.cc b/media/filters/android/media_codec_audio_decoder.cc
+--- a/media/filters/android/media_codec_audio_decoder.cc
++++ b/media/filters/android/media_codec_audio_decoder.cc
+@@ -95,7 +95,11 @@ void MediaCodecAudioDecoder::Initialize(const AudioDecoderConfig& config,
+ 
+   switch (config.codec()) {
+     case AudioCodec::kAAC:
+-#if BUILDFLAG(USE_PROPRIETARY_CODECS)
++#if BUILDFLAG(ENABLE_PLATFORM_AAC_AUDIO)
++      // FFmpegAudioDecoder declines AAC in this configuration, so MediaCodec
++      // decodes every AAC stream.
++      platform_codec_supported = true;
++#elif BUILDFLAG(USE_PROPRIETARY_CODECS)
+       // Chrome doesn't bundle an xHE-AAC decoder, so we must use MediaCodec.
+       platform_codec_supported =
+           allow_clear_fallback || config.is_encrypted() ||
 diff --git a/media/filters/ffmpeg_audio_decoder.cc b/media/filters/ffmpeg_audio_decoder.cc
 --- a/media/filters/ffmpeg_audio_decoder.cc
 +++ b/media/filters/ffmpeg_audio_decoder.cc

@@ -6,6 +6,9 @@ Adds a new option in the privacy settings that allows the selection of
 the days to keep in the browsing history.
 Selecting the "Never" item activates the kSavingBrowserHistoryDisabled
 flag and immediately deletes all the history.
+A "No history" choice made while the history database cannot be opened
+is carried out when the database opens, unless history was turned back
+on before that.
 Some parts authored by csagan5.
 
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
@@ -18,12 +21,12 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../preference_spinner_single_line.xml        | 26 ++++++--
  .../java/res/layout/preference_spinner.xml    |  7 +++
  .../layout/preference_spinner_single_line.xml |  7 +++
- .../settings/SpinnerPreference.java           |  7 +++
+ .../settings/SpinnerPreference.java           | 14 +++++
  ...istory-number-of-days-privacy-setting.grdp | 18 ++++++
  .../core/browser/browsing_history_service.cc  |  4 +-
  .../core/browser/expire_history_backend.cc    | 13 +++-
  .../core/browser/expire_history_backend.h     |  2 +
- .../history/core/browser/history_backend.cc   | 17 +++++
+ .../history/core/browser/history_backend.cc   | 24 +++++++
  .../history/core/browser/history_backend.h    |  7 +--
  .../history/core/browser/history_service.cc   | 37 +++++++++++
  .../history/core/browser/history_service.h    |  8 +++
@@ -32,7 +35,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../history_embeddings/core/sql_database.cc   |  2 +-
  .../omnibox/browser/shortcuts_backend.cc      |  4 +-
  .../utility/safari_data_importer.cc           |  2 +-
- 22 files changed, 232 insertions(+), 18 deletions(-)
+ 22 files changed, 246 insertions(+), 18 deletions(-)
  create mode 100644 components/cromite_components_strings_grd/History-number-of-days-privacy-setting.grdp
 
 diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
@@ -285,7 +288,7 @@ diff --git a/components/browser_ui/settings/android/widget/java/src/org/chromium
  import android.util.AttributeSet;
  import android.view.View;
  import android.widget.AdapterView;
-@@ -105,6 +106,12 @@ public class SpinnerPreference extends Preference
+@@ -105,6 +106,19 @@ public class SpinnerPreference extends Preference
          super.onBindViewHolder(holder);
  
          ((TextView) holder.findViewById(R.id.title)).setText(getTitle());
@@ -294,6 +297,13 @@ diff --git a/components/browser_ui/settings/android/widget/java/src/org/chromium
 +        if (summaryView != null && !TextUtils.isEmpty(summary)) {
 +            summaryView.setText(summary);
 +            summaryView.setVisibility(View.VISIBLE);
++            if (getLayoutResource() == R.layout.preference_spinner_single_line) {
++                // A single-line row with a summary is a titled setting: its title wraps and
++                // uses the primary color, unlike a plain label such as "Time range".
++                TextView titleView = (TextView) holder.findViewById(R.id.title);
++                titleView.setSingleLine(false);
++                titleView.setTextAppearance(R.style.TextAppearance_TextLarge_Primary);
++            }
 +        }
          mSpinner = (Spinner) holder.findViewById(R.id.spinner);
          assert mSpinner != null;
@@ -405,7 +415,7 @@ diff --git a/components/history/core/browser/history_backend.cc b/components/his
  // The maximum number of days for which domain visit metrics are computed
  // each time HistoryBackend::GetDomainDiversity() is called.
  constexpr int kDomainDiversityMaxBacktrackedDays = 7;
-@@ -1398,6 +1402,19 @@ void HistoryBackend::InitImpl(
+@@ -1398,6 +1402,26 @@ void HistoryBackend::InitImpl(
    expirer_.StartExpiringOldStuff(base::Days(kExpireDaysThreshold));
  }
  
@@ -416,10 +426,17 @@ diff --git a/components/history/core/browser/history_backend.cc b/components/his
 +  // they are stored as-is
 +  kExpireDaysThreshold = days;
 +  expirer_.SetExpireDaysThreshold(base::Days(days));
-+  // `db_` is null when the database could not be opened.
-+  if (days == 0 && db_) {
-+    DeleteAllHistory();
++  if (days != 0) {
++    return;
 +  }
++  // `db_` is null when the database could not be opened. The threshold stays 0,
++  // so the deletion runs at the first start in which the database opens.
++  if (!db_) {
++    LOG(WARNING) << "History deletion skipped: the history database is not "
++                    "open";
++    return;
++  }
++  DeleteAllHistory();
 +}
 +
  void HistoryBackend::CloseAllDatabases() {

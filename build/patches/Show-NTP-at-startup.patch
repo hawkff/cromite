@@ -12,7 +12,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../browser/BrowserRestartActivity.java       |  1 +
  .../browser/ChromeInactivityTracker.java      | 14 ++++++++
  .../chrome/browser/ChromeTabbedActivity.java  | 12 ++++---
- .../browser/tasks/ReturnToChromeUtil.java     | 16 ++++++++-
+ .../browser/tasks/ReturnToChromeUtil.java     | 18 +++++++++-
  chrome/app/settings_strings.grdp              |  2 +-
  .../HomeTipsModulesProvider.java              |  4 +--
  .../flags/android/chrome_feature_list.cc      |  1 +
@@ -29,7 +29,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../about_flags_cc/show-ntp-at-startup.inc    | 12 +++++++
  .../show-ntp-at-startup.inc                   |  5 +++
  .../show-ntp-at-startup.inc                   |  1 +
- 21 files changed, 133 insertions(+), 23 deletions(-)
+ 21 files changed, 135 insertions(+), 23 deletions(-)
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sShowNtpAtStartupAndroid.java
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/show-ntp-at-startup.grdp
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc
@@ -159,7 +159,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tasks/ReturnToC
  import org.chromium.chrome.browser.ntp.NewTabPage;
  import org.chromium.chrome.browser.profiles.Profile;
  import org.chromium.chrome.browser.tab.Tab;
-@@ -137,6 +139,18 @@ public final class ReturnToChromeUtil {
+@@ -137,6 +139,20 @@ public final class ReturnToChromeUtil {
              return false;
          }
  
@@ -172,13 +172,15 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tasks/ReturnToC
 +                        intent, BrowserRestartActivity.EXTRA_RESTART, false);
 +        if (isMainIntentFromLauncherOrRestart && inactivityTracker.isNewStartup()) {
 +            inactivityTracker.setIsStartup(false);
-+            return true;
++            // A relaunch ends the startup without a new tab page, so the page in use stays in
++            // front, and a later return from the launcher does not count as a startup either.
++            return IntentUtils.isMainIntentFromLauncher(intent);
 +        }
 +
          // Checks whether to show the NTP homepage due to feature flag
          // HOME_SURFACE_RETURN_TIME_SECONDS.
          long lastVisibleTimeMs = inactivityTracker.getLastVisibleTimeMs();
-@@ -246,7 +260,7 @@ public final class ReturnToChromeUtil {
+@@ -246,7 +262,7 @@ public final class ReturnToChromeUtil {
              TabModel currentTabModel,
              TabCreator tabCreator,
              HomeSurfaceTracker homeSurfaceTracker) {

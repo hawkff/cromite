@@ -10,7 +10,7 @@ suit Cromite logic.
  .../adblock_chrome_content_browser_client.cc  |    6 +
  .../adblock_chrome_content_browser_client.h   |    4 +
  chrome/browser/adblock/android/BUILD.gn       |    5 +-
- .../adblock/android/adblock_strings.grd       |   52 +-
+ .../adblock/android/adblock_strings.grd       |   67 +-
  .../java/res/layout/adblock_custom_item.xml   |   14 +-
  .../layout/adblock_filter_lists_list_item.xml |   10 +
  ...ences.xml => eyeo_adblock_preferences.xml} |   30 +-
@@ -18,9 +18,9 @@ suit Cromite logic.
  .../AdblockCustomFilterListsFragment.java     |   37 +-
  .../AdblockCustomFiltersFragment.java         |    7 +-
  .../settings/AdblockCustomItemFragment.java   |   28 +-
- .../settings/AdblockFilterListsAdapter.java   |    6 +-
+ .../settings/AdblockFilterListsAdapter.java   |   32 +-
  .../settings/AdblockFilterListsFragment.java  |    8 +-
- .../settings/AdblockSettingsFragment.java     |  181 +-
+ .../settings/AdblockSettingsFragment.java     |  202 +-
  chrome/browser/android/tab_features.cc        |    4 +-
  .../chrome_thin_webview_initializer.cc        |   11 +-
  .../browser/chrome_content_browser_client.cc  |    6 +-
@@ -31,8 +31,8 @@ suit Cromite logic.
  ...hrome_browser_main_extra_parts_profiles.cc |    2 -
  .../extensions/api/_permission_features.json  |   14 -
  .../common/extensions/api/adblock_private.idl |    8 +
- .../adblock/android/adblock_controller_jni.cc |  121 +-
- .../components/adblock/AdblockController.java |   70 +-
+ .../adblock/android/adblock_controller_jni.cc |  128 +-
+ .../components/adblock/AdblockController.java |   55 +-
  components/adblock/content/browser/BUILD.gn   |   24 +-
  .../content/browser/adblock_blocking_page.cc  |  183 +
  .../content/browser/adblock_blocking_page.h   |   75 +
@@ -122,7 +122,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 117 files changed, 8982 insertions(+), 726 deletions(-)
+ 117 files changed, 9036 insertions(+), 726 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -180,7 +180,7 @@ diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/j
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
-@@ -956,6 +956,8 @@ public class MainSettings extends ChromeBaseSettingsFragment
+@@ -961,6 +961,8 @@ public class MainSettings extends ChromeBaseSettingsFragment
                                  R.string.prefs_section_account_and_google_services,
                                  ManageSyncSettings.class.getName());
                      }
@@ -259,7 +259,7 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
    <outputs>
      <output filename="values-af/adblock_strings.xml" lang="af" type="android" />
      <output filename="values-am/adblock_strings.xml" lang="am" type="android" />
-@@ -188,14 +188,44 @@
+@@ -188,14 +188,59 @@
        <message name="IDS_ADBLOCK_SETTINGS_TITLE" desc="Title of Adblock settings menu item [CHAR-LIMIT=12]">
          Ad blocking
        </message>
@@ -274,6 +274,21 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
 +      </message>
 +      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_UPDATE_DONE" desc="Snackbar shown when every selected filter list has been downloaded again.">
 +        Filter lists updated
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LIST_DOWNLOADING" desc="Status line of a selected filter list while it is being downloaded.">
++        Downloading…
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LIST_BUILT_IN" desc="Status line of a selected filter list that uses the copy shipped with the browser until a download succeeds.">
++        Using the built-in copy
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LIST_UNAVAILABLE" desc="Status line of a selected filter list when no download time is known.">
++        Update information unavailable
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LIST_UPDATED" desc="Status line of a selected filter list: when it was last downloaded. TIME is a date and time.">
++        Updated <ph name="TIME">%1$s</ph>
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LIST_UPDATED_VERSION" desc="Status line of a selected filter list: when it was last downloaded and the version the list states. TIME is a date and time, VERSION is the version text of the list, for example 202611230945.">
++        Updated <ph name="TIME">%1$s</ph>, version <ph name="VERSION">%2$s</ph>
 +      </message>
 +      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_START_UPDATE" desc="">
 +        Update filter lists now
@@ -306,7 +321,7 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
        </message>
        <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_AA_ENABLED_TITLE" desc="Title of SwitchPreference to enable/disable Acceptable Ads">
          Acceptable Ads
-@@ -210,34 +240,34 @@
+@@ -210,34 +255,34 @@
          Allow auto adjustments of filter lists collection, based on your geolocation, to provide the best ad-filtering experience.
        </message>
        <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_DOMAINS_TITLE" desc="Title of Preference to configure allowed domains">
@@ -540,7 +555,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 -        return customStrings;
 +    @Override
 +    protected String getItemStatus(Subscription item) {
-+        return item.getDescription();
++        return AdblockFilterListsAdapter.getStatusText(getContext(), item);
      }
  
      @Override
@@ -653,7 +668,15 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsAdapter.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsAdapter.java
 --- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsAdapter.java
 +++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsAdapter.java
-@@ -79,20 +79,22 @@ public class AdblockFilterListsAdapter extends BaseAdapter implements OnClickLis
+@@ -18,6 +18,7 @@
+ package org.chromium.chrome.browser.adblock.settings;
+ 
+ import android.content.Context;
++import android.text.TextUtils;
+ import android.view.LayoutInflater;
+ import android.view.View;
+ import android.view.View.OnClickListener;
+@@ -79,23 +80,50 @@ public class AdblockFilterListsAdapter extends BaseAdapter implements OnClickLis
                  mController.getInstalledSubscriptions();
          boolean subscribed = false;
          boolean autoinstalled = false;
@@ -663,7 +686,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
              if (subscription.url().equals(item.url())) {
                  subscribed = true;
                  autoinstalled = subscription.autoinstalled();
-+                status.setText(subscription.getDescription());
++                status.setText(getStatusText(view.getContext(), subscription));
                  break;
              }
          }
@@ -678,6 +701,34 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
          return view;
      }
  
++    // Status line of a selected list. Only an installed list with a time shows an update;
++    // missing data (state Unknown, for example while ad blocking is off) says nothing about
++    // past downloads, so it is reported as unavailable.
++    static String getStatusText(Context context, AdblockController.Subscription subscription) {
++        String state = subscription.state();
++        String time = subscription.installation_time();
++        String version = subscription.version();
++        if ("Installing".equals(state)) {
++            return context.getString(R.string.fragment_adblock_settings_filter_list_downloading);
++        }
++        if ("Preloaded".equals(state)) {
++            return context.getString(R.string.fragment_adblock_settings_filter_list_built_in);
++        }
++        if (!"Installed".equals(state) && !"AutoInstalled".equals(state)
++                || TextUtils.isEmpty(time)) {
++            return context.getString(R.string.fragment_adblock_settings_filter_list_unavailable);
++        }
++        return TextUtils.isEmpty(version)
++                ? context.getString(R.string.fragment_adblock_settings_filter_list_updated, time)
++                : context.getString(
++                        R.string.fragment_adblock_settings_filter_list_updated_version,
++                        time,
++                        version);
++    }
++
+     @Override
+     public void onClick(View view) {
+         URL url = (URL) view.getTag();
 diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java
 --- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java
 +++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java
@@ -705,7 +756,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockSettingsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockSettingsFragment.java
 --- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockSettingsFragment.java
 +++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockSettingsFragment.java
-@@ -13,27 +13,67 @@
+@@ -13,27 +13,74 @@
  package org.chromium.chrome.browser.adblock.settings;
  
  import android.os.Bundle;
@@ -761,6 +812,13 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 +    private static final long UPDATE_TIMEOUT_MS = 60_000;
 +    private final Handler mHandler = new Handler(Looper.getMainLooper());
 +    private final Runnable mUpdateTimeout = this::endPendingUpdate;
++    // After "Block ads" is turned on, the lists load again with no event when they are ready,
++    // so the update time is read again for a short while.
++    // shortcut: polls for up to 5 s; a slower load shows the time when the page is reopened.
++    private static final long SUMMARY_RETRY_MS = 500;
++    private static final int SUMMARY_RETRIES = 10;
++    private int mSummaryRetriesLeft;
++    private final Runnable mSummaryRetry = this::retryLastUpdateSummary;
  
 +    private static final String START_UPDATE_KEY =
 +        "fragment_adblock_settings_start_update";
@@ -775,7 +833,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      private static final String SETTINGS_ENABLED_KEY = "fragment_adblock_settings_enabled_key";
      private static final String SETTINGS_FILTER_LISTS_KEY =
              "fragment_adblock_settings_filter_lists_key";
-@@ -51,10 +91,47 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
+@@ -51,10 +98,47 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
      private static final int ON_OFF_TOGGLE_COUNT_TIME_WINDOW_MS = 3000;
      private long mOnOffTogleTimestamp;
  
@@ -823,7 +881,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
          mAutoInstalledEnabled =
                  (ChromeSwitchPreference) findPreference(SETTINGS_AUTO_INSTALL_ENABLED_KEY);
          mAllowedDomains = findPreference(SETTINGS_ALLOWED_DOMAINS_KEY);
-@@ -62,36 +139,46 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
+@@ -62,36 +146,46 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
      }
  
      private boolean areMoreOptionsEnabled() {
@@ -882,7 +940,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      }
  
      private void maybeEnableMoreOptions() {
-@@ -122,34 +209,65 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
+@@ -122,34 +216,78 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
  
      @Override
      public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -923,6 +981,14 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 +        updateLastUpdateSummary();
 +    }
 +
++    private void retryLastUpdateSummary() {
++        if (mPendingUpdates != null) return;
++        updateLastUpdateSummary();
++        if (mStartUpdate.getSummary() == null && --mSummaryRetriesLeft > 0) {
++            mHandler.postDelayed(mSummaryRetry, SUMMARY_RETRY_MS);
++        }
++    }
++
 +    // No time means no update data right now (for example while ad blocking is off), not that
 +    // nothing was ever downloaded, so the row then shows no summary.
 +    private void updateLastUpdateSummary() {
@@ -945,22 +1011,27 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
  
              applyAdblockEnabled((Boolean) newValue);
 -        } else if (preference.getKey().equals(SETTINGS_AA_ENABLED_KEY)) {
-+            // Turning blocking off cancels the downloads; the row shows what is known now.
-+            endPendingUpdate();
-+        } else if (preference.getKey().equals(PRIVILEGED_FILTERS_KEY)) {
-             AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+-            AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
 -                    .setAcceptableAdsEnabled((Boolean) newValue);
 -        } else {
 -            assert preference.getKey().equals(SETTINGS_AUTO_INSTALL_ENABLED_KEY);
 -
--            AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
++            // Turning blocking off cancels the downloads; the row shows what is known now.
++            endPendingUpdate();
++            mHandler.removeCallbacks(mSummaryRetry);
++            if ((Boolean) newValue) {
++                mSummaryRetriesLeft = SUMMARY_RETRIES;
++                mHandler.postDelayed(mSummaryRetry, SUMMARY_RETRY_MS);
++            }
++        } else if (preference.getKey().equals(PRIVILEGED_FILTERS_KEY)) {
+             AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
 -                    .setAutoInstallEnabled((Boolean) newValue);
 +                .setPrivilegedFiltersEnabled(
 +                    (Boolean) newValue);
          }
          return true;
      }
-@@ -158,5 +276,16 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
+@@ -158,5 +296,17 @@ public class AdblockSettingsFragment extends PreferenceFragmentCompat
      public void onResume() {
          super.onResume();
          synchronizePreferences();
@@ -974,6 +1045,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 +        AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
 +                .removeSubscriptionUpdateObserver(this);
 +        mHandler.removeCallbacks(mUpdateTimeout);
++        mHandler.removeCallbacks(mSummaryRetry);
 +        mPendingUpdates = null;
      }
  }
@@ -1386,16 +1458,17 @@ diff --git a/chrome/common/extensions/api/adblock_private.idl b/chrome/common/ex
 diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/adblock/android/adblock_controller_jni.cc
 --- a/components/adblock/android/adblock_controller_jni.cc
 +++ b/components/adblock/android/adblock_controller_jni.cc
-@@ -23,6 +23,8 @@
+@@ -23,6 +23,9 @@
  #include "base/android/jni_array.h"
  #include "base/android/jni_string.h"
  #include "base/android/jni_weak_ref.h"
-+#include "base/i18n/time_formatting.h"
++#include "base/i18n/icubridge/date_time_formatter.h"
++#include "base/i18n/icubridge/icu_bridge.h"
 +#include "base/strings/utf_string_conversions.h"
  #include "base/logging.h"
  #include "components/adblock/android/jni_headers/AdblockController_jni.h"
  #include "components/adblock/content/browser/factories/subscription_service_factory.h"
-@@ -34,7 +36,7 @@
+@@ -34,7 +37,7 @@
  using base::android::CheckException;
  using base::android::ConvertUTF8ToJavaString;
  using base::android::GetClass;
@@ -1404,7 +1477,20 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
  using base::android::MethodID;
  using base::android::ScopedJavaLocalRef;
  using base::android::ToJavaArrayOfObjects;
-@@ -48,6 +50,9 @@ ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
+@@ -42,12 +45,22 @@ using base::android::ToJavaArrayOfStrings;
+ 
+ namespace {
+ 
++// Date with abbreviated month and time without seconds, in the browser locale.
++std::u16string FormatUpdateTime(base::Time time) {
++  return base::i18n::IcuBridge::GetInstance().date_time_formatter().Format(
++      time, base::i18n::datetime_options::YMDT::Medium().with_time_precision(
++                base::i18n::DateTimeFormatterOptions::TimePrecision::kMinute));
++}
++
+ ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
+                                    ScopedJavaLocalRef<jclass>& url_class,
+                                    jmethodID& url_constructor,
                                     const std::string& url,
                                     const std::string& title,
                                     const std::string& version,
@@ -1414,7 +1500,7 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
                                     const std::vector<std::string>& languages,
                                     const bool autoinstalled) {
    ScopedJavaLocalRef<jobject> url_param =
-@@ -58,24 +63,45 @@ ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
+@@ -58,24 +71,44 @@ ScopedJavaLocalRef<jobject> ToJava(JNIEnv* env,
    return Java_Subscription_Constructor(env, url_param,
                                         ConvertUTF8ToJavaString(env, title),
                                         ConvertUTF8ToJavaString(env, version),
@@ -1451,8 +1537,7 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
 +        // A null time has no date to show; the list then reads as unavailable.
 +        sub->GetInstallationTime().is_null()
 +            ? std::string()
-+            : base::UTF16ToUTF8(
-+                  base::TimeFormatFriendlyDateAndTime(sub->GetInstallationTime())),
++            : base::UTF16ToUTF8(FormatUpdateTime(sub->GetInstallationTime())),
 +        metadata ? metadata->GetDownloadSuccessCount(sub->GetSourceUrl()) : 0,
 +        metadata ? metadata->GetDownloadErrorCount(sub->GetSourceUrl()) : 0,
 +        std::vector<std::string>{},
@@ -1462,7 +1547,7 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
    }
    return jobjects;
  }
-@@ -94,7 +120,11 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
+@@ -94,7 +127,11 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
        DCHECK(sub.url.is_valid());
        if (sub.url.is_valid()) {
          jobjects.push_back(ToJava(env, url_class, url_constructor,
@@ -1475,7 +1560,7 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
                                    false));
        }
      }
-@@ -104,10 +134,56 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
+@@ -104,10 +141,56 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
  
  }  // namespace
  
@@ -1533,7 +1618,7 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
    auto* subscription_service =
        adblock::SubscriptionServiceFactory::GetForBrowserContext(
-@@ -119,11 +195,42 @@ JNI_AdblockController_GetInstalledSubscriptions(
+@@ -119,11 +202,42 @@ JNI_AdblockController_GetInstalledSubscriptions(
  
    return ToJavaArrayOfObjects(
        env, CSubscriptionsToJObjects(
@@ -1571,13 +1656,13 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
 +    return ConvertUTF8ToJavaString(env, "");
 +  }
 +  return base::android::ConvertUTF16ToJavaString(
-+      env, base::TimeFormatFriendlyDateAndTime(last_update));
++      env, FormatUpdateTime(last_update));
 +}
 +
  static base::android::ScopedJavaLocalRef<jobjectArray>
  JNI_AdblockController_GetRecommendedSubscriptions(JNIEnv* env) {
    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-@@ -131,3 +238,5 @@ JNI_AdblockController_GetRecommendedSubscriptions(JNIEnv* env) {
+@@ -131,3 +245,5 @@ JNI_AdblockController_GetRecommendedSubscriptions(JNIEnv* env) {
    auto list = adblock::config::GetKnownSubscriptions();
    return ToJavaArrayOfObjects(env, CSubscriptionsToJObjects(env, list));
  }
@@ -1586,16 +1671,7 @@ diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/a
 diff --git a/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java b/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java
 --- a/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java
 +++ b/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java
-@@ -17,6 +17,8 @@
- 
- package org.chromium.components.adblock;
- 
-+import android.text.TextUtils;
-+
- import androidx.annotation.UiThread;
- 
- import org.jni_zero.CalledByNative;
-@@ -53,7 +55,7 @@ public class AdblockController {
+@@ -53,7 +53,7 @@ public class AdblockController {
                  FilteringConfiguration.createConfiguration("adblock", mBrowserContextHandle);
          try {
              mAcceptableAds =
@@ -1604,7 +1680,7 @@ diff --git a/components/adblock/android/java/src/org/chromium/components/adblock
          } catch (java.net.MalformedURLException e) {
              mAcceptableAds = null;
          }
-@@ -84,6 +86,10 @@ public class AdblockController {
+@@ -84,6 +84,10 @@ public class AdblockController {
          private String mVersion = "";
          private String[] mLanguages = {};
          private boolean mAutoInstalled;
@@ -1615,7 +1691,7 @@ diff --git a/components/adblock/android/java/src/org/chromium/components/adblock
  
          public Subscription(final URL url, final String title, final String version) {
              this.mUrl = url;
-@@ -96,6 +102,9 @@ public class AdblockController {
+@@ -96,6 +100,9 @@ public class AdblockController {
                  final URL url,
                  final String title,
                  final String version,
@@ -1625,7 +1701,7 @@ diff --git a/components/adblock/android/java/src/org/chromium/components/adblock
                  final String[] languages,
                  boolean autoinstalled) {
              this.mUrl = url;
-@@ -103,6 +112,28 @@ public class AdblockController {
+@@ -103,8 +110,17 @@ public class AdblockController {
              this.mVersion = version;
              this.mLanguages = languages;
              this.mAutoInstalled = autoinstalled;
@@ -1633,28 +1709,17 @@ diff --git a/components/adblock/android/java/src/org/chromium/components/adblock
 +            this.mInstallationTime = installation_time;
 +            this.mDownloadSuccessCount = download_success_count;
 +            this.mDownloadErrorCount = download_error_count;
-+        }
-+
+         }
+ 
 +        public String state() { return mState; }
 +        public String installation_time() { return mInstallationTime; }
 +        public long download_success_count() { return mDownloadSuccessCount; }
 +        public long download_error_count() { return mDownloadErrorCount; }
-+        // Status line of a selected list. Only an installed list with a time shows an update;
-+        // missing data (state Unknown, for example while ad blocking is off) says nothing about
-+        // past downloads, so it is reported as unavailable.
-+        public String getDescription() {
-+            if ("Installing".equals(mState)) return "Downloading…";
-+            if ("Preloaded".equals(mState)) return "Using the built-in copy";
-+            if (!"Installed".equals(mState) && !"AutoInstalled".equals(mState)
-+                    || TextUtils.isEmpty(mInstallationTime)) {
-+                return "Update information unavailable";
-+            }
-+            String updated = "Updated " + mInstallationTime;
-+            return TextUtils.isEmpty(mVersion) ? updated : updated + ", version " + mVersion;
-         }
- 
++
          public String title() {
-@@ -137,6 +168,7 @@ public class AdblockController {
+             return mTitle;
+         }
+@@ -137,6 +153,7 @@ public class AdblockController {
  
      @UiThread
      public void setAcceptableAdsEnabled(boolean enabled) {
@@ -1662,7 +1727,7 @@ diff --git a/components/adblock/android/java/src/org/chromium/components/adblock
          if (enabled) mFilteringConfiguration.addFilterList(mAcceptableAds);
          else mFilteringConfiguration.removeFilterList(mAcceptableAds);
      }
-@@ -174,6 +206,35 @@ public class AdblockController {
+@@ -174,6 +191,35 @@ public class AdblockController {
          mFilteringConfiguration.removeFilterList(url);
      }
  
@@ -1698,7 +1763,7 @@ diff --git a/components/adblock/android/java/src/org/chromium/components/adblock
      @UiThread
      public List<Subscription> getInstalledSubscriptions() {
          Object[] raw = AdblockControllerJni.get().getInstalledSubscriptions(mBrowserContextHandle);
-@@ -276,8 +337,13 @@ public class AdblockController {
+@@ -276,8 +322,13 @@ public class AdblockController {
      }
  
      @NativeMethods

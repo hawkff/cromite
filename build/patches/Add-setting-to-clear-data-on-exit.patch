@@ -13,24 +13,24 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/android/chrome_java_sources.gni        |   1 +
  .../java/res/xml/privacy_preferences.xml      |   5 +
  .../chrome/browser/ChromeTabbedActivity.java  |   7 +-
- .../ClearBrowsingDataFragment.java            |  36 ++++-
+ .../ClearBrowsingDataFragment.java            |  36 +++-
  .../ClearBrowsingDataFragmentAtStart.java     |  79 +++++++++
  chrome/app/settings_strings.grdp              |   8 +
  chrome/browser/about_flags.cc                 |   1 +
  .../browsing_data/browsing_data_bridge.cc     |  20 ++-
  .../browsing_data_counter_bridge.cc           |   2 +-
  .../browsing_data/BrowsingDataBridge.java     |  12 +-
- .../chrome_browsing_data_lifetime_manager.cc  | 151 +++++++++++++++++-
- .../chrome_browsing_data_lifetime_manager.h   |  27 ++++
+ .../chrome_browsing_data_lifetime_manager.cc  | 157 +++++++++++++++++-
+ .../chrome_browsing_data_lifetime_manager.h   |  27 +++
  .../chrome_browsing_data_remover_delegate.cc  |  11 ++
  ...ent_browser_client_navigation_throttles.cc |   5 +
  .../api/browsing_data/browsing_data_api.cc    |   2 +-
  .../browser/profiles/ProfileManagerUtils.java |   5 +
  .../profiles/android/profile_manager_utils.cc |   5 +
- chrome/browser/profiles/profile_manager.cc    |  17 +-
- chrome/browser/profiles/profile_manager.h     |   2 +
+ chrome/browser/profiles/profile_manager.cc    |  39 ++++-
+ chrome/browser/profiles/profile_manager.h     |   6 +
  .../strings/android_chrome_strings.grd        |   3 +
- .../Add-setting-to-clear-data-on-exit.grdp    |   9 ++
+ .../Add-setting-to-clear-data-on-exit.grdp    |   9 +
  .../content/browsing_data_helper.cc           |   9 +-
  components/browsing_data/core/BUILD.gn        |   5 +
  .../core/browsing_data_policies_utils.cc      |  20 +--
@@ -40,13 +40,13 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../core/clear_browsing_data_tab.h            |  21 +++
  components/browsing_data/core/pref_names.cc   |  17 ++
  components/browsing_data/core/pref_names.h    |  16 ++
- components/favicon/core/favicon_database.cc   |   9 ++
+ components/favicon/core/favicon_database.cc   |   9 +
  components/favicon/core/favicon_database.h    |   3 +
  .../search_engines/template_url_service.cc    |   1 +
  content/browser/btm/btm_service_impl.cc       |   2 +-
  .../public/browser/browsing_data_remover.h    |   5 +
  .../Add-setting-to-clear-data-on-exit.inc     |   8 +
- 36 files changed, 533 insertions(+), 42 deletions(-)
+ 36 files changed, 564 insertions(+), 43 deletions(-)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/browsing_data/ClearBrowsingDataFragmentAtStart.java
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-setting-to-clear-data-on-exit.grdp
  create mode 100644 components/browsing_data/core/clear_browsing_data_tab.h
@@ -458,7 +458,14 @@ diff --git a/chrome/browser/browsing_data/android/java/src/org/chromium/chrome/b
 diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.cc b/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.cc
 --- a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.cc
 +++ b/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.cc
-@@ -11,7 +11,9 @@
+@@ -5,13 +5,16 @@
+ #include "chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.h"
+ 
+ #include <algorithm>
++#include <ios>
+ #include <limits>
+ #include <set>
+ #include <string>
  #include <utility>
  
  #include "base/command_line.h"
@@ -468,7 +475,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  #include "base/memory/raw_ptr.h"
  #include "base/metrics/histogram_functions.h"
  #include "base/scoped_observation.h"
-@@ -19,6 +21,7 @@
+@@ -19,6 +22,7 @@
  #include "base/task/task_traits.h"
  #include "base/values.h"
  #include "build/build_config.h"
@@ -476,7 +483,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  #include "chrome/browser/browsing_data/chrome_browsing_data_remover_constants.h"
  #include "chrome/browser/browsing_data/chrome_browsing_data_remover_delegate.h"
  #include "chrome/browser/lifetime/browser_shutdown.h"
-@@ -41,6 +44,9 @@
+@@ -41,6 +45,9 @@
  #include "content/public/browser/browsing_data_filter_builder.h"
  #include "content/public/browser/browsing_data_remover.h"
  #include "content/public/browser/download_manager.h"
@@ -486,7 +493,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  #include "content/public/browser/web_contents.h"
  #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
  #include "url/gurl.h"
-@@ -61,6 +67,9 @@ namespace {
+@@ -61,6 +68,9 @@ namespace {
  constexpr int kInitialCleanupDelayInSeconds = 15;
  constexpr int kTestCleanupPeriodInMinutes = 5;
  constexpr int kDefaultCleanupPeriodInMinutes = 30;
@@ -496,7 +503,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  
  using ScheduledRemovalSettings =
      ChromeBrowsingDataLifetimeManager::ScheduledRemovalSettings;
-@@ -82,9 +91,11 @@ class BrowsingDataRemoverObserver
+@@ -82,15 +92,22 @@ class BrowsingDataRemoverObserver
        content::BrowsingDataRemover* remover,
        bool filterable_deletion,
        Profile* profile,
@@ -510,7 +517,18 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
    }
  
    // content::BrowsingDataRemover::Observer:
-@@ -101,6 +112,9 @@ class BrowsingDataRemoverObserver
+   void OnBrowsingDataRemoverDone(uint64_t failed_data_types) override {
+     base::UmaHistogramMediumTimes(duration_histogram(),
+                                   base::TimeTicks::Now() - start_time_);
++    if (failed_data_types) {
++      LOG(WARNING) << "Browsing data removal: some data types were not "
++                      "deleted, mask 0x"
++                   << std::hex << failed_data_types;
++    }
+     // Having |keep_browser_alive_| being true means that the deletion that just
+     // finished was happening at the browser exit, therefore
+     // |kClearBrowsingDataOnExitDeletionPending| is no more necessary;
+@@ -101,6 +118,9 @@ class BrowsingDataRemoverObserver
      // The profile and browser should not be shutting down yet.
      CHECK(!keep_browser_alive_ || !profile_->ShutdownStarted(),
            base::NotFatalUntil::M161);
@@ -520,7 +538,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
      delete this;
    }
  
-@@ -108,11 +122,13 @@ class BrowsingDataRemoverObserver
+@@ -108,11 +128,13 @@ class BrowsingDataRemoverObserver
    BrowsingDataRemoverObserver(content::BrowsingDataRemover* remover,
                                bool filterable_deletion,
                                Profile* profile,
@@ -536,7 +554,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  #if !BUILDFLAG(IS_ANDROID)
      if (keep_browser_alive) {
        keep_alive_ = std::make_unique<ScopedKeepAlive>(
-@@ -144,11 +160,44 @@ class BrowsingDataRemoverObserver
+@@ -144,11 +166,44 @@ class BrowsingDataRemoverObserver
  
    const raw_ptr<Profile> profile_;
    bool keep_browser_alive_;
@@ -581,7 +599,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  uint64_t GetOriginTypeMask(const base::ListValue& data_types) {
    uint64_t result = 0;
    for (const auto& data_type : data_types) {
-@@ -329,8 +378,25 @@ void ChromeBrowsingDataLifetimeManager::Shutdown() {
+@@ -329,8 +384,25 @@ void ChromeBrowsingDataLifetimeManager::Shutdown() {
  
  void ChromeBrowsingDataLifetimeManager::ClearBrowsingDataForOnExitPolicy(
      bool keep_browser_alive) {
@@ -609,7 +627,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  
    if (!data_types.empty() &&
        IsConditionSatisfiedForBrowsingDataRemoval(GetSyncTypesForPolicyPref(
-@@ -344,18 +410,88 @@ void ChromeBrowsingDataLifetimeManager::ClearBrowsingDataForOnExitPolicy(
+@@ -344,18 +416,88 @@ void ChromeBrowsingDataLifetimeManager::ClearBrowsingDataForOnExitPolicy(
      if (browser_shutdown::HasShutdownStarted())
        CHECK(keep_browser_alive, base::NotFatalUntil::M161);
  #endif
@@ -699,7 +717,7 @@ diff --git a/chrome/browser/browsing_data/chrome_browsing_data_lifetime_manager.
  void ChromeBrowsingDataLifetimeManager::UpdateScheduledRemovalSettings() {
    weak_ptr_factory_.InvalidateWeakPtrs();
    scheduled_removals_settings_ =
-@@ -439,6 +575,7 @@ void ChromeBrowsingDataLifetimeManager::StartScheduledBrowsingDataRemoval() {
+@@ -439,6 +581,7 @@ void ChromeBrowsingDataLifetimeManager::StartScheduledBrowsingDataRemoval() {
  bool ChromeBrowsingDataLifetimeManager::
      IsConditionSatisfiedForBrowsingDataRemoval(
          const syncer::UserSelectableTypeSet sync_types) {
@@ -883,11 +901,49 @@ diff --git a/chrome/browser/profiles/android/profile_manager_utils.cc b/chrome/b
 diff --git a/chrome/browser/profiles/profile_manager.cc b/chrome/browser/profiles/profile_manager.cc
 --- a/chrome/browser/profiles/profile_manager.cc
 +++ b/chrome/browser/profiles/profile_manager.cc
-@@ -1567,6 +1567,19 @@ void ProfileManager::DoFinalInit(ProfileInfo* profile_info,
-   }
- }
+@@ -1539,6 +1539,22 @@ void ProfileManager::DoFinalInit(ProfileInfo* profile_info,
+   // here, and nowhere else.
+   profile_info->MarkProfileAsCreated(profile);
  
++#if BUILDFLAG(IS_ANDROID)
++  // Delete the data selected for removal at startup, whatever activity started
++  // the browser. This runs before the observers below learn of the profile, so
++  // the request comes before any page of the profile can load.
++  if (!profile->IsOffTheRecord()) {
++    auto* browsing_data_lifetime_manager =
++        ChromeBrowsingDataLifetimeManagerFactory::GetForProfile(profile);
++    if (browsing_data_lifetime_manager) {
++      browsing_data_lifetime_manager->ClearBrowsingDataForOnExitPolicy(
++          /*keep_browser_alive=*/false);
++      // The first tabbed activity of this process would request it again.
++      skip_next_removal_at_start_ = true;
++    }
++  }
++#endif  // BUILDFLAG(IS_ANDROID)
++
+   for (auto& observer : observers_)
+     observer.OnProfileAdded(profile);
+ 
+@@ -1549,7 +1565,6 @@ void ProfileManager::DoFinalInit(ProfileInfo* profile_info,
+           switches::kEnableCaretBrowsing)) {
+     profile->GetPrefs()->SetBoolean(prefs::kCaretBrowsingEnabled, true);
+   }
+-#endif  // !BUILDFLAG(IS_ANDROID)
+ 
+   // Delete browsing data specified by the ClearBrowsingDataOnExitList policy
+   // if they were not properly deleted on the last browser shutdown.
+@@ -1565,6 +1580,24 @@ void ProfileManager::DoFinalInit(ProfileInfo* profile_info,
+           /*keep_browser_alive=*/false);
+     }
+   }
++#endif  // !BUILDFLAG(IS_ANDROID)
++}
++
 +void ProfileManager::RemoveBrowsingDataAtStart() {
++  // DoFinalInit() already requested it for this process start.
++  if (std::exchange(skip_next_removal_at_start_, false)) {
++    return;
++  }
 +  std::ranges::for_each(
 +      GetLoadedProfiles(),
 +      [](Profile* profile) {
@@ -898,12 +954,10 @@ diff --git a/chrome/browser/profiles/profile_manager.cc b/chrome/browser/profile
 +              /*keep_browser_alive=*/false);
 +        }
 +      });
-+}
-+
+ }
+ 
  void ProfileManager::DoFinalInitForServices(Profile* profile,
-                                             bool go_off_the_record) {
-   if (!do_final_services_init_ ||
-@@ -2315,9 +2328,9 @@ void ProfileManager::OnBrowserClosed(BrowserWindowInterface* browser) {
+@@ -2315,9 +2348,9 @@ void ProfileManager::OnBrowserClosed(BrowserWindowInterface* browser) {
    // Do nothing if the closed window is not the last window of the same profile.
    bool has_other_window = false;
    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
@@ -927,6 +981,17 @@ diff --git a/chrome/browser/profiles/profile_manager.h b/chrome/browser/profiles
    // If a profile with the given path is currently managed by this object and
    // fully initialized, return a pointer to the corresponding Profile object;
    // otherwise return null.
+@@ -690,6 +692,10 @@ class ProfileManager : public Profile::Delegate {
+   // Controls whether to initialize some services. Only disabled for testing.
+   bool do_final_services_init_ = true;
+ 
++  // Set when DoFinalInit() requested the removal of browsing data at startup;
++  // the next RemoveBrowsingDataAtStart() call then does nothing.
++  bool skip_next_removal_at_start_ = false;
++
+   bool defer_async_loading_ = true;
+   std::vector<base::OnceClosure> deferred_asynchronous_loads_;
+ 
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd

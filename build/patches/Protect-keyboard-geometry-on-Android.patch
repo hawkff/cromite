@@ -29,7 +29,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../browser/tab/TabWebContentsObserver.java   |   17 +
  .../browser/flags/ChromeFeatureList.java      |    2 +-
  .../sAndroidProtectedKeyboardGeometry.java    |   35 +
- ...otectedKeyboardGeometryContentSetting.java |   94 ++
+ ...otectedKeyboardGeometryContentSetting.java |  104 ++
  .../protected_keyboard_geometry.grdp          |   27 +
  .../protected_keyboard_geometry.inc           |   25 +
  .../protected_keyboard_geometry.inc           |    1 +
@@ -65,7 +65,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  ui/android/overscroll_refresh.h               |    5 +
  ui/android/overscroll_refresh_handler.cc      |   24 +
  ui/android/overscroll_refresh_handler.h       |    5 +
- 44 files changed, 2435 insertions(+), 30 deletions(-)
+ 44 files changed, 2445 insertions(+), 30 deletions(-)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/compositor/ProtectedViewportScrollView.java
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sAndroidProtectedKeyboardGeometry.java
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/CromiteProtectedKeyboardGeometryContentSetting.java
@@ -2216,7 +2216,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 new file mode 100644
 --- /dev/null
 +++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/CromiteProtectedKeyboardGeometryContentSetting.java
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,104 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -2304,6 +2304,16 @@ new file mode 100644
 +    @Override
 +    public int getAddExceptionDialogMessage() {
 +        return R.string.website_settings_category_protected_keyboard_geometry_enabled;
++    }
++
++    @Override
++    public int getAllowedGroupHeading() {
++        return R.string.website_settings_category_protected_keyboard_geometry_enabled;
++    }
++
++    @Override
++    public int getBlockedGroupHeading() {
++        return R.string.website_settings_category_protected_keyboard_geometry_disabled;
 +    }
 +
 +    @Override
