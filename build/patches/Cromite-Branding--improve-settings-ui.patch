@@ -10,8 +10,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../android/java/res/xml/main_preferences.xml |   4 +-
  .../res/xml/privacy_preferences_cromite.xml   | 180 ++++++++++++++++++
  .../privacy/settings/PrivacySettings.java     |  23 +--
+ .../chrome/browser/settings/MainSettings.java |   2 +
  .../Cromite-settings-ui.grdp                  |  15 ++
- 5 files changed, 204 insertions(+), 20 deletions(-)
+ 6 files changed, 206 insertions(+), 20 deletions(-)
  create mode 100644 chrome/android/java/res/xml/privacy_preferences_cromite.xml
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp
 
@@ -296,6 +297,18 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  
                      // The page keeps this row hidden.
                      indexData.removeEntry(getUniqueId(PREF_JAVASCRIPT_OPTIMIZER));
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/MainSettings.java
+@@ -937,6 +937,8 @@ public class MainSettings extends ChromeBaseSettingsFragment
+                 public void updateDynamicPreferences(
+                         Context context, SettingsIndexData indexData, Profile profile) {
+                     indexData.removeEntry(getUniqueId(PREF_SETTINGS_PROMO_CARD));
++                    // The Google services row is hidden, so its page is left out of search.
++                    indexData.removeEntry(getUniqueId(PREF_GOOGLE_SERVICES));
+                     if (!shouldShowAddressBarPref(context)) {
+                         indexData.removeEntry(getUniqueId(PREF_ADDRESS_BAR));
+                     }
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp
 new file mode 100644
 --- /dev/null

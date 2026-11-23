@@ -8,7 +8,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
  chrome/android/chrome_java_resources.gni      |   1 +
  chrome/android/chrome_java_sources.gni        |   2 +
- .../android/java/res/layout/fre_tosanduma.xml | 160 +++++++++
+ .../android/java/res/layout/fre_tosanduma.xml | 161 +++++++++
  chrome/android/java/res/values/dimens.xml     |  11 +
  chrome/android/java/res/values/styles.xml     |  24 ++
  .../DefaultSearchEngineFirstRunFragment.java  |   3 -
@@ -23,7 +23,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  ...creenSigninAndHistorySyncActivityBase.java |   6 +-
  .../browser/locale/LocaleManagerDelegate.java |   5 +-
  .../Welcome-screen.grdp                       |  26 ++
- 17 files changed, 926 insertions(+), 86 deletions(-)
+ 17 files changed, 927 insertions(+), 86 deletions(-)
  create mode 100644 chrome/android/java/res/layout/fre_tosanduma.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/firstrun/ToSAndUMAFirstRunFragment.java
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/firstrun/TosAndUmaFragmentView.java
@@ -56,7 +56,7 @@ diff --git a/chrome/android/java/res/layout/fre_tosanduma.xml b/chrome/android/j
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/res/layout/fre_tosanduma.xml
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,161 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<!--
 +Copyright 2015 The Chromium Authors
@@ -148,6 +148,7 @@ new file mode 100644
 +                        android:id="@+id/auto_updater_checkbox"
 +                        android:layout_width="wrap_content"
 +                        android:layout_height="wrap_content"
++                        android:minHeight="48dp"
 +                        android:lineSpacingMultiplier="1.4"
 +                        android:text="@string/auto_updater_check"
 +                        android:paddingStart="@dimen/fre_tos_checkbox_padding"

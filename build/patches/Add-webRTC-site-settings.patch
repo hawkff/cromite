@@ -7,14 +7,14 @@ Requires patch: Content-settings-infrastructure.patch
 Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
- .../impl/BromiteWebRTCContentSetting.java     | 94 +++++++++++++++++++
- .../bromite_content_settings/webrtc.grdp      | 27 ++++++
- .../bromite_content_settings/webrtc.inc       | 22 +++++
- .../bromite_content_settings/WEBRTC.inc       |  1 +
- .../peer_connection_dependency_factory.cc     |  6 ++
- .../peerconnection/rtc_rtp_receiver.cc        | 11 +++
- .../modules/peerconnection/rtc_rtp_sender.cc  | 11 +++
- 7 files changed, 172 insertions(+)
+ .../impl/BromiteWebRTCContentSetting.java     | 104 ++++++++++++++++++
+ .../bromite_content_settings/webrtc.grdp      |  27 +++++
+ .../bromite_content_settings/webrtc.inc       |  22 ++++
+ .../bromite_content_settings/WEBRTC.inc       |   1 +
+ .../peer_connection_dependency_factory.cc     |   6 +
+ .../peerconnection/rtc_rtp_receiver.cc        |  11 ++
+ .../modules/peerconnection/rtc_rtp_sender.cc  |  11 ++
+ 7 files changed, 182 insertions(+)
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteWebRTCContentSetting.java
  create mode 100644 components/browser_ui/strings/bromite_content_settings/webrtc.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/webrtc.inc
@@ -24,7 +24,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 new file mode 100644
 --- /dev/null
 +++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteWebRTCContentSetting.java
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,104 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -112,6 +112,16 @@ new file mode 100644
 +    @Override
 +    public int getAddExceptionDialogMessage() {
 +        return R.string.website_settings_category_webrtc_enabled;
++    }
++
++    @Override
++    public int getAllowedGroupHeading() {
++        return R.string.website_settings_category_webrtc_enabled;
++    }
++
++    @Override
++    public int getBlockedGroupHeading() {
++        return R.string.website_settings_category_webrtc_disabled;
 +    }
 +
 +    @Override

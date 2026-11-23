@@ -9,7 +9,7 @@ The feature is controlled by a feature flag (default enabled)
 
 Require: Content-settings-infrastructure.patch
 ---
- .../impl/BromiteViewportContentSetting.java   |  94 +++++++++++++
+ .../impl/BromiteViewportContentSetting.java   | 104 +++++++++++++++
  .../bromite_content_settings/viewport.grdp    |  27 ++++
  .../bromite_content_settings/viewport.inc     |  22 ++++
  .../bromite_content_settings/VIEWPORT.inc     |   1 +
@@ -36,7 +36,7 @@ Require: Content-settings-infrastructure.patch
  third_party/blink/renderer/core/page/page.cc  | 123 ++++++++++++++++++
  third_party/blink/renderer/core/page/page.h   |  10 ++
  .../renderer/core/style/computed_style.h      |   6 +
- 27 files changed, 485 insertions(+), 22 deletions(-)
+ 27 files changed, 495 insertions(+), 22 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteViewportContentSetting.java
  create mode 100644 components/browser_ui/strings/bromite_content_settings/viewport.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/viewport.inc
@@ -49,7 +49,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 new file mode 100644
 --- /dev/null
 +++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteViewportContentSetting.java
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,104 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -140,6 +140,16 @@ new file mode 100644
 +    }
 +
 +    @Override
++    public int getAllowedGroupHeading() {
++        return R.string.website_settings_category_viewport_enabled;
++    }
++
++    @Override
++    public int getBlockedGroupHeading() {
++        return R.string.website_settings_category_viewport_disabled;
++    }
++
++    @Override
 +    public @Nullable Boolean considerException(SiteSettingsCategory category, @ContentSetting int value) {
 +        return value != ContentSetting.BLOCK;
 +    }
@@ -161,7 +171,7 @@ new file mode 100644
 +    Viewport size protection
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_VIEWPORT_PROTECTION_DESCRIPTION" desc="Description of the viewport protection content setting." formatter_data="android_java">
-+    Hides your screen size from sites by reporting a slightly different size on each page load
++    Hides your screen size from sites by reporting a slightly different size, which changes when you go to another site
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_VIEWPORT_ENABLED" desc="Summary text explaining that viewport size change is full enabled." formatter_data="android_java">
 +    Enabled

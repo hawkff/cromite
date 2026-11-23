@@ -796,7 +796,7 @@ diff --git a/tools/grit/grit/grd_reader.py b/tools/grit/grit/grd_reader.py
 +            if filepath.endswith(".grdp"):
 +              partnode.placeholder_inputs.append(filepath)
 +              try:
-+                self.source = partname
++                self.source = filepath
 +                xml.sax.parse(filepath, GrdPartContentHandler(self))
 +              finally:
 +                self.source = oldsource
