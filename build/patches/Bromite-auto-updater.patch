@@ -1604,10 +1604,10 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
          Chrome updates are no longer supported for this version of Android
        </message>
 +      <message name="IDS_ALLOW_INLINE_UPDATE_TITLE" desc="Title for allow inline update preference">
-+        Allow checking for updates
++        Check for updates
 +      </message>
 +      <message name="IDS_ALLOW_INLINE_UPDATE_SUMMARY" desc="Summary for allow inline update preference">
-+        Notify about new releases by periodically checking for their availability
++        Checks for a new version from time to time and lets you know
 +      </message>
  
        <!-- Account management UI strings. -->

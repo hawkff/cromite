@@ -130,7 +130,7 @@ new file mode 100644
 +    @Override
 +    public ContentSettingsResources.ResourceItem getResourceItem() {
 +        return new ContentSettingsResources.ResourceItem(
-+            /*icon*/ R.drawable.web_asset,
++            /*icon*/ R.drawable.router_24,
 +            /*title*/ R.string.insecure_private_network_permission_title,
 +            /*defaultEnabledValue*/ getDefaultEnabledValue(),
 +            /*defaultDisabledValue*/ getDefaultDisabledValue(),
@@ -184,10 +184,10 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +  <message name="IDS_INSECURE_PRIVATE_NETWORK_PERMISSION_TITLE" desc="" formatter_data="android_java">
-+    Access to Private Network
++    Access to private network
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_INSECURE_PRIVATE_NETWORK_DESCRIPTION" desc="" formatter_data="android_java">
-+    Enable access to private network
++    Lets sites reach devices and services on your private network
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_INSECURE_PRIVATE_NETWORK_ALLOWED" desc="" formatter_data="android_java">
 +    Allow access to private network
@@ -196,7 +196,7 @@ new file mode 100644
 +    Block access to private network
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_INSECURE_PRIVATE_NETWORK_ASK" desc="" formatter_data="android_java">
-+    Ask access to private network
++    Ask before sites access private network
 +  </message>
 +</grit-part>
 diff --git a/components/content_settings/core/browser/bromite_content_settings/insecure_private_network.inc b/components/content_settings/core/browser/bromite_content_settings/insecure_private_network.inc

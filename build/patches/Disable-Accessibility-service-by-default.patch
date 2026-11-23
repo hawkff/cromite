@@ -18,10 +18,10 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_ENABLE_ACCESSIBILITY_TITLE" desc="Title of enable accessibility settings, which allows the user to enable service. [CHAR_LIMIT=32]">
-+        Enable Accessibility Service
++        Let apps read the open page
 +    </message>
 +    <message name="IDS_ENABLE_ACCESSIBILITY_SUMMARY" desc="Summary of enable accessibility settings.">
-+        Activates or deactivates the communication of all user activities in ui to the Accessibility provider
++        When on, the assistant and other apps that ask Android for screen content get the text and layout of the page you are viewing. Incognito pages are never shared.
 +    </message>
 +</grit-part>
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml

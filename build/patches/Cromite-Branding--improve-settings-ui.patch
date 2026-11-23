@@ -8,10 +8,10 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
  chrome/android/chrome_java_resources.gni      |   2 +-
  .../android/java/res/xml/main_preferences.xml |   4 +-
- .../res/xml/privacy_preferences_cromite.xml   | 185 ++++++++++++++++++
+ .../res/xml/privacy_preferences_cromite.xml   | 180 ++++++++++++++++++
  .../privacy/settings/PrivacySettings.java     |  23 +--
  .../Cromite-settings-ui.grdp                  |  15 ++
- 5 files changed, 209 insertions(+), 20 deletions(-)
+ 5 files changed, 204 insertions(+), 20 deletions(-)
  create mode 100644 chrome/android/java/res/xml/privacy_preferences_cromite.xml
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp
 
@@ -51,7 +51,7 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrom
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/res/xml/privacy_preferences_cromite.xml
-@@ -0,0 +1,185 @@
+@@ -0,0 +1,180 @@
 +<?xml version="1.0" encoding="utf-8"?><!--
 +Copyright 2022 The Chromium Authors
 +Use of this source code is governed by a BSD-style license that can be
@@ -92,13 +92,13 @@ new file mode 100644
 +        android:title="@string/third_party_cookies_link_row_label"
 +        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings" />
 +    <Preference
-+        android:key="do_not_track"
-+        android:title="@string/do_not_track_title"
-+        android:fragment="org.chromium.chrome.browser.privacy.settings.DoNotTrackSettings" />
-+    <Preference
 +        android:key="gpc"
 +        android:title="@string/gpc_title"
 +        android:fragment="org.chromium.chrome.browser.privacy.settings.GpcSettings" />
++    <Preference
++        android:key="do_not_track"
++        android:title="@string/do_not_track_title"
++        android:fragment="org.chromium.chrome.browser.privacy.settings.DoNotTrackSettings" />
 +    <Preference
 +        android:key="referers_policy"
 +        android:title="@string/referers_policy_title"
@@ -171,11 +171,6 @@ new file mode 100644
 +        android:key="secure_dns"
 +        android:title="@string/settings_secure_dns_title"
 +        android:fragment="org.chromium.chrome.browser.privacy.secure_dns.SecureDnsSettings" />
-+    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
-+        android:title="@string/dangling_pointer_detector_title"
-+        android:summary="@string/dangling_pointer_detector_summary"
-+        app:featureName="enable-dangling-pointer-detector"
-+        app:needRestart="true" />
 +
 +    <PreferenceCategory
 +        android:title="@string/services_category_title"/>
@@ -299,8 +294,8 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
 +                    // The page shows the Global Privacy Control setting instead.
 +                    indexData.removeEntry(getUniqueId(PREF_UNIVERSAL_OPT_OUT));
  
-                     if (shouldHideAdvancedProtectionInfoPref()) {
-                         indexData.removeEntry(getUniqueId(PREF_ADVANCED_PROTECTION_INFO));
+                     // The page keeps this row hidden.
+                     indexData.removeEntry(getUniqueId(PREF_JAVASCRIPT_OPTIMIZER));
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Cromite-settings-ui.grdp
 new file mode 100644
 --- /dev/null
@@ -312,13 +307,13 @@ new file mode 100644
 +        Browsing data
 +    </message>
 +    <message name="IDS_DATA_EXPOSED_TO_WEBSITE_SECTION_TITLE" desc="">
-+        Data exposed to the websites
++        Data shared with sites
 +    </message>
 +    <message name="IDS_INCOGNITO_RELATED_SECTION_TITLE" desc="">
 +        Incognito mode
 +    </message>
 +    <message name="IDS_DATA_EXPOSED_TO_DEVICE_SECTION_TITLE" desc="">
-+        Data exposed in the device
++        Other apps and this device
 +    </message>
 +</grit-part>
 --

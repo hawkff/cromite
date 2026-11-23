@@ -263,13 +263,13 @@ new file mode 100644
 +    When on, sites can use pop-ups and redirects. When off, sites can’t use pop-ups and redirects.
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_POPUP_BLOCK_ALL" desc="" formatter_data="android_java">
-+    Block all popups
++    Block all pop-ups
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_POPUP_ALLOWED" desc="" formatter_data="android_java">
-+    Allows popups
++    Allow pop-ups
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_POPUP_BLOCKED" desc="" formatter_data="android_java">
-+    Block some popups
++    Block some pop-ups
 +  </message>
 +</grit-part>
 diff --git a/components/content_settings/core/browser/bromite_content_settings/popups.inc b/components/content_settings/core/browser/bromite_content_settings/popups.inc

@@ -445,10 +445,10 @@ new file mode 100644
 +        Ask to restart on connection change
 +    </message>
 +    <message name="IDS_ASK_TO_RESTART_ON_CONNECTION_CHANGE_SUMMARY" desc="Summary text for 'Ask to restart on connection change' settings option.">
-+        If the IP of the connection changes, access to the network is blocked and a browser restart is requested
++        Pauses pages when your internet connection changes and asks whether to restart
 +    </message>
 +    <message name="IDS_ASK_TO_RESTART_ON_CONNECTION_CHANGE_RESTART" desc="">
-+        Connection to internet has changed, execution is paused. Restart Cromite?
++        Your internet connection changed, so pages are paused. Restart the browser?
 +    </message>
 +    <message name="IDS_ASK_TO_RESTART_ON_CONNECTION_CHANGE_CLOSE_NOTIFICATION" desc="">
 +        Not now

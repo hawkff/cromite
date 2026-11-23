@@ -47,7 +47,7 @@ new file mode 100644
 +        Always show toolbar
 +    </message>
 +    <message name="IDS_LOCK_TOOLBAR_SUMMARY" desc="Summary text for 'Always show toolbar' settings option.">
-+        Blocks the toolbar's hiding
++        Keeps the toolbar on screen when you scroll
 +    </message>
 +</grit-part>
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml

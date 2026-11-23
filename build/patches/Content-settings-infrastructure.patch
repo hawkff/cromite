@@ -11,13 +11,14 @@ Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 Require: bromite-build-utils.patch
 ---
- .../ChromeSiteSettingsDelegate.java           |  17 +-
+ .../privacy/settings/PrivacySettings.java     |   3 +
+ .../ChromeSiteSettingsDelegate.java           |  20 +-
  ...page_specific_content_settings_delegate.cc |   2 +-
  .../browser_ui/settings/android/BUILD.gn      |   1 +
  .../preference_spinner_single_widget.xml      |  92 ++++
  .../settings/SpinnerPreference.java           |  25 ++
  .../browser_ui/site_settings/android/BUILD.gn |  17 +
- .../res/xml/site_settings_preferences.xml     |   7 +
+ .../res/xml/site_settings_preferences.xml     |  37 ++
  .../site_settings/AllSiteSettings.java        |   5 +-
  .../BromiteCustomContentSetting.java          | 159 +++++++
  .../BromiteCustomContentSettingImpl.java      | 422 ++++++++++++++++++
@@ -62,7 +63,7 @@ Require: bromite-build-utils.patch
  .../platform/web_content_settings_client.h    |  13 +
  .../execution_context/execution_context.cc    |  16 +
  .../execution_context/execution_context.h     |   5 +
- 51 files changed, 1358 insertions(+), 68 deletions(-)
+ 52 files changed, 1394 insertions(+), 68 deletions(-)
  create mode 100644 components/browser_ui/settings/android/java/res/layout/preference_spinner_single_widget.xml
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSetting.java
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSettingImpl.java
@@ -73,6 +74,19 @@ Require: bromite-build-utils.patch
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/placeholder.txt
  create mode 100644 components/content_settings/core/common/bromite_content_settings/placeholder.txt
 
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+@@ -808,6 +808,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+                         indexData.removeEntry(getUniqueId(PREF_UNIVERSAL_OPT_OUT));
+                     }
+ 
++                    // The page keeps this row hidden.
++                    indexData.removeEntry(getUniqueId(PREF_JAVASCRIPT_OPTIMIZER));
++
+                     if (shouldHideAdvancedProtectionInfoPref()) {
+                         indexData.removeEntry(getUniqueId(PREF_ADVANCED_PROTECTION_INFO));
+                     }
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/site_settings/ChromeSiteSettingsDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/site_settings/ChromeSiteSettingsDelegate.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/site_settings/ChromeSiteSettingsDelegate.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/site_settings/ChromeSiteSettingsDelegate.java
@@ -87,7 +101,17 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/site_settings/C
  /** A SiteSettingsDelegate instance that contains Chrome-specific Site Settings logic. */
  @NullMarked
  public class ChromeSiteSettingsDelegate implements SiteSettingsDelegate {
-@@ -227,7 +231,7 @@ public class ChromeSiteSettingsDelegate implements SiteSettingsDelegate {
+@@ -143,6 +147,9 @@ public class ChromeSiteSettingsDelegate implements SiteSettingsDelegate {
+                 return SiteSettingsCategory.adsCategoryEnabled();
+             case SiteSettingsCategory.Type.ANTI_ABUSE:
+                 return false;
++            // The JavaScript JIT category is the one control for JavaScript optimization.
++            case SiteSettingsCategory.Type.JAVASCRIPT_OPTIMIZER:
++                return false;
+             case SiteSettingsCategory.Type.AUTO_DARK_WEB_CONTENT:
+                 return ChromeFeatureList.isEnabled(
+                         ChromeFeatureList.DARKEN_WEBSITES_CHECKBOX_IN_THEMES_SETTING);
+@@ -227,7 +234,7 @@ public class ChromeSiteSettingsDelegate implements SiteSettingsDelegate {
  
      @Override
      public boolean isHelpAndFeedbackEnabled() {
@@ -96,7 +120,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/site_settings/C
      }
  
      @Override
-@@ -333,6 +337,17 @@ public class ChromeSiteSettingsDelegate implements SiteSettingsDelegate {
+@@ -333,6 +340,17 @@ public class ChromeSiteSettingsDelegate implements SiteSettingsDelegate {
          return mPrivacySandboxBridge.getRelatedWebsiteSetOwner(memberOrigin);
      }
  
@@ -320,16 +344,74 @@ diff --git a/components/browser_ui/site_settings/android/BUILD.gn b/components/b
 diff --git a/components/browser_ui/site_settings/android/java/res/xml/site_settings_preferences.xml b/components/browser_ui/site_settings/android/java/res/xml/site_settings_preferences.xml
 --- a/components/browser_ui/site_settings/android/java/res/xml/site_settings_preferences.xml
 +++ b/components/browser_ui/site_settings/android/java/res/xml/site_settings_preferences.xml
-@@ -194,4 +194,11 @@ The order of the following items is from: http://crbug.com/610358.
+@@ -108,6 +108,10 @@ The order of the following items is from: http://crbug.com/610358.
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+         android:key="loopback_network" />
++    <!-- Access to private network (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="insecure_private_network" />
+ 
+     <!-- CONTENT SETTINGS section -->
+     <org.chromium.components.browser_ui.settings.ChromeBasePreferenceCategory
+@@ -122,6 +126,14 @@ The order of the following items is from: http://crbug.com/610358.
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+         android:key="javascript" />
++    <!-- JavaScript JIT (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="javascript_jit" />
++    <!-- Images (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="images" />
+     <!-- Popups -->
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+@@ -130,6 +142,10 @@ The order of the following items is from: http://crbug.com/610358.
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+         android:key="sound" />
++    <!-- Autoplay (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="autoplay" />
+     <!-- Ads -->
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+@@ -166,6 +182,26 @@ The order of the following items is from: http://crbug.com/610358.
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+         android:key="automatic_downloads" />
++    <!-- WebGL (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="webgl" />
++    <!-- WebRTC (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="webrtc" />
++    <!-- Viewport size protection (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="viewport" />
++    <!-- Keyboard size protection (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="keyboard_size_protection" />
++    <!-- Time zone override (series) -->
++    <org.chromium.components.browser_ui.settings.ChromeBasePreference
++        android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
++        android:key="timezone_override" />
+     <!-- V8 Optimizer -->
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.components.browser_ui.site_settings.SingleCategorySettings"
+@@ -194,4 +230,5 @@ The order of the following items is from: http://crbug.com/610358.
          android:summary="@string/safety_hub_autorevocation_toggle_summary"
          app:backgroundStyle="card"/>
  
-+    <Preference
-+        android:key="divider_cromite"
-+        android:selectable="false"
-+        android:layout="@layout/horizontal_divider"/>
-+
-+    <PreferenceCategory android:title="Cromite content settings"/>
 +
  </PreferenceScreen>
 diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/AllSiteSettings.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/AllSiteSettings.java
@@ -1422,7 +1504,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
              }
              int titleId = ContentSettingsResources.getTitleForCategory(prefCategory);
 -            indexData.updateEntryForKey(prefFragment, key, titleId);
-+            if (indexData.getEntry(key) != null)
++            if (indexData.getEntryForKey(prefFragment, key) != null)
 +                indexData.updateEntryForKey(prefFragment, key, titleId);
          }
      }

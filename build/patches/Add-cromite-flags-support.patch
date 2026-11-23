@@ -25,7 +25,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  base/feature_list.h                           |   5 +
  build/android/gyp/java_cpp_features.py        |  15 ++
  chrome/android/java/res/values/values.xml     |   3 +
+ .../java/res/xml/appearance_preferences.xml   |   3 +-
  .../java/res/xml/privacy_preferences.xml      |   4 +
+ .../settings/AppearanceSettingsFragment.java  |   3 +-
  .../homepage/settings/HomepageSettings.java   |   2 +-
  .../privacy/settings/PrivacySettings.java     |   2 +-
  .../settings/FragmentDependencyProvider.java  |   9 +-
@@ -113,7 +115,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  third_party/blink/public/common/features.h    |   1 +
  ui/base/ui_base_features.cc                   |   1 +
  ui/base/ui_base_features.h                    |   1 +
- 100 files changed, 944 insertions(+), 38 deletions(-)
+ 102 files changed, 948 insertions(+), 40 deletions(-)
  create mode 100644 base/android/java/src/org/chromium/base/ImmutableFlagWithDefault.java
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/include_all_directory.java
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/java_template/CromiteCachedFlag.java.tmpl
@@ -661,6 +663,19 @@ diff --git a/chrome/android/java/res/values/values.xml b/chrome/android/java/res
      <!-- Full Screen Constants -->
      <!-- These constants were chosen empirically for their visually pleasant behavior.
           Contact tedchoc@chromium.org or dtrainor@chromium.org for questions about
+diff --git a/chrome/android/java/res/xml/appearance_preferences.xml b/chrome/android/java/res/xml/appearance_preferences.xml
+--- a/chrome/android/java/res/xml/appearance_preferences.xml
++++ b/chrome/android/java/res/xml/appearance_preferences.xml
+@@ -5,7 +5,8 @@ Use of this source code is governed by a BSD-style license that can be
+ found in the LICENSE file.
+ -->
+ <PreferenceScreen
+-    xmlns:android="http://schemas.android.com/apk/res/android">
++    xmlns:android="http://schemas.android.com/apk/res/android"
++    xmlns:app="http://schemas.android.com/apk/res-auto">
+ 
+     <org.chromium.components.browser_ui.settings.ChromeBasePreference
+         android:fragment="org.chromium.chrome.browser.night_mode.settings.ThemeSettingsFragment"
 diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/android/java/res/xml/privacy_preferences.xml
 --- a/chrome/android/java/res/xml/privacy_preferences.xml
 +++ b/chrome/android/java/res/xml/privacy_preferences.xml
@@ -675,6 +690,19 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences.xml b/chrome/androi
      <org.chromium.components.browser_ui.settings.ChromeBasePreference
          android:key="universal_opt_out"
          android:title="@string/universal_opt_out_title"
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/appearance/settings/AppearanceSettingsFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/appearance/settings/AppearanceSettingsFragment.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/appearance/settings/AppearanceSettingsFragment.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/appearance/settings/AppearanceSettingsFragment.java
+@@ -75,7 +75,8 @@ public class AppearanceSettingsFragment extends ChromeBaseSettingsFragment
+     private @Nullable OnSharedPreferenceChangeListener mTabPositionListener;
+ 
+     @Override
+-    public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
++    public void onCreatePreferencesCromite(
++            @Nullable Bundle savedInstanceState, @Nullable String rootKey) {
+         mPageTitle.set(getTitle(getContext()));
+         SettingsUtils.addPreferencesFromResource(this, R.xml.appearance_preferences);
+ 
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/homepage/settings/HomepageSettings.java b/chrome/android/java/src/org/chromium/chrome/browser/homepage/settings/HomepageSettings.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/homepage/settings/HomepageSettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/homepage/settings/HomepageSettings.java

@@ -11,7 +11,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../java/res/xml/homepage_preferences.xml     |  6 ++++
  .../browser/BrowserRestartActivity.java       |  1 +
  .../browser/ChromeInactivityTracker.java      | 14 ++++++++
- .../chrome/browser/ChromeTabbedActivity.java  | 11 ++++---
+ .../chrome/browser/ChromeTabbedActivity.java  | 12 ++++---
  .../browser/tasks/ReturnToChromeUtil.java     | 16 ++++++++-
  chrome/app/settings_strings.grdp              |  2 +-
  .../HomeTipsModulesProvider.java              |  4 +--
@@ -29,7 +29,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../about_flags_cc/show-ntp-at-startup.inc    | 12 +++++++
  .../show-ntp-at-startup.inc                   |  5 +++
  .../show-ntp-at-startup.inc                   |  1 +
- 21 files changed, 132 insertions(+), 23 deletions(-)
+ 21 files changed, 133 insertions(+), 23 deletions(-)
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sShowNtpAtStartupAndroid.java
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/show-ntp-at-startup.grdp
  create mode 100644 cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc
@@ -99,16 +99,17 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeInactivit
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -3707,6 +3707,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3723,6 +3723,9 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
          mInactivityTrackerSupplier.set(
                  new ChromeInactivityTracker(
                          ChromePreferenceKeys.TABBED_ACTIVITY_LAST_BACKGROUNDED_TIME_MS_PREF));
-+        mInactivityTrackerSupplier.get().setIsStartup(
-+            !CipherLazyHolder.sCipherInstance.restoreFromBundle(getSavedInstanceState()));
++        // A start with saved state continues an earlier session (recreation, or a restore after
++        // the system ended the process in the background), so it is not a startup.
++        mInactivityTrackerSupplier.get().setIsStartup(getSavedInstanceState() == null);
          TabUsageTracker.initialize(this.getLifecycleDispatcher(), tabModelSelector);
          TabGroupUsageTracker.initialize(
                  this.getLifecycleDispatcher(), tabModelSelector, this::isWarmOnResume);
-@@ -3737,13 +3739,13 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3753,13 +3756,13 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          getTabModelSelectorSupplier(),
                          getTabContentManagerSupplier(),
                          SetupListModuleUtils::isSetupListActive);
@@ -124,7 +125,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
          }
  
          SafetyHubMagicStackBuilder safetyHubMagicStackBuilder =
-@@ -3752,7 +3754,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3768,7 +3771,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          mTabModelProfileSupplier,
                          mTabModelSelector,
                          getModalDialogManagerSupplier().asNonNull());
@@ -133,7 +134,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  
          // Fetch and register the appropriate collection of educational tip or setup list modules.
          HomeTipsModulesProvider.registerTipModules(
-@@ -3769,7 +3771,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -3785,7 +3788,8 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
                          () ->
                                  SettingsNavigationFactory.createSettingsNavigation()
                                          .startSettings(this, TabsSettings.class));
@@ -447,10 +448,10 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_SHOW_NTP_AT_STARTUP_TITLE" desc="Text for 'Show NTP at startup' settings option.">
-+        Show NTP at startup
++        Open a new tab at startup
 +    </message>
 +    <message name="IDS_SHOW_NTP_AT_STARTUP_SUMMARY" desc="Summary text for 'Show NTP at startup' settings option.">
-+        Enable showing a NewTabPage at startup and allows selection of the last open tab
++        Starts on a new tab page. Your previous tabs stay open.
 +    </message>
 +</grit-part>
 diff --git a/cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc b/cromite_flags/chrome/browser/about_flags_cc/show-ntp-at-startup.inc

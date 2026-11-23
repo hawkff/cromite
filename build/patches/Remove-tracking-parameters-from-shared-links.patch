@@ -33,15 +33,15 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../bookmarks/BookmarkManagerMediator.java    |   4 +-
  .../bookmarks/BookmarkToolbarMediator.java    |   3 +-
  .../download/home/list/ShareUtils.java        |   3 +-
- .../browser/omnibox/UrlBarMediator.java       |  31 +++-
- .../omnibox/UrlBarMediatorUnitTest.java       |  43 +++++
+ .../browser/omnibox/UrlBarMediator.java       |  31 ++-
+ .../omnibox/UrlBarMediatorUnitTest.java       |  50 +++++
  ...tracking-parameters-from-shared-links.grdp |   9 +
  .../browser_ui/share/ShareParams.java         |   4 +-
  ui/android/BUILD.gn                           |   2 +
  .../org/chromium/ui/base/ClipboardImpl.java   |   2 +-
- .../src/org/chromium/ui/base/LinkCleaner.java | 175 ++++++++++++++++++
- .../org/chromium/ui/base/LinkCleanerTest.java | 143 ++++++++++++++
- 17 files changed, 435 insertions(+), 13 deletions(-)
+ .../src/org/chromium/ui/base/LinkCleaner.java | 189 ++++++++++++++++++
+ .../org/chromium/ui/base/LinkCleanerTest.java | 143 +++++++++++++
+ 17 files changed, 456 insertions(+), 13 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Remove-tracking-parameters-from-shared-links.grdp
  create mode 100644 ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
  create mode 100644 ui/android/junit/src/org/chromium/ui/base/LinkCleanerTest.java
@@ -95,7 +95,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.ui.base.PageTransition;
  import org.chromium.ui.base.SelectFileDialog;
  import org.chromium.ui.base.WindowAndroid;
-@@ -4582,7 +4583,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4599,7 +4600,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
              Clipboard.getInstance()
                      .setText(
                              currentTab.getTitle(),
@@ -288,14 +288,14 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
 +     * that has some and cleaning is on, or null so that the text is copied as it is.
 +     */
 +    private static @Nullable String getCleanedLink(String text) {
-+        String cleaned = LinkCleaner.cleanIfEnabled(text);
-+        if (cleaned.equals(text)) return null;
-+        // The parsed URL only decides whether to clean; the cleaning keeps the text as typed.
++        // The parsed URL decides whether to clean and names the site for the site-specific rules;
++        // the cleaning keeps the text as typed.
 +        GURL url = new GURL(text);
 +        if (!url.isValid() || !UrlUtilities.isHttpOrHttps(url) || url.getHost().isEmpty()) {
 +            return null;
 +        }
-+        return cleaned;
++        String cleaned = LinkCleaner.cleanIfEnabled(text, url.getHost());
++        return cleaned.equals(text) ? null : cleaned;
      }
  
      @Override
@@ -310,7 +310,7 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
  import org.chromium.ui.modelutil.PropertyModel;
  import org.chromium.ui.modelutil.PropertyObservable.PropertyObserver;
  import org.chromium.url.GURL;
-@@ -533,6 +534,48 @@ public class UrlBarMediatorUnitTest {
+@@ -533,6 +534,55 @@ public class UrlBarMediatorUnitTest {
                  mMediator.getReplacementCutCopyText(editingText, new TextSelection(12, 0)));
      }
  
@@ -341,6 +341,13 @@ diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/brow
 +        assertNull(
 +                mMediator.getReplacementCutCopyText(
 +                        cleanLink, new TextSelection(0, cleanLink.length())));
++
++        // Site-specific rules match the host the URL parser resolves; the typed host is kept.
++        String escapedHost = "https://%78.com/u/status/1?s=20&t=abc";
++        assertEquals(
++                "https://%78.com/u/status/1",
++                mMediator.getReplacementCutCopyText(
++                        escapedHost, new TextSelection(0, escapedHost.length())));
 +
 +        // Text that is not a valid URL is copied as selected, even if it looks like one.
 +        String invalidPort = "https://example.com:abc/?utm_source=keep";
@@ -436,7 +443,7 @@ diff --git a/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java b/ui/andr
 new file mode 100644
 --- /dev/null
 +++ b/ui/android/java/src/org/chromium/ui/base/LinkCleaner.java
-@@ -0,0 +1,175 @@
+@@ -0,0 +1,189 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +
 +package org.chromium.ui.base;
@@ -497,10 +504,19 @@ new file mode 100644
 +
 +    /** Returns {@link #clean(String)} of the link, or the link itself if the switch is off. */
 +    public static String cleanIfEnabled(String url) {
++        return cleanIfEnabled(url, null);
++    }
++
++    /**
++     * Like {@link #cleanIfEnabled(String)}, but the site-specific rules match siteHost, the host as
++     * a URL parser resolves it, when it is not null. Use it for text that may spell the host
++     * differently, such as "%78.com" for "x.com"; the returned text keeps that spelling.
++     */
++    public static String cleanIfEnabled(String url, @Nullable String siteHost) {
 +        if (!ContextUtils.getAppSharedPreferences().getBoolean(PREF_CLEAN_LINKS, true)) {
 +            return url;
 +        }
-+        return clean(url);
++        return clean(url, siteHost);
 +    }
 +
 +    /**
@@ -511,6 +527,10 @@ new file mode 100644
 +     * a single http or https URL with a host is returned unchanged.
 +     */
 +    public static String clean(String url) {
++        return clean(url, null);
++    }
++
++    private static String clean(String url, @Nullable String siteHost) {
 +        int schemeEnd = url.indexOf("://");
 +        if (schemeEnd < 0) return url;
 +        String scheme = url.substring(0, schemeEnd);
@@ -531,6 +551,7 @@ new file mode 100644
 +        if (authorityEnd < 0 || authorityEnd > queryStart) authorityEnd = queryStart;
 +        String host = getHost(url.substring(authorityStart, authorityEnd));
 +        if (host.isEmpty()) return url;
++        if (siteHost != null) host = getHost(siteHost);
 +
 +        String[] params = url.substring(queryStart + 1, queryEnd).split("&", -1);
 +        List<String> kept = new ArrayList<>();

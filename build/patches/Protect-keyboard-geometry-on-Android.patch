@@ -2319,16 +2319,16 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +  <message name="IDS_SITE_SETTINGS_TYPE_PROTECTED_KEYBOARD_GEOMETRY" desc="The label used for site settings controls." formatter_data="android_java">
-+    Keyboard Size Protection
++    Keyboard size protection
 +  </message>
 +  <message name="IDS_PROTECTED_KEYBOARD_GEOMETRY_PERMISSION_TITLE" desc="Title of the permission to use [CHAR-LIMIT=32]" formatter_data="android_java">
-+    Keyboard Size Protection
++    Keyboard size protection
 +  </message>
 +  <message name="IDS_SITE_SETTINGS_TYPE_PROTECTED_KEYBOARD_GEOMETRY_MID_SENTENCE" desc="The label used for site settings controls when used mid-sentence." formatter_data="android_java">
-+    Keyboard Size Protection
++    Keyboard size protection
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_PROTECTED_KEYBOARD_GEOMETRY_DESCRIPTION" desc="Description of the content setting." formatter_data="android_java">
-+    Hides the keyboard size
++    Hides the size of your on-screen keyboard from sites
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_PROTECTED_KEYBOARD_GEOMETRY_ENABLED" desc="Summary text explaining is full enabled." formatter_data="android_java">
 +    Enabled

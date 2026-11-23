@@ -12,7 +12,6 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
  .../java/res/xml/developer_preferences.xml    |  12 ++
  .../init/ProcessInitializationHandler.java    |   6 +-
- .../tracing/settings/DeveloperSettings.java   |   2 +-
  chrome/browser/BUILD.gn                       |   5 +
  chrome/browser/android/devtools_server.cc     |  10 +
  ...ontent_browser_client_receiver_bindings.cc |  10 +
@@ -36,7 +35,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../about_flags_cc/Enable-test-support.inc    |  19 ++
  .../Enable-test-support.inc                   |   7 +
  .../Enable-test-support.inc                   |   2 +
- 26 files changed, 593 insertions(+), 7 deletions(-)
+ 25 files changed, 592 insertions(+), 6 deletions(-)
  create mode 100644 chrome/browser/cromite/cromite_private_api_host.cc
  create mode 100644 chrome/browser/cromite/cromite_private_api_host.h
  create mode 100644 chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/cromite/sActAsWebView.java
@@ -95,18 +94,6 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/init/ProcessIni
                                      assumeNonNull(LocalStatePrefs.get()));
                      mDevToolsServer.setRemoteDebuggingEnabled(
                              true, DevToolsServer.Security.ALLOW_DEBUG_PERMISSION);
-diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tracing/settings/DeveloperSettings.java b/chrome/android/java/src/org/chromium/chrome/browser/tracing/settings/DeveloperSettings.java
---- a/chrome/android/java/src/org/chromium/chrome/browser/tracing/settings/DeveloperSettings.java
-+++ b/chrome/android/java/src/org/chromium/chrome/browser/tracing/settings/DeveloperSettings.java
-@@ -41,7 +41,7 @@ public class DeveloperSettings extends ChromeBaseSettingsFragment implements Emb
-     private final NonNullObservableSupplier<String> mPageTitle =
-             ObservableSuppliers.createNonNull(MSG_DEVELOPER_OPTIONS_TITLE);
- 
--    private static @TriState int sIsEnabledForTests;
-+    private static @TriState int sIsEnabledForTests = TriState.TRUE;
- 
-     public static boolean shouldShowDeveloperSettings() {
-         // Always enabled on canary, dev and local builds, otherwise can be enabled by tapping the
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn

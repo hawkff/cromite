@@ -274,7 +274,7 @@ new file mode 100644
 +    Allow sites to load images
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_IMAGES_DISABLED" desc="Summary text explaining that sites are not allowed to load images." formatter_data="android_java">
-+    Disallow sites to load images
++    Block sites from loading images
 +  </message>
 +</grit-part>
 diff --git a/components/content_settings/core/browser/bromite_content_settings/images.inc b/components/content_settings/core/browser/bromite_content_settings/images.inc

@@ -19,7 +19,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../chrome/browser/app/ChromeActivity.java    |   5 +-
  .../init/ChromeBrowserInitializer.java        |   3 +
  .../PrivacyPreferencesManagerImpl.java        |  42 ++++
- .../settings/UserAgentPreferences.java        | 189 ++++++++++++++++++
+ .../settings/UserAgentPreferences.java        | 199 ++++++++++++++++++
  .../chromium/chrome/browser/tab/TabImpl.java  |  59 +++++-
  .../chromium/chrome/browser/tab/TabUtils.java |   8 +-
  .../browser/android/content/content_utils.cc  |  29 +++
@@ -43,7 +43,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../browser/web_contents/web_contents_impl.cc |   6 +-
  .../framehost/NavigationControllerImpl.java   |   3 +-
  content/renderer/render_thread_impl.cc        |   1 -
- 33 files changed, 776 insertions(+), 17 deletions(-)
+ 33 files changed, 786 insertions(+), 17 deletions(-)
  create mode 100644 chrome/android/java/res/layout/custom_useragent_preferences.xml
  create mode 100644 chrome/android/java/res/xml/useragent_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/settings/UserAgentPreferences.java
@@ -343,7 +343,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/UserAg
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/UserAgentPreferences.java
-@@ -0,0 +1,189 @@
+@@ -0,0 +1,199 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -381,13 +381,16 @@ new file mode 100644
 +import android.widget.CompoundButton;
 +import androidx.recyclerview.widget.RecyclerView;
 +
++import org.chromium.base.supplier.MonotonicObservableSupplier;
++import org.chromium.base.supplier.ObservableSuppliers;
++import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
 +import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
++import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
 +import org.chromium.components.browser_ui.widget.RadioButtonWithDescription;
 +import org.chromium.components.browser_ui.widget.RadioButtonWithEditText;
 +import org.chromium.components.browser_ui.settings.SettingsUtils;
 +import org.chromium.components.content_settings.ContentSettingsType;
 +import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
-+import org.chromium.components.browser_ui.settings.SettingsFragment;
 +import org.chromium.chrome.browser.app.tabwindow.TabWindowManagerSingleton;
 +import org.chromium.chrome.browser.tabwindow.TabWindowManager;
 +import org.chromium.chrome.browser.privacy.settings.PrivacyPreferencesManagerImpl;
@@ -400,7 +403,7 @@ new file mode 100644
 + */
 +public class UserAgentPreferences
 +        extends PreferenceFragmentCompat
-+        implements RadioGroup.OnCheckedChangeListener, SettingsFragment,
++        implements RadioGroup.OnCheckedChangeListener, EmbeddableSettingsPage,
 +                   ProfileDependentSetting {
 +
 +    private RadioButtonWithDescription useDefaultAgentSwitch;
@@ -411,6 +414,13 @@ new file mode 100644
 +    private RadioGroup mRadioGroupDesktopMode;
 +    private CheckBox mDesktopModeViewportmeta;
 +    private Profile mProfile;
++    private final SettableMonotonicObservableSupplier<String> mPageTitle =
++            ObservableSuppliers.createMonotonic();
++
++    @Override
++    public MonotonicObservableSupplier<String> getPageTitle() {
++        return mPageTitle;
++    }
 +
 +    @Override
 +    public @AnimationType int getAnimationType() {
@@ -424,7 +434,7 @@ new file mode 100644
 +
 +    @Override
 +    public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-+        getActivity().setTitle(R.string.useragent_settings_title);
++        mPageTitle.set(getString(R.string.useragent_settings_title));
 +        SettingsUtils.addPreferencesFromResource(this, R.xml.useragent_preferences);
 +    }
 +
@@ -988,10 +998,10 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
  
 +      <!-- User Agent settings -->
 +      <message name="IDS_PREFS_USERAGENT_SETTINGS" desc="Title of the User Agent preference. [CHAR-LIMIT=32]">
-+        User Agent
++        User agent
 +      </message>
 +      <message name="IDS_USERAGENT_SETTINGS_TITLE" desc="Title of the User Agent screen. [CHAR-LIMIT=32]">
-+        Customize User Agent
++        User agent
 +      </message>
 +      <message name="IDS_CUSTOM_UA_FLAG_ON" desc="The label of the option that allows users to define custom user agent.">
 +        Use custom user agent
@@ -1000,16 +1010,16 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 +        Use standard user agent
 +      </message>
 +      <message name="IDS_CUSTOM_UA_PLACEHOLDER" desc="The label of the placeholder for user agent textbox.">
-+        Insert a valid user agent
++        Enter a user agent
 +      </message>
 +      <message name="IDS_CUSTOM_UA_TEXT" desc="The label of the placeholder for user agent textbox.">
-+        Mobile User Agent
++        Mobile sites
 +      </message>
 +      <message name="IDS_CUSTOM_DESKTOP_UA_TEXT" desc="The label of the placeholder for user agent textbox.">
-+        Desktop Mode User Agent
++        Desktop sites
 +      </message>
 +      <message name="IDS_DESKTOP_MODE_VIEWPORTMETA_CHECKBOX" desc="The label of the enable viewport meta checkbox for user desktop mode.">
-+        Enable processing of the viewport meta tag also for desktop mode
++        Apply the viewport meta tag on desktop sites too
 +      </message>
 +
        <!-- Notification channels -->

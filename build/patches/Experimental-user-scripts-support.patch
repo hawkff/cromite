@@ -48,7 +48,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../renderer/chrome_render_thread_observer.cc |  15 +-
  components/components_strings.grd             |   1 +
  components/user_scripts/README.md             | 150 ++++
- components/user_scripts/android/BUILD.gn      | 103 +++
+ components/user_scripts/android/BUILD.gn      | 104 +++
  .../java/res/layout/accept_script_item.xml    | 160 ++++
  .../java/res/layout/accept_script_list.xml    |  10 +
  .../java/res/layout/scripts_preference.xml    |  40 +
@@ -60,8 +60,8 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../components/user_scripts/ScriptInfo.java   |  37 +
  .../user_scripts/ScriptListBaseAdapter.java   | 162 ++++
  .../user_scripts/ScriptListPreference.java    | 171 ++++
- .../user_scripts/UserScriptsBridge.java       | 212 +++++
- .../user_scripts/UserScriptsPreferences.java  | 122 +++
+ .../user_scripts/UserScriptsBridge.java       | 213 +++++
+ .../user_scripts/UserScriptsPreferences.java  | 117 +++
  .../user_scripts/android/java_sources.gni     |  18 +
  .../android/user_scripts_bridge.cc            | 174 ++++
  .../android/user_scripts_bridge.h             |  31 +
@@ -133,10 +133,10 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../renderer/user_scripts_renderer_client.h   |  38 +
  .../renderer/web_ui_injection_host.cc         |  40 +
  .../renderer/web_ui_injection_host.h          |  31 +
- .../strings/userscripts_strings.grdp          |  54 ++
+ .../strings/userscripts_strings.grdp          |  55 ++
  .../Experimental-user-scripts-support.inc     |  13 +
  tools/gritsettings/resource_ids.spec          |   6 +
- 109 files changed, 10499 insertions(+), 7 deletions(-)
+ 109 files changed, 10497 insertions(+), 7 deletions(-)
  create mode 100644 components/user_scripts/README.md
  create mode 100755 components/user_scripts/android/BUILD.gn
  create mode 100644 components/user_scripts/android/java/res/layout/accept_script_item.xml
@@ -888,7 +888,7 @@ diff --git a/components/user_scripts/android/BUILD.gn b/components/user_scripts/
 new file mode 100755
 --- /dev/null
 +++ b/components/user_scripts/android/BUILD.gn
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,104 @@
 +# This file is part of Bromite.
 +
 +# Bromite is free software: you can redistribute it and/or modify
@@ -960,6 +960,7 @@ new file mode 100755
 +    ":java_resources",
 +    "//base:base_java",
 +    "//base:content_uri_utils_java",
++    "//base:supplier_java",
 +    "//build/android:build_java",
 +    "//components/browser_ui/settings/android:java",
 +    "//components/browser_ui/widget/android:java",
@@ -1885,7 +1886,7 @@ diff --git a/components/user_scripts/android/java/src/org/chromium/components/us
 new file mode 100644
 --- /dev/null
 +++ b/components/user_scripts/android/java/src/org/chromium/components/user_scripts/UserScriptsBridge.java
-@@ -0,0 +1,212 @@
+@@ -0,0 +1,213 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -2016,9 +2017,10 @@ new file mode 100644
 +        String message = context.getString(R.string.ask_to_install, scriptName);
 +
 +        AlertDialog.Builder builder = new AlertDialog.Builder(context);
-+        builder.setMessage(message)
-+            .setPositiveButton(context.getString(R.string.ok), dialogClickListener)
-+            .setNegativeButton(context.getString(R.string.no), dialogClickListener)
++        builder.setTitle(R.string.ask_to_install_title)
++            .setMessage(message)
++            .setPositiveButton(context.getString(R.string.install_script), dialogClickListener)
++            .setNegativeButton(context.getString(R.string.cancel), dialogClickListener)
 +            .show();
 +    }
 +
@@ -2102,7 +2104,7 @@ diff --git a/components/user_scripts/android/java/src/org/chromium/components/us
 new file mode 100755
 --- /dev/null
 +++ b/components/user_scripts/android/java/src/org/chromium/components/user_scripts/UserScriptsPreferences.java
-@@ -0,0 +1,122 @@
+@@ -0,0 +1,117 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -2123,11 +2125,8 @@ new file mode 100755
 +package org.chromium.components.user_scripts;
 +
 +import android.app.Activity;
-+import android.content.Context;
 +import android.content.Intent;
 +import android.os.Bundle;
-+import android.provider.Browser;
-+import android.net.Uri;
 +import android.view.MenuItem;
 +import android.view.View;
 +
@@ -2135,11 +2134,14 @@ new file mode 100755
 +import androidx.preference.PreferenceFragmentCompat;
 +
 +import org.chromium.base.Log;
++import org.chromium.base.supplier.MonotonicObservableSupplier;
++import org.chromium.base.supplier.ObservableSuppliers;
++import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
 +import org.chromium.ui.base.WindowAndroid;
 +import org.chromium.ui.base.ActivityWindowAndroid;
 +
 +import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
-+import org.chromium.components.browser_ui.settings.SettingsFragment;
++import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
 +import org.chromium.components.browser_ui.settings.SettingsUtils;
 +import org.chromium.components.browser_ui.settings.TextMessagePreference;
 +
@@ -2148,7 +2150,7 @@ new file mode 100755
 +
 +public class UserScriptsPreferences
 +        extends PreferenceFragmentCompat
-+        implements SettingsUtils.ISupportHelpAndFeedback, SettingsFragment {
++        implements EmbeddableSettingsPage {
 +
 +    private static final String PREF_ENABLED_SWITCH = "enabled_switch";
 +    private static final String PREF_SCRIPTLISTPREFERENCE = "script_list";
@@ -2156,6 +2158,13 @@ new file mode 100755
 +    public static final String EXTRA_SCRIPT_FILE = "org.chromium.chrome.preferences.script_file";
 +
 +    private FragmentWindowAndroid mWindowAndroid;
++    private final SettableMonotonicObservableSupplier<String> mPageTitle =
++            ObservableSuppliers.createMonotonic();
++
++    @Override
++    public MonotonicObservableSupplier<String> getPageTitle() {
++        return mPageTitle;
++    }
 +
 +    @Override
 +    public @AnimationType int getAnimationType() {
@@ -2170,7 +2179,7 @@ new file mode 100755
 +
 +    @Override
 +    public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-+        getActivity().setTitle(R.string.prefs_userscripts_settings);
++        mPageTitle.set(getString(R.string.prefs_userscripts_settings));
 +        SettingsUtils.addPreferencesFromResource(this, R.xml.userscripts_preferences);
 +
 +        ChromeSwitchPreference enabledSwitch =
@@ -2195,18 +2204,6 @@ new file mode 100755
 +    public void onActivityResult(int requestCode, int resultCode, Intent data) {
 +        // handle picker callback from SelectFileDialog
 +        mWindowAndroid.getIntentRequestTracker().onActivityResult(requestCode, resultCode, data);
-+    }
-+
-+    public void onHelpAndFeebackPressed() {
-+        Context context = getContext();
-+
-+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/bromite/bromite/wiki/UserScripts"));
-+        // Let Chromium know that this intent is from Chromium, so that it does not close the app when
-+        // the user presses 'back' button.
-+        intent.putExtra(Browser.EXTRA_APPLICATION_ID, context.getPackageName());
-+        intent.putExtra(Browser.EXTRA_CREATE_NEW_TAB, true);
-+        intent.setPackage(context.getPackageName());
-+        context.startActivity(intent);
 +    }
 +
 +    public static Bundle createFragmentArgsForInstall(String filePath) {
@@ -11429,7 +11426,7 @@ diff --git a/components/user_scripts/strings/userscripts_strings.grdp b/componen
 new file mode 100755
 --- /dev/null
 +++ b/components/user_scripts/strings/userscripts_strings.grdp
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,55 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +
@@ -11437,18 +11434,18 @@ new file mode 100755
 +  <message name="IDS_PREFS_USERSCRIPTS_SETTINGS"
 +           desc="."
 +           formatter_data="android_java">
-+    User Scripts
++    User scripts
 +  </message>
 +
 +  <message name="IDS_OPTION_USERSCRIPT_FLAG" desc="." formatter_data="android_java">
-+    Activate User Scripts
++    Use user scripts
 +  </message>
 +
 +  <message name="IDS_OPTION_USERSCRIPT_FLAG_ON" desc=". [CHAR-LIMIT=32]" formatter_data="android_java">
-+    ON
++    On
 +  </message>
 +  <message name="IDS_OPTION_USERSCRIPT_FLAG_OFF" desc=". [CHAR-LIMIT=32]" formatter_data="android_java">
-+    OFF
++    Off
 +  </message>
 +
 +  <message name="IDS_ADD_SCRIPT" desc=". [CHAR-LIMIT=32]" formatter_data="android_java">
@@ -11465,22 +11462,23 @@ new file mode 100755
 +    File:
 +  </message>
 +  <message name="IDS_SCRIPTS_ITEM_URL" desc="." formatter_data="android_java">
-+    Url:
++    URL:
 +  </message>
 +
 +  <message name="IDS_SCRIPTS_VIEW_SOURCE" desc=". [CHAR-LIMIT=32]" formatter_data="android_java">
 +    View source
 +  </message>
 +
-+  <message name="IDS_ASK_TO_INSTALL" desc=". [CHAR-LIMIT=32]" formatter_data="android_java">
-+    Do you want to install this user script from following location?
-+
-+<ph name="FILE">%s</ph>
-+
-+NOTE: only install user scripts that you have verified are secure, user scripts can steal your credentials and data.
++  <message name="IDS_ASK_TO_INSTALL_TITLE" desc="Title of the dialog that asks before a user script is installed." formatter_data="android_java">
++    Install user script?
 +  </message>
-+  <message name="IDS_NO" desc=". [CHAR-LIMIT=32]" formatter_data="android_java">
-+    No
++  <message name="IDS_ASK_TO_INSTALL" desc="Message of the dialog that asks before a user script is installed. FILE is the location of the script." formatter_data="android_java">
++    <ph name="FILE">%s</ph>
++
++Only install user scripts you trust. A user script can steal your passwords and other data.
++  </message>
++  <message name="IDS_INSTALL_SCRIPT" desc="Button that installs a user script. [CHAR-LIMIT=32]" formatter_data="android_java">
++    Install
 +  </message>
 +
 +</grit-part>

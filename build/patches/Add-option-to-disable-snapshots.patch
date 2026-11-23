@@ -214,7 +214,7 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
 +        Use only icons in the tab grid
 +      </message>
 +      <message name="IDS_TABGRID_USE_ICONS_SUMMARY" desc="Summary text for 'Use icons in the tab grid' settings-privacy option.">
-+        Disable saving snapshots to disk (even for incognito sessions)
++        Shows site icons instead of page previews and saves no page snapshots, also for incognito tabs
 +      </message>
 +
        <!-- Tab Group Tab Switcher strings -->

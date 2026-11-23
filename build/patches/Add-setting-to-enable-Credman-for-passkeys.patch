@@ -108,13 +108,13 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_ENABLE_ANDROID_CREDMAN_TITLE" desc="" formatter_data="android_java">
-+        Enable Android Credential Manager
++        Use Android Credential Manager
 +    </message>
 +    <message name="IDS_ENABLE_ANDROID_CREDMAN_SUMMARY" desc="" formatter_data="android_java">
-+        Enable support for Android Credential Manager
++        Lets sites use passkeys through Android Credential Manager
 +    </message>
 +    <message name="IDS_ENABLE_ANDROID_CREDMAN_DISABLED_SUMMARY" desc="" formatter_data="android_java">
-+        Not supported on your device (require A14+)
++        Needs Android 14 or later
 +    </message>
 +</grit-part>
 diff --git a/components/webauthn/android/java/src/org/chromium/components/webauthn/AuthenticatorImpl.java b/components/webauthn/android/java/src/org/chromium/components/webauthn/AuthenticatorImpl.java
