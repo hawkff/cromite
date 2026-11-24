@@ -42,7 +42,7 @@ suit Cromite logic.
  .../adblock_web_ui_controller_factory.cc      |    1 +
  .../browser/adblock_webcontents_observer.cc   |   63 +-
  .../browser/adblock_webcontents_observer.h    |    5 +-
- .../content/browser/element_hider_impl.cc     |   21 +-
+ .../content/browser/element_hider_impl.cc     |   34 +-
  .../content/browser/eyeo_document_info.cc     |   15 +
  .../content/browser/eyeo_document_info.h      |    9 +
  .../adblock_request_throttle_factory.cc       |    2 +-
@@ -56,7 +56,12 @@ suit Cromite logic.
  .../browser/resource_classification_runner.h  |    7 +
  .../resource_classification_runner_impl.cc    |   71 +-
  .../resource_classification_runner_impl.h     |    8 +
+ ...esource_classification_runner_impl_test.cc |   15 +-
  components/adblock/core/BUILD.gn              |   41 +-
+ .../core/classifier/resource_classifier.h     |   11 +
+ .../classifier/resource_classifier_impl.cc    |   36 +
+ .../classifier/resource_classifier_impl.h     |    8 +
+ .../test/mock_resource_classifier.h           |    9 +
  components/adblock/core/common/BUILD.gn       |    8 -
  .../adblock/core/common/adblock_constants.cc  |   17 +-
  .../adblock/core/common/adblock_constants.h   |    1 -
@@ -122,7 +127,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 117 files changed, 9036 insertions(+), 726 deletions(-)
+ 122 files changed, 9117 insertions(+), 737 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -2853,16 +2858,33 @@ diff --git a/components/adblock/content/browser/adblock_webcontents_observer.h b
 diff --git a/components/adblock/content/browser/element_hider_impl.cc b/components/adblock/content/browser/element_hider_impl.cc
 --- a/components/adblock/content/browser/element_hider_impl.cc
 +++ b/components/adblock/content/browser/element_hider_impl.cc
-@@ -133,7 +133,7 @@ void GenerateElemHidingEmuJavaScript(const GURL& url,
+@@ -24,6 +24,7 @@
+ #include "base/json/json_string_value_serializer.h"
+ #include "base/json/string_escape.h"
+ #include "base/logging.h"
++#include "base/no_destructor.h"
+ #include "base/strings/string_util.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/task/thread_pool.h"
+@@ -133,20 +134,21 @@ void GenerateElemHidingEmuJavaScript(const GURL& url,
  }
  
  std::string GenerateXpath3Dep() {
 -  static std::string xpath3_dep =
-+  std::string xpath3_dep =
++  // Loaded once: the resource is gzip-compressed in the pak.
++  static const base::NoDestructor<std::string> xpath3_dep(
        "(" +
        ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
            IDR_ADBLOCK_SNIPPETS_XPATH3_DEP_JS) +
-@@ -146,7 +146,7 @@ std::string GenerateXpath3Dep() {
+-      ")();";
+-  if (xpath3_dep == "()();") {
++      ")();");
++  if (*xpath3_dep == "()();") {
+     LOG(WARNING) << "[eyeo] Snippets library does not support xpath3!";
+     return "";
+   }
+-  return xpath3_dep;
++  return *xpath3_dep;
  }
  
  void GenerateSnippetScript(const GURL& url,
@@ -2871,16 +2893,28 @@ diff --git a/components/adblock/content/browser/element_hider_impl.cc b/componen
                             std::string& output) {
    TRACE_EVENT1("eyeo", "GenerateSnippetScript", "url", url.spec());
    // snippets must be JSON representation of the array of arrays of snippets
-@@ -155,7 +155,7 @@ void GenerateSnippetScript(const GURL& url,
+@@ -155,16 +157,17 @@ void GenerateSnippetScript(const GURL& url,
    serializer.Serialize(std::move(input));
    // snippets_lib should be the library as-is, without any escaping or JSON
    // parsing.
 -  static std::string snippets_lib =
-+  std::string snippets_lib =
++  // Loaded once: the resource is gzip-compressed in the pak.
++  static const base::NoDestructor<std::string> snippets_lib(
        ui::ResourceBundle::GetSharedInstance().LoadDataResourceString(
-           IDR_ADBLOCK_SNIPPETS_JS);
+-          IDR_ADBLOCK_SNIPPETS_JS);
++          IDR_ADBLOCK_SNIPPETS_JS));
  
-@@ -186,7 +186,7 @@ ElementHider::ElemhideInjectionData PrepareElemhideEmulationData(
+   output = "{{xpath3}}({{callback}})({}, ...{{snippets}});";
+   bool require_xpath3 =
+       serialized.find("hide-if-matches-xpath3") != std::string::npos;
+   base::ReplaceSubstringsAfterOffset(&output, 0, "{{xpath3}}",
+                                      require_xpath3 ? GenerateXpath3Dep() : "");
+-  base::ReplaceSubstringsAfterOffset(&output, 0, "{{callback}}", snippets_lib);
++  base::ReplaceSubstringsAfterOffset(&output, 0, "{{callback}}", *snippets_lib);
+   base::ReplaceSubstringsAfterOffset(&output, 0, "{{snippets}}", serialized);
+ }
+ 
+@@ -186,7 +189,7 @@ ElementHider::ElemhideInjectionData PrepareElemhideEmulationData(
    TRACE_EVENT1("eyeo", "PrepareElemhideEmulationData", "url", url.spec());
  
    ContentFiltersData eh_data, eh_emu_data;
@@ -2889,7 +2923,7 @@ diff --git a/components/adblock/content/browser/element_hider_impl.cc b/componen
    for (const auto& collection : subscription_collections) {
      bool doc_allowlisted = !!collection->FindBySpecialFilter(
          SpecialFilterType::Document, url, frame_hierarchy, sitekey);
-@@ -242,7 +242,7 @@ void InsertUserCSSAndApplyElemHidingEmuJS(
+@@ -242,7 +245,7 @@ void InsertUserCSSAndApplyElemHidingEmuJS(
    if (!frame_host) {
      // Render frame host was destroyed before element hiding could be applied.
      // This is not a bug, just legitimate a race condition.
@@ -2898,7 +2932,7 @@ diff --git a/components/adblock/content/browser/element_hider_impl.cc b/componen
      return;
    }
    auto* info = EyeoDocumentInfo::GetOrCreateForCurrentDocument(frame_host);
-@@ -263,20 +263,17 @@ void InsertUserCSSAndApplyElemHidingEmuJS(
+@@ -263,20 +266,17 @@ void InsertUserCSSAndApplyElemHidingEmuJS(
      frame_host->ExecuteJavaScriptInIsolatedWorld(
          base::UTF8ToUTF16(input.elemhide_js),
          content::RenderFrameHost::JavaScriptResultCallback(),
@@ -2922,7 +2956,7 @@ diff --git a/components/adblock/content/browser/element_hider_impl.cc b/componen
  
      DVLOG(1) << "[eyeo] Snippet - executed JS in frame" << " '"
               << frame_host->GetFrameName() << "'";
-@@ -358,7 +355,7 @@ void ElementHiderImpl::HideBlockedElement(
+@@ -358,7 +358,7 @@ void ElementHiderImpl::HideBlockedElement(
    render_frame_host->ExecuteJavaScriptInIsolatedWorld(
        base::UTF8ToUTF16(js),
        content::RenderFrameHost::JavaScriptResultCallback(),
@@ -3413,8 +3447,8 @@ diff --git a/components/adblock/content/browser/resource_classification_runner_i
 +    replace_host.SetHostStr(alias);
 +    alias_url = request_url.ReplaceComponents(replace_host);
 +
-+    auto classification_result = resource_classifier->ClassifyRequest(
-+        std::move(subscription_collections), alias_url, frame_hierarchy,
++    auto classification_result = resource_classifier->ClassifyAliasRequest(
++        subscription_collections, request_url, alias_url, frame_hierarchy,
 +        adblock_resource_type, sitekey);
 +
 +    if (classification_result.decision == ClassificationDecision::Allowed) {
@@ -3488,6 +3522,52 @@ diff --git a/components/adblock/content/browser/resource_classification_runner_i
        const std::vector<GURL> frame_hierarchy,
        ContentType adblock_resource_type,
        const SiteKey sitekey);
+diff --git a/components/adblock/content/browser/test/resource_classification_runner_impl_test.cc b/components/adblock/content/browser/test/resource_classification_runner_impl_test.cc
+--- a/components/adblock/content/browser/test/resource_classification_runner_impl_test.cc
++++ b/components/adblock/content/browser/test/resource_classification_runner_impl_test.cc
+@@ -124,9 +124,11 @@ class AdblockResourceClassificationRunnerImplTest
+   void ClassifierReturnsRequestClassification(GURL url,
+                                               ContentType content_type,
+                                               Decision decision) {
+-    EXPECT_CALL(
+-        *mock_resource_classifier_,
+-        ClassifyRequest(_, url, kFrameHierarchy, content_type, kSitekey))
++    // Without DNS aliases the runner classifies the request URL as its own
++    // alias.
++    EXPECT_CALL(*mock_resource_classifier_,
++                ClassifyAliasRequest(_, url, url, kFrameHierarchy,
++                                     content_type, kSitekey))
+         .WillOnce(testing::Return(ResourceClassifier::ClassificationResult{
+             decision, kSubscriptionUrl, kConfigurationName}));
+   }
+@@ -201,7 +203,7 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
+                           FilterMatchResult::kBlockRule);
+ 
+   classification_runner_->CheckRequestFilterMatch(
+-      std::move(*mock_snapshot_), kUrl, ContentType::Image,
++      std::move(*mock_snapshot_), kUrl, /*dns_aliases=*/{}, ContentType::Image,
+       RequestInitiator(main_rfh()), callback.Get());
+ 
+   task_environment()->RunUntilIdle();
+@@ -228,7 +230,8 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
+                           FilterMatchResult::kBlockRule);
+ 
+   classification_runner_->CheckRequestFilterMatch(
+-      std::move(*mock_snapshot_), kWebsocketUrl, ContentType::Websocket,
++      std::move(*mock_snapshot_), kWebsocketUrl, /*dns_aliases=*/{},
++      ContentType::Websocket,
+       RequestInitiator(main_rfh()), callback.Get());
+   task_environment()->RunUntilIdle();
+ }
+@@ -300,7 +303,7 @@ TEST_F(AdblockResourceClassificationRunnerImplTest,
+   EXPECT_CALL(callback, Run(FilterMatchResult::kBlockRule));
+ 
+   classification_runner_->CheckRequestFilterMatch(
+-      std::move(*mock_snapshot_), kUrl, ContentType::Image,
++      std::move(*mock_snapshot_), kUrl, /*dns_aliases=*/{}, ContentType::Image,
+ 
+       RequestInitiator(main_rfh()), callback.Get());
+ 
 diff --git a/components/adblock/core/BUILD.gn b/components/adblock/core/BUILD.gn
 --- a/components/adblock/core/BUILD.gn
 +++ b/components/adblock/core/BUILD.gn
@@ -3568,6 +3648,110 @@ diff --git a/components/adblock/core/BUILD.gn b/components/adblock/core/BUILD.gn
 -
 -  configs += [ ":eyeo_telemetry_config" ]
  }
+diff --git a/components/adblock/core/classifier/resource_classifier.h b/components/adblock/core/classifier/resource_classifier.h
+--- a/components/adblock/core/classifier/resource_classifier.h
++++ b/components/adblock/core/classifier/resource_classifier.h
+@@ -61,6 +61,17 @@ class ResourceClassifier
+       ContentType content_type,
+       const SiteKey& sitekey) const = 0;
+ 
++  // Classifies |request_url| with its host replaced by |alias_url|'s, a DNS
++  // alias of that host. A blocking filter that matches the alias does not
++  // apply when the same collection has an allowing filter for |request_url|.
++  virtual ClassificationResult ClassifyAliasRequest(
++      const SubscriptionService::Snapshot& subscription_collections,
++      const GURL& request_url,
++      const GURL& alias_url,
++      const std::vector<GURL>& frame_hierarchy,
++      ContentType content_type,
++      const SiteKey& sitekey) const = 0;
++
+   virtual ClassificationResult ClassifyPopup(
+       const SubscriptionService::Snapshot& subscription_collections,
+       const GURL& popup_url,
+diff --git a/components/adblock/core/classifier/resource_classifier_impl.cc b/components/adblock/core/classifier/resource_classifier_impl.cc
+--- a/components/adblock/core/classifier/resource_classifier_impl.cc
++++ b/components/adblock/core/classifier/resource_classifier_impl.cc
+@@ -347,6 +347,42 @@ ClassificationResult ResourceClassifierImpl::ClassifyRequest(
+   return classification;
+ }
+ 
++ClassificationResult ResourceClassifierImpl::ClassifyAliasRequest(
++    const SubscriptionService::Snapshot& subscription_collections,
++    const GURL& request_url,
++    const GURL& alias_url,
++    const std::vector<GURL>& frame_hierarchy,
++    ContentType content_type,
++    const SiteKey& sitekey) const {
++  auto classification =
++      ClassificationResult{ClassificationResult::Decision::Ignored, {}, {}};
++  for (const auto& collection : subscription_collections) {
++    auto result = ClassifyRequestWithSingleCollection(
++        *collection, alias_url, frame_hierarchy, content_type, sitekey);
++    if (result.decision == ClassificationResult::Decision::Blocked &&
++        alias_url != request_url) {
++      // An allowing filter for the URL the page requested also covers the
++      // hosts that URL resolves to.
++      const auto subscription_with_allowing_filter_it =
++          collection->FindByAllowFilter(request_url, frame_hierarchy,
++                                        content_type, sitekey);
++      if (subscription_with_allowing_filter_it) {
++        result = ClassificationResult{
++            ClassificationResult::Decision::Allowed,
++            *subscription_with_allowing_filter_it,
++            collection->GetFilteringConfigurationName()};
++      }
++    }
++    if (result.decision == ClassificationResult::Decision::Blocked) {
++      return result;
++    }
++    if (result.decision == ClassificationResult::Decision::Allowed) {
++      classification = result;
++    }
++  }
++  return classification;
++}
++
+ ClassificationResult ResourceClassifierImpl::ClassifyPopup(
+     const SubscriptionService::Snapshot& subscription_collections,
+     const GURL& popup_url,
+diff --git a/components/adblock/core/classifier/resource_classifier_impl.h b/components/adblock/core/classifier/resource_classifier_impl.h
+--- a/components/adblock/core/classifier/resource_classifier_impl.h
++++ b/components/adblock/core/classifier/resource_classifier_impl.h
+@@ -35,6 +35,14 @@ class ResourceClassifierImpl final : public ResourceClassifier {
+       ContentType content_type,
+       const SiteKey& sitekey) const final;
+ 
++  ClassificationResult ClassifyAliasRequest(
++      const SubscriptionService::Snapshot& subscription_collections,
++      const GURL& request_url,
++      const GURL& alias_url,
++      const std::vector<GURL>& frame_hierarchy,
++      ContentType content_type,
++      const SiteKey& sitekey) const final;
++
+   ClassificationResult ClassifyPopup(
+       const SubscriptionService::Snapshot& subscription_collections,
+       const GURL& popup_url,
+diff --git a/components/adblock/core/classifier/test/mock_resource_classifier.h b/components/adblock/core/classifier/test/mock_resource_classifier.h
+--- a/components/adblock/core/classifier/test/mock_resource_classifier.h
++++ b/components/adblock/core/classifier/test/mock_resource_classifier.h
+@@ -35,6 +35,15 @@ class MockResourceClassifier : public ResourceClassifier {
+                ContentType,
+                const SiteKey&),
+               (override, const));
++  MOCK_METHOD(ClassificationResult,
++              ClassifyAliasRequest,
++              (const SubscriptionService::Snapshot&,
++               const GURL&,
++               const GURL&,
++               const std::vector<GURL>&,
++               ContentType,
++               const SiteKey&),
++              (override, const));
+   MOCK_METHOD(ClassificationResult,
+               ClassifyPopup,
+               (const SubscriptionService::Snapshot&,
 diff --git a/components/adblock/core/common/BUILD.gn b/components/adblock/core/common/BUILD.gn
 --- a/components/adblock/core/common/BUILD.gn
 +++ b/components/adblock/core/common/BUILD.gn
