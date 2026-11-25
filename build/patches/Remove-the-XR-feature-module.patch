@@ -23,7 +23,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -6182,8 +6182,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -6192,8 +6192,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
      }
  
      private void maybeInitializeXrSceneCoreSession() {
@@ -33,7 +33,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
              var xrSceneCoreSessionManager = assertNonNull(mXrSceneCoreSessionManagerSupplier.get());
              mXrSceneCoreSessionInitializer =
                      XrModule.getImpl()
-@@ -6198,8 +6197,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -6208,8 +6207,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
  
          XrSceneCoreSessionManager xrSceneCoreSessionManager = null;
          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {

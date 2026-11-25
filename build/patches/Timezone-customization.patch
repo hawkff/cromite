@@ -13,7 +13,7 @@ Require: Content-settings-infrastructure.patch
  .../browser_ui/site_settings/android/BUILD.gn |   3 +
  .../res/layout/time_zone_select_dialog.xml    |  36 ++++
  ...ezoneoverride_site_settings_preference.xml |  68 ++++++
- ...imezoneOverrideSiteSettingsPreference.java | 196 ++++++++++++++++++
+ ...imezoneOverrideSiteSettingsPreference.java | 199 ++++++++++++++++++
  .../WebsitePreferenceBridge.java              |  10 +
  ...BromiteTimezoneOverrideContentSetting.java | 147 +++++++++++++
  .../android/website_preference_bridge.cc      |  19 ++
@@ -37,7 +37,7 @@ Require: Content-settings-infrastructure.patch
  .../timezone/external_timezone_controller.h   |  34 +++
  .../core/timezone/timezone_controller.cc      |  11 -
  .../core/timezone/timezone_controller.h       |  12 +-
- 27 files changed, 763 insertions(+), 17 deletions(-)
+ 27 files changed, 766 insertions(+), 17 deletions(-)
  create mode 100755 components/browser_ui/site_settings/android/java/res/layout/time_zone_select_dialog.xml
  create mode 100755 components/browser_ui/site_settings/android/java/res/layout/timezoneoverride_site_settings_preference.xml
  create mode 100755 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java
@@ -187,7 +187,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 new file mode 100755
 --- /dev/null
 +++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/TimezoneOverrideSiteSettingsPreference.java
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,199 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -365,6 +365,9 @@ new file mode 100755
 +            public void onClick(DialogInterface dialog, int button) {
 +                if (button == AlertDialog.BUTTON_POSITIVE) {
 +                    mAsk.setPrimaryText(currentSelected);
++                    // A chosen zone applies only with the custom option selected.
++                    mAsk.setChecked(true);
++                    onCheckedChanged(mRadioGroup, mAsk.getId());
 +                } else {
 +                    dialog.dismiss();
 +                }

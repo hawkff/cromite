@@ -1,0 +1,139 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Tue, 24 Nov 2026 23:18:59 +0000
+Subject: Enable the back/forward cache in regular profiles on 4 GB devices
+
+A back or forward navigation in a regular profile can restore the
+previous page from memory instead of loading it again. The cache keeps
+the upstream Android configuration: up to 6 pages per tab for at most 10
+minutes, fewer under memory pressure.
+
+The cache stays off on devices that report 3276 MiB of memory or less,
+approximately the 3.2 GiB boundary that base::SysInfo uses between 3 GB
+and 4 GB devices. The kernel reports less than the installed memory, so
+this admits devices sold with 4 GB and excludes those sold with 3 GB.
+Cached pages keep their renderer processes alive, which raises memory
+use; under memory pressure those processes can be killed, making some
+history navigations slower. The limit is the default of the
+memory_threshold_for_back_forward_cache_in_mb parameter of
+BackForwardCacheMemoryControls, raised from 1200 to 3276 MB.
+
+Off-the-record profiles (incognito tabs, always-incognito mode, incognito
+and ephemeral custom tabs) never store pages in the cache:
+TabWebContentsDelegateAndroid reports the cache as unsupported for them.
+
+A page keeps what was decided when it was loaded: the renderer content
+settings, the renderer process with its JIT and optimizer mode, its
+service and shared workers, whether the ad blocker filters its requests,
+and its local network access policy. When one of those site settings
+changes, including a site's cookie setting, which also decides whether
+third-party workers may run, or when all site settings change at once
+(for example a policy update), every page of the profile is marked as
+not cacheable and pages already in the cache are evicted. A later back
+navigation then loads the page again with the new setting, so a revoked
+site permission cannot come back through a restored page. The global
+third-party cookie setting is not a site setting: like an open page, a
+cached page keeps the third-party workers it already has after that
+setting changes.
+
+The ad blocker skips element hiding for documents restored from the
+cache; they keep what was applied when they were loaded.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../tab_web_contents_delegate_android.cc      |  3 ++-
+ .../browser/adblock_webcontents_observer.cc   |  5 ++++
+ .../browser/page_specific_content_settings.cc | 23 +++++++++++++++++++
+ content/common/content_navigation_policy.cc   | 10 +++++---
+ 4 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/chrome/browser/android/tab_web_contents_delegate_android.cc b/chrome/browser/android/tab_web_contents_delegate_android.cc
+--- a/chrome/browser/android/tab_web_contents_delegate_android.cc
++++ b/chrome/browser/android/tab_web_contents_delegate_android.cc
+@@ -795,7 +795,8 @@ void TabWebContentsDelegateAndroid::ExitPictureInPicture() {
+ 
+ bool TabWebContentsDelegateAndroid::IsBackForwardCacheSupported(
+     content::WebContents& web_contents) {
+-  return true;
++  // Pages of off-the-record profiles are not stored in the back/forward cache.
++  return !web_contents.GetBrowserContext()->IsOffTheRecord();
+ }
+ 
+ content::PreloadingEligibility
+diff --git a/components/adblock/content/browser/adblock_webcontents_observer.cc b/components/adblock/content/browser/adblock_webcontents_observer.cc
+--- a/components/adblock/content/browser/adblock_webcontents_observer.cc
++++ b/components/adblock/content/browser/adblock_webcontents_observer.cc
+@@ -168,6 +168,11 @@ void AdblockWebContentObserver::DidFinishNavigation(
+   if (!frame) {
+     return;
+   }
++  if (navigation_handle->IsServedFromBackForwardCache()) {
++    // The restored document still has the element hiding and snippets that
++    // were applied when it was loaded.
++    return;
++  }
+   if (ShouldSkipElementHiding(url)) {
+     VLOG(1) << "[eyeo] Unsupported scheme, skipping injection.";
+     return;
+diff --git a/components/content_settings/browser/page_specific_content_settings.cc b/components/content_settings/browser/page_specific_content_settings.cc
+--- a/components/content_settings/browser/page_specific_content_settings.cc
++++ b/components/content_settings/browser/page_specific_content_settings.cc
+@@ -33,6 +33,7 @@
+ #include "components/content_settings/core/common/content_settings_types.mojom-shared.h"
+ #include "components/content_settings/core/common/content_settings_utils.h"
+ #include "components/privacy_sandbox/privacy_sandbox_features.h"
++#include "content/public/browser/back_forward_cache.h"
+ #include "content/public/browser/browser_thread.h"
+ #include "content/public/browser/cookie_access_details.h"
+ #include "content/public/browser/navigation_handle.h"
+@@ -1387,6 +1388,28 @@ void PageSpecificContentSettings::OnContentSettingChanged(
+   if (IsEmbeddedPage())
+     return;
+ 
++  // A page keeps the renderer rules, the process (with its JIT and optimizer
++  // mode), its workers, and the ad blocking and local network access
++  // decisions made when it was loaded. After one of those settings changes,
++  // the page must not come back from the back/forward cache: a cached page is
++  // evicted, an active page will not be stored. Cookie settings also decide
++  // whether third-party service and shared workers may run. DEFAULT is a
++  // change of all types at once, for example a policy update. Reason id 0 is
++  // the embedder's "unknown" reason, which the metrics enums already list.
++  if (content_type == ContentSettingsType::DEFAULT ||
++      RendererContentSettingRules::IsRendererContentSetting(content_type) ||
++      content_type == ContentSettingsType::JAVASCRIPT_OPTIMIZER ||
++      content_type == ContentSettingsType::COOKIES ||
++      content_type == ContentSettingsType::ADS ||
++      content_type == ContentSettingsType::INSECURE_PRIVATE_NETWORK) {
++    content::BackForwardCache::DisableForRenderFrameHost(
++        &page().GetMainDocument(),
++        content::BackForwardCache::DisabledReason(
++            content::BackForwardCache::DisabledSource::kEmbedder, /*id=*/0,
++            "Content setting changed", /*context=*/"",
++            /*report_string=*/"masked"));
++  }
++
+   const GURL current_url = page().GetMainDocument().GetLastCommittedURL();
+   if (content_type == ContentSettingsType::STORAGE_ACCESS) {
+     if (!secondary_pattern.Matches(current_url)) {
+diff --git a/content/common/content_navigation_policy.cc b/content/common/content_navigation_policy.cc
+--- a/content/common/content_navigation_policy.cc
++++ b/content/common/content_navigation_policy.cc
+@@ -27,11 +27,15 @@ bool DeviceHasEnoughMemoryForBackForwardCache() {
+   // It is important to check the base::FeatureList to avoid activating any
+   // field trial groups if BFCache is disabled due to memory threshold.
+   if (base::FeatureList::IsEnabled(features::kBackForwardCacheMemoryControls)) {
+-    // On Android, BackForwardCache is enabled for devices with 1200MB memory or
+-    // above.
++    // On Android, BackForwardCache is enabled for devices sold with 4GB of
++    // memory or more. Cached pages keep their renderers alive, which raises
++    // memory use; under memory pressure those renderers can be killed, making
++    // some history navigations slower. The kernel reports less than the
++    // installed memory, so the threshold is 3276MiB, approximately the 3.2GiB
++    // boundary between 3GB and 4GB devices in base::SysInfo.
+     int default_memory_threshold_mb =
+ #if BUILDFLAG(IS_ANDROID)
+-        1200;
++        3276;
+ #else
+         // Desktop has lower memory limitations compared to Android allowing us
+         // to enable BackForwardCache for all devices.
+--

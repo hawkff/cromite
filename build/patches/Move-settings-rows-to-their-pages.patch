@@ -26,8 +26,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../java/res/xml/developer_preferences.xml    |  7 ++-
  .../java/res/xml/privacy_preferences.xml      |  7 ++-
  .../res/xml/privacy_preferences_cromite.xml   |  6 ++
+ .../privacy/settings/PrivacySettings.java     | 14 +++++
  .../res/xml/accessibility_preferences.xml     | 46 ---------------
- 5 files changed, 71 insertions(+), 52 deletions(-)
+ 6 files changed, 85 insertions(+), 52 deletions(-)
 
 diff --git a/chrome/android/java/res/xml/appearance_preferences.xml b/chrome/android/java/res/xml/appearance_preferences.xml
 --- a/chrome/android/java/res/xml/appearance_preferences.xml
@@ -143,6 +144,44 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrom
  
      <PreferenceCategory
          android:title="@string/data_exposed_to_device_section_title"/>
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
+@@ -39,6 +39,7 @@ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.R;
+ import org.chromium.chrome.browser.enterprise.util.ManagedBrowserUtils;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
++import org.chromium.chrome.browser.flags.CromiteNativeUtils;
+ import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthSettingSwitchPreference;
+ import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+@@ -140,6 +141,8 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+     private static final String PREF_PROXY_OPTIONS = "proxy";
+     private static final String PREF_INCOGNITO_LOCK = "incognito_lock";
+     private static final String PREF_JAVASCRIPT_OPTIMIZER = "javascript_optimizer";
++    private static final String PREF_FONTS_FINGERPRINTING_MITIGATION =
++            "android_fonts_fingerprinting_mitigation";
+     @VisibleForTesting static final String PREF_DO_NOT_TRACK = "do_not_track";
+     @VisibleForTesting static final String PREF_UNIVERSAL_OPT_OUT = "universal_opt_out";
+     // moved from SyncAndServicesSettings.java
+@@ -659,6 +662,17 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+                                 getProfile(), ContentSettingsType.JAVASCRIPT_OPTIMIZER)
+                         ? R.string.website_settings_category_javascript_optimizer_allowed_list
+                         : R.string.website_settings_category_javascript_optimizer_blocked_list);
++
++        ChromeSwitchPreference fontsPref =
++                (ChromeSwitchPreference) findPreference(PREF_FONTS_FINGERPRINTING_MITIGATION);
++        if (fontsPref != null) {
++            // The switch shows the summary of its new state as soon as it is changed.
++            fontsPref.setSummaryOff(R.string.android_fonts_fingerprinting_mitigation_summary);
++            fontsPref.setSummaryOn(
++                    CromiteNativeUtils.isFontsPackInstalled()
++                            ? R.string.android_fonts_fingerprinting_mitigation_summary_installed
++                            : R.string.android_fonts_fingerprinting_mitigation_summary_pending);
++        }
+     }
+ 
+     /** Shows the advanced-protection-section if needed. */
 diff --git a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 --- a/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml
 +++ b/components/browser_ui/accessibility/android/java/res/xml/accessibility_preferences.xml

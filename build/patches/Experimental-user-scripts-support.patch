@@ -58,7 +58,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../user_scripts/FragmentWindowAndroid.java   |  96 ++
  .../user_scripts/IUserScriptsUtils.java       |  22 +
  .../components/user_scripts/ScriptInfo.java   |  37 +
- .../user_scripts/ScriptListBaseAdapter.java   | 165 ++++
+ .../user_scripts/ScriptListBaseAdapter.java   | 168 ++++
  .../user_scripts/ScriptListPreference.java    | 171 ++++
  .../user_scripts/UserScriptsBridge.java       | 213 +++++
  .../user_scripts/UserScriptsPreferences.java  | 117 +++
@@ -136,7 +136,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../strings/userscripts_strings.grdp          |  55 ++
  .../Experimental-user-scripts-support.inc     |  13 +
  tools/gritsettings/resource_ids.spec          |   6 +
- 109 files changed, 10502 insertions(+), 7 deletions(-)
+ 109 files changed, 10505 insertions(+), 7 deletions(-)
  create mode 100644 components/user_scripts/README.md
  create mode 100755 components/user_scripts/android/BUILD.gn
  create mode 100644 components/user_scripts/android/java/res/layout/accept_script_item.xml
@@ -1545,7 +1545,7 @@ diff --git a/components/user_scripts/android/java/src/org/chromium/components/us
 new file mode 100644
 --- /dev/null
 +++ b/components/user_scripts/android/java/src/org/chromium/components/user_scripts/ScriptListBaseAdapter.java
-@@ -0,0 +1,165 @@
+@@ -0,0 +1,168 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -1566,6 +1566,7 @@ new file mode 100644
 +package org.chromium.components.user_scripts;
 +
 +import android.content.Context;
++import android.text.TextUtils;
 +import android.view.LayoutInflater;
 +import android.view.MotionEvent;
 +import android.view.View;
@@ -1642,9 +1643,11 @@ new file mode 100644
 +            }
 +
 +            mTitle.setText(item.Name);
-+            // The switch and the menu button stand apart from the title, so name them after it.
-+            mSwitch.setContentDescription(item.Name);
-+            mMoreButton.setContentDescriptionContext(item.Name);
++            // The switch and the menu button stand apart from the title, so name them after it,
++            // or after the file when the script declares no name.
++            String label = TextUtils.isEmpty(item.Name) ? item.Key : item.Name;
++            mSwitch.setContentDescription(label);
++            mMoreButton.setContentDescriptionContext(label);
 +            mDescription.setText(item.Description);
 +            mVersion.setText(item.Version);
 +            mFile.setText(item.Key);
