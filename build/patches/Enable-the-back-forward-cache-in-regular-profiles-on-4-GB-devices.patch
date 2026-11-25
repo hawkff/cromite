@@ -35,8 +35,10 @@ revoked site permission cannot come back through a restored page.
 
 Deleting cookies or site storage, from the settings, at startup or
 through a Clear-Site-Data header, also evicts the cached pages whose
-main document matches the removal filter. A deletion for one site does
-not evict other sites' pages that embed it.
+main document matches the removal filter and marks the matching open
+and prerendered pages as not cacheable, when the deletion starts and
+again when it completes. A deletion for one site does not evict other
+sites' pages that embed it.
 
 The ad blocker skips element hiding for documents restored from the
 cache; they keep what was applied when they were loaded.
@@ -45,11 +47,11 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
  .../tab_web_contents_delegate_android.cc      |  3 +-
  .../browser/adblock_webcontents_observer.cc   |  5 ++
- .../browser/page_specific_content_settings.cc | 47 +++++++++++++++++++
- .../browser/page_specific_content_settings.h  |  8 ++++
- .../browsing_data_remover_impl.cc             | 14 ++++++
- content/common/content_navigation_policy.cc   | 10 ++--
- 6 files changed, 83 insertions(+), 4 deletions(-)
+ .../browser/page_specific_content_settings.cc | 47 ++++++++++++++
+ .../browser/page_specific_content_settings.h  |  8 +++
+ .../browsing_data_remover_impl.cc             | 63 +++++++++++++++++++
+ content/common/content_navigation_policy.cc   | 10 ++-
+ 6 files changed, 132 insertions(+), 4 deletions(-)
 
 diff --git a/chrome/browser/android/tab_web_contents_delegate_android.cc b/chrome/browser/android/tab_web_contents_delegate_android.cc
 --- a/chrome/browser/android/tab_web_contents_delegate_android.cc
@@ -193,27 +195,115 @@ diff --git a/components/content_settings/browser/page_specific_content_settings.
 diff --git a/content/browser/browsing_data/browsing_data_remover_impl.cc b/content/browser/browsing_data/browsing_data_remover_impl.cc
 --- a/content/browser/browsing_data/browsing_data_remover_impl.cc
 +++ b/content/browser/browsing_data/browsing_data_remover_impl.cc
-@@ -684,6 +684,20 @@ void BrowsingDataRemoverImpl::RemoveImpl(
+@@ -10,6 +10,7 @@
+ #include <set>
+ #include <string>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+@@ -36,10 +37,12 @@
+ #include "content/browser/preloading/prefetch/prefetch_service.h"
+ #include "content/browser/preloading/prefetch/prefetch_status.h"
+ #include "content/browser/preloading/prerender/prerender_host_registry.h"
++#include "content/browser/renderer_host/frame_tree.h"
+ #include "content/browser/renderer_host/render_frame_host_impl.h"
+ #include "content/browser/renderer_host/render_process_host_impl.h"
+ #include "content/browser/web_contents/web_contents_impl.h"
+ #include "content/common/features.h"
++#include "content/public/browser/back_forward_cache.h"
+ #include "content/public/browser/browser_context.h"
+ #include "content/public/browser/browser_task_traits.h"
+ #include "content/public/browser/browser_thread.h"
+@@ -56,6 +59,7 @@
+ #include "services/network/public/mojom/clear_data_filter.mojom.h"
+ #include "services/network/public/mojom/network_context.mojom.h"
+ #include "storage/browser/quota/special_storage_policy.h"
++#include "third_party/blink/public/common/storage_key/storage_key.h"
+ #include "third_party/perfetto/include/perfetto/tracing/track.h"
+ #include "url/gurl.h"
+ #include "url/origin.h"
+@@ -124,6 +128,50 @@ bool DoesStorageKeyMatchMask(
+   return false;
+ }
+ 
++// A page keeps in memory what it read from cookies and site storage, so it must
++// not come back from the back/forward cache after they are deleted, whatever
++// the time range. Pages in the cache whose main document matches
++// `storage_key_filter` are evicted, and matching open and prerendered pages are
++// marked as not cacheable.
++void DisableBackForwardCacheForRemoval(
++    BrowserContext* browser_context,
++    const StoragePartition::StorageKeyMatcherFunction& storage_key_filter) {
++  // Pages of off-the-record profiles are never stored in the cache.
++  if (browser_context->IsOffTheRecord()) {
++    return;
++  }
++  for (WebContentsImpl* web_contents : WebContentsImpl::GetAllWebContents()) {
++    if (web_contents->GetBrowserContext() != browser_context) {
++      continue;
++    }
++    web_contents->GetController().GetBackForwardCache().Flush(
++        storage_key_filter);
++    std::vector<RenderFrameHostImpl*> main_documents = {
++        web_contents->GetPrimaryMainFrame()};
++    if (PrerenderHostRegistry* prerender_host_registry =
++            web_contents->GetPrerenderHostRegistry()) {
++      for (FrameTree* frame_tree :
++           prerender_host_registry->GetPrerenderFrameTrees()) {
++        main_documents.push_back(frame_tree->GetMainFrame());
++      }
++    }
++    for (RenderFrameHostImpl* main_document : main_documents) {
++      if (!storage_key_filter.Run(blink::StorageKey::CreateFirstParty(
++              main_document->GetLastCommittedOrigin()))) {
++        continue;
++      }
++      // Reason id 0 is the embedder's "unknown" reason, as for content setting
++      // changes.
++      BackForwardCache::DisableForRenderFrameHost(
++          main_document,
++          BackForwardCache::DisabledReason(
++              BackForwardCache::DisabledSource::kEmbedder, /*id=*/0,
++              "Cookies or site storage deleted", /*context=*/"",
++              /*report_string=*/"masked"));
++    }
++  }
++}
++
+ }  // namespace
+ 
+ BrowsingDataRemoverImpl::BrowsingDataRemoverImpl(
+@@ -684,6 +732,14 @@ void BrowsingDataRemoverImpl::RemoveImpl(
      }
    }
  
 +  //////////////////////////////////////////////////////////////////////////////
-+  // Back/forward cache. A cached page keeps in memory what it read from
-+  // cookies and site storage, so it must not be restored after they are
-+  // deleted, whatever the time range.
++  // Back/forward cache. Done again in Notify() for pages loaded while the
++  // deletion runs.
 +  if (remove_mask & (DATA_TYPE_COOKIES | DATA_TYPE_DOM_STORAGE)) {
-+    auto storage_key_filter = filter_builder->BuildStorageKeyFilter();
-+    for (WebContentsImpl* web_contents : WebContentsImpl::GetAllWebContents()) {
-+      if (web_contents->GetBrowserContext() == browser_context_) {
-+        web_contents->GetController().GetBackForwardCache().Flush(
-+            storage_key_filter);
-+      }
-+    }
++    DisableBackForwardCacheForRemoval(browser_context_,
++                                      filter_builder->BuildStorageKeyFilter());
 +  }
 +
    //////////////////////////////////////////////////////////////////////////////
    // Auth cache.
    if (remove_mask & DATA_TYPE_COOKIES) {
+@@ -847,6 +903,13 @@ void BrowsingDataRemoverImpl::Notify() {
+   CHECK(!task_queue_.empty(), base::NotFatalUntil::M159);
+ 
+   const RemovalTask& task = task_queue_.front();
++  // A page loaded after RemoveImpl() may have read the data before it was
++  // deleted.
++  if ((task.remove_mask & (DATA_TYPE_COOKIES | DATA_TYPE_DOM_STORAGE)) &&
++      !browser_context_->ShutdownStarted()) {
++    DisableBackForwardCacheForRemoval(
++        browser_context_, task.filter_builder->BuildStorageKeyFilter());
++  }
+   for (Observer* observer : task.observers) {
+     if (observer_list_.HasObserver(observer)) {
+       observer->OnBrowsingDataRemoverDone(failed_data_types_);
 diff --git a/content/common/content_navigation_policy.cc b/content/common/content_navigation_policy.cc
 --- a/content/common/content_navigation_policy.cc
 +++ b/content/common/content_navigation_policy.cc

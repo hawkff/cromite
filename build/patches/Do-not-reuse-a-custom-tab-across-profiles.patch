@@ -1,0 +1,120 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Wed, 25 Nov 2026 14:46:38 +0000
+Subject: Do not reuse a custom tab across profiles
+
+When an app opens a link with the session of a custom tab or trusted
+web activity that is already open, the link loads in that activity's
+tab, whose profile was chosen when the activity was created. After the
+option to open links from other apps in incognito was turned on, such a
+link from the same app loaded in the regular profile of the older
+activity; after the option was turned off, it loaded in the older
+activity's off-the-record profile.
+
+Now a link whose new custom tab would be off the record while the open
+tab is not, or the other way around, opens in a new custom tab, which
+uses the profile the link asks for. A link that matches the open tab's
+profile still loads in it.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../customtabs/BaseCustomTabActivity.java     | 16 ++++++++++---
+ .../customtabs/CustomTabSessionHandler.java   |  7 ++++--
+ .../content/CustomTabIntentHandler.java       | 23 +++++++++++++++++++
+ 3 files changed, 41 insertions(+), 5 deletions(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/BaseCustomTabActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/BaseCustomTabActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/BaseCustomTabActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/BaseCustomTabActivity.java
+@@ -13,6 +13,7 @@ import static org.chromium.build.NullUtil.assumeNonNull;
+ import static org.chromium.chrome.browser.customtabs.content.CustomTabActivityNavigationController.FinishReason.HANDLED_BY_OS;
+ 
+ import android.app.Activity;
++import android.content.Context;
+ import android.content.Intent;
+ import android.os.Build;
+ import android.os.Bundle;
+@@ -300,13 +301,22 @@ public abstract class BaseCustomTabActivity extends ChromeActivity {
+      */
+     protected @Nullable BrowserServicesIntentDataProvider buildIntentDataProvider(
+             Intent intent, @CustomTabsIntent.ColorScheme int colorScheme) {
++        return buildCustomTabIntentDataProvider(intent, this, colorScheme);
++    }
++
++    /**
++     * Builds the {@link BrowserServicesIntentDataProvider} that a custom tab activity created for
++     * {@code intent} uses, which also decides the profile of its tab.
++     */
++    static BrowserServicesIntentDataProvider buildCustomTabIntentDataProvider(
++            Intent intent, Context context, @CustomTabsIntent.ColorScheme int colorScheme) {
+         if (AuthTabIntentDataProvider.isAuthTabIntent(intent)) {
+-            return new AuthTabIntentDataProvider(intent, this, colorScheme);
++            return new AuthTabIntentDataProvider(intent, context, colorScheme);
+         } else if (IncognitoCustomTabIntentDataProvider.isValidIncognitoIntent(
+                 intent, /* recordMetrics= */ true)) {
+-            return new IncognitoCustomTabIntentDataProvider(intent, this, colorScheme);
++            return new IncognitoCustomTabIntentDataProvider(intent, context, colorScheme);
+         }
+-        return new CustomTabIntentDataProvider(intent, this, colorScheme);
++        return new CustomTabIntentDataProvider(intent, context, colorScheme);
+     }
+ 
+     /** Builds {@link BrowserServicesIntentDataProvider} for this {@link CustomTabActivity}. */
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabSessionHandler.java b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabSessionHandler.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabSessionHandler.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/CustomTabSessionHandler.java
+@@ -166,9 +166,12 @@ public class CustomTabSessionHandler
+         // This method is used for legacy non-clearTop intent delivery as well as
+         // cross-task TWA shortcut intent routing (see
+         // LaunchIntentDispatcher#launchCustomTabActivity).
+-        CustomTabIntentDataProvider dataProvider =
+-                new CustomTabIntentDataProvider(
++        // Built as for a new activity, so that its profile can be compared with the tab's.
++        BrowserServicesIntentDataProvider dataProvider =
++                BaseCustomTabActivity.buildCustomTabIntentDataProvider(
+                         intent, mActivity, CustomTabsIntent.COLOR_SCHEME_LIGHT);
++        // LaunchIntentDispatcher then opens the link in a new activity.
++        if (mIntentHandler.opensInOtherProfile(dataProvider)) return false;
+ 
+         return mIntentHandler.onNewIntent(dataProvider);
+     }
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/content/CustomTabIntentHandler.java b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/content/CustomTabIntentHandler.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/customtabs/content/CustomTabIntentHandler.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/customtabs/content/CustomTabIntentHandler.java
+@@ -108,6 +108,14 @@ public class CustomTabIntentHandler {
+             intent.setFlags((intent.getFlags() & ~flagsToRemove) | Intent.FLAG_ACTIVITY_NEW_TASK);
+             mContext.startActivity(intent);
+             return false;
++        } else if (opensInOtherProfile(intentDataProvider)) {
++            // Open the link in a new activity on top of this one, as when no activity of the
++            // session is in the task.
++            assumeNonNull(intent);
++            int flagsToRemove = Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP;
++            intent.setFlags(intent.getFlags() & ~flagsToRemove);
++            mContext.startActivity(intent);
++            return false;
+         }
+ 
+         if (IntentHandler.shouldIgnoreIntent(assumeNonNull(intent), mContext, true)) {
+@@ -134,6 +142,21 @@ public class CustomTabIntentHandler {
+         return true;
+     }
+ 
++    /**
++     * Returns whether the link of a new intent for this session must not load in this activity's
++     * tab because a new custom tab for it would be off the record and this tab is not, or the
++     * other way around. The tab's profile was fixed when the activity was created, and the option
++     * to open external links in incognito can change after that.
++     *
++     * @param intentDataProvider Data provider built from the new intent as for a new activity.
++     */
++    public boolean opensInOtherProfile(BrowserServicesIntentDataProvider intentDataProvider) {
++        Tab tab = mTabProvider.getTab();
++        boolean tabIsOffTheRecord =
++                tab != null ? tab.isOffTheRecord() : mIntentDataProvider.isOffTheRecord();
++        return tabIsOffTheRecord != intentDataProvider.isOffTheRecord();
++    }
++
+     private boolean maybeRelaunchForCctResumption(
+             BrowserServicesIntentDataProvider intentDataProvider) {
+         if (ChromeFeatureList.sCctTabResumption.isEnabled()) {
+--
