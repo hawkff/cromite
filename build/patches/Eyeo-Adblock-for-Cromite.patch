@@ -17,7 +17,7 @@ suit Cromite logic.
  .../AdblockAllowedDomainsFragment.java        |    7 +-
  .../AdblockCustomFilterListsFragment.java     |   37 +-
  .../AdblockCustomFiltersFragment.java         |    7 +-
- .../settings/AdblockCustomItemFragment.java   |   28 +-
+ .../settings/AdblockCustomItemFragment.java   |   27 +-
  .../settings/AdblockFilterListsAdapter.java   |   32 +-
  .../settings/AdblockFilterListsFragment.java  |    8 +-
  .../settings/AdblockSettingsFragment.java     |  202 +-
@@ -127,7 +127,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 122 files changed, 9117 insertions(+), 737 deletions(-)
+ 122 files changed, 9116 insertions(+), 737 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -633,15 +633,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
              mRemoveButton = rootView.findViewById(R.id.fragment_adblock_custom_item_remove);
              mRemoveButton.setContentDescription(
                      AdblockCustomItemFragment.this.getCustomItemRemoveButtonContentDescription());
-@@ -107,6 +115,7 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
-                     String item = (String) v.getTag();
-                     removeItemImpl(item);
-                     mAdapter.notifyDataSetChanged();
-+                    mItem.setText(item);
-                 }
-             };
- 
-@@ -134,16 +143,25 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
+@@ -134,16 +142,25 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
                  convertView.setTag(new Holder(convertView));
              }
  

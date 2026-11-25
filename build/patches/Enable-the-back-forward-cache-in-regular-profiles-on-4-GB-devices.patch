@@ -28,23 +28,28 @@ and its local network access policy. When one of those site settings
 changes, including a site's cookie setting, which also decides whether
 third-party workers may run, or when all site settings change at once
 (for example a policy update), every page of the profile is marked as
-not cacheable and pages already in the cache are evicted. A later back
-navigation then loads the page again with the new setting, so a revoked
-site permission cannot come back through a restored page. The global
-third-party cookie setting is not a site setting: like an open page, a
-cached page keeps the third-party workers it already has after that
-setting changes.
+not cacheable and pages already in the cache are evicted. A change of
+the global third-party cookie setting evicts them the same way. A later
+back navigation then loads the page again with the new setting, so a
+revoked site permission cannot come back through a restored page.
+
+Deleting cookies or site storage, from the settings, at startup or
+through a Clear-Site-Data header, also evicts the cached pages whose
+main document matches the removal filter. A deletion for one site does
+not evict other sites' pages that embed it.
 
 The ad blocker skips element hiding for documents restored from the
 cache; they keep what was applied when they were loaded.
 
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 ---
- .../tab_web_contents_delegate_android.cc      |  3 ++-
- .../browser/adblock_webcontents_observer.cc   |  5 ++++
- .../browser/page_specific_content_settings.cc | 23 +++++++++++++++++++
- content/common/content_navigation_policy.cc   | 10 +++++---
- 4 files changed, 37 insertions(+), 4 deletions(-)
+ .../tab_web_contents_delegate_android.cc      |  3 +-
+ .../browser/adblock_webcontents_observer.cc   |  5 ++
+ .../browser/page_specific_content_settings.cc | 47 +++++++++++++++++++
+ .../browser/page_specific_content_settings.h  |  8 ++++
+ .../browsing_data_remover_impl.cc             | 14 ++++++
+ content/common/content_navigation_policy.cc   | 10 ++--
+ 6 files changed, 83 insertions(+), 4 deletions(-)
 
 diff --git a/chrome/browser/android/tab_web_contents_delegate_android.cc b/chrome/browser/android/tab_web_contents_delegate_android.cc
 --- a/chrome/browser/android/tab_web_contents_delegate_android.cc
@@ -77,15 +82,54 @@ diff --git a/components/adblock/content/browser/adblock_webcontents_observer.cc 
 diff --git a/components/content_settings/browser/page_specific_content_settings.cc b/components/content_settings/browser/page_specific_content_settings.cc
 --- a/components/content_settings/browser/page_specific_content_settings.cc
 +++ b/components/content_settings/browser/page_specific_content_settings.cc
-@@ -33,6 +33,7 @@
+@@ -32,7 +32,9 @@
+ #include "components/content_settings/core/common/content_settings_types.h"
  #include "components/content_settings/core/common/content_settings_types.mojom-shared.h"
  #include "components/content_settings/core/common/content_settings_utils.h"
++#include "components/content_settings/core/common/pref_names.h"
  #include "components/privacy_sandbox/privacy_sandbox_features.h"
 +#include "content/public/browser/back_forward_cache.h"
  #include "content/public/browser/browser_thread.h"
  #include "content/public/browser/cookie_access_details.h"
  #include "content/public/browser/navigation_handle.h"
-@@ -1387,6 +1388,28 @@ void PageSpecificContentSettings::OnContentSettingChanged(
+@@ -649,6 +651,14 @@ PageSpecificContentSettings::PageSpecificContentSettings(content::Page& page,
+           GetWebContents()->GetPrimaryMainFrame()->GetStoragePartition(),
+           delegate_->CreateBrowsingDataModelDelegate())) {
+   observation_.Observe(map_.get());
++  if (PrefService* pref_service = delegate_->GetPrefs()) {
++    cookie_controls_mode_registrar_.Init(pref_service);
++    cookie_controls_mode_registrar_.Add(
++        prefs::kCookieControlsMode,
++        base::BindRepeating(
++            &PageSpecificContentSettings::OnCookieControlsModeChanged,
++            base::Unretained(this)));
++  }
+   if (page.GetMainDocument().GetLifecycleState() ==
+       LifecycleState::kPrerendering) {
+     updates_queued_during_prerender_ = std::make_unique<PendingUpdates>();
+@@ -1380,6 +1390,21 @@ void PageSpecificContentSettings::IncrementStatefulBounceCount() {
+       ->NotifyStatefulBounceObservers();
+ }
+ 
++void PageSpecificContentSettings::OnCookieControlsModeChanged() {
++  if (IsEmbeddedPage()) {
++    return;
++  }
++  // The global third-party cookie setting also decides whether third-party
++  // service and shared workers may run, which a cached page keeps. See
++  // OnContentSettingChanged().
++  content::BackForwardCache::DisableForRenderFrameHost(
++      &page().GetMainDocument(),
++      content::BackForwardCache::DisabledReason(
++          content::BackForwardCache::DisabledSource::kEmbedder, /*id=*/0,
++          "Third-party cookie setting changed", /*context=*/"",
++          /*report_string=*/"masked"));
++}
++
+ void PageSpecificContentSettings::OnContentSettingChanged(
+     const ContentSettingsPattern& primary_pattern,
+     const ContentSettingsPattern& secondary_pattern,
+@@ -1387,6 +1412,28 @@ void PageSpecificContentSettings::OnContentSettingChanged(
    if (IsEmbeddedPage())
      return;
  
@@ -114,6 +158,62 @@ diff --git a/components/content_settings/browser/page_specific_content_settings.
    const GURL current_url = page().GetMainDocument().GetLastCommittedURL();
    if (content_type == ContentSettingsType::STORAGE_ACCESS) {
      if (!secondary_pattern.Matches(current_url)) {
+diff --git a/components/content_settings/browser/page_specific_content_settings.h b/components/content_settings/browser/page_specific_content_settings.h
+--- a/components/content_settings/browser/page_specific_content_settings.h
++++ b/components/content_settings/browser/page_specific_content_settings.h
+@@ -30,6 +30,7 @@
+ #include "components/content_settings/core/browser/host_content_settings_map.h"
+ #include "components/content_settings/core/common/content_settings.h"
+ #include "components/content_settings/core/common/content_settings_types.h"
++#include "components/prefs/pref_change_registrar.h"
+ #include "content/public/browser/allow_service_worker_result.h"
+ #include "content/public/browser/page_user_data.h"
+ #include "content/public/browser/render_frame_host.h"
+@@ -559,6 +560,9 @@ class PageSpecificContentSettings
+                                const ContentSettingsPattern& secondary_pattern,
+                                ContentSettingsType content_type) override;
+ 
++  // Called when the global third-party cookie setting changes.
++  void OnCookieControlsModeChanged();
++
+   // Clears settings changed by the user via PageInfo since the last navigation.
+   void ClearContentSettingsChangedViaPageInfo();
+ 
+@@ -703,6 +707,10 @@ class PageSpecificContentSettings
+   base::ScopedObservation<HostContentSettingsMap, content_settings::Observer>
+       observation_{this};
+ 
++  // Watches the global third-party cookie setting, which is a profile pref and
++  // not a content setting.
++  PrefChangeRegistrar cookie_controls_mode_registrar_;
++
+   // Calls to |delegate_| and SiteDataObservers that have been queued up while
+   // the page is prerendering. These calls are run when the page is activated.
+   std::unique_ptr<PendingUpdates> updates_queued_during_prerender_;
+diff --git a/content/browser/browsing_data/browsing_data_remover_impl.cc b/content/browser/browsing_data/browsing_data_remover_impl.cc
+--- a/content/browser/browsing_data/browsing_data_remover_impl.cc
++++ b/content/browser/browsing_data/browsing_data_remover_impl.cc
+@@ -684,6 +684,20 @@ void BrowsingDataRemoverImpl::RemoveImpl(
+     }
+   }
+ 
++  //////////////////////////////////////////////////////////////////////////////
++  // Back/forward cache. A cached page keeps in memory what it read from
++  // cookies and site storage, so it must not be restored after they are
++  // deleted, whatever the time range.
++  if (remove_mask & (DATA_TYPE_COOKIES | DATA_TYPE_DOM_STORAGE)) {
++    auto storage_key_filter = filter_builder->BuildStorageKeyFilter();
++    for (WebContentsImpl* web_contents : WebContentsImpl::GetAllWebContents()) {
++      if (web_contents->GetBrowserContext() == browser_context_) {
++        web_contents->GetController().GetBackForwardCache().Flush(
++            storage_key_filter);
++      }
++    }
++  }
++
+   //////////////////////////////////////////////////////////////////////////////
+   // Auth cache.
+   if (remove_mask & DATA_TYPE_COOKIES) {
 diff --git a/content/common/content_navigation_policy.cc b/content/common/content_navigation_policy.cc
 --- a/content/common/content_navigation_policy.cc
 +++ b/content/common/content_navigation_policy.cc

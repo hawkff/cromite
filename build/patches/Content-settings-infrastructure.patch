@@ -16,6 +16,7 @@ Require: bromite-build-utils.patch
  ...page_specific_content_settings_delegate.cc |   2 +-
  .../browser_ui/settings/android/BUILD.gn      |   1 +
  .../preference_spinner_single_widget.xml      |  92 ++++
+ .../settings/ChromeSwitchPreference.java      |   9 +-
  .../settings/SpinnerPreference.java           |  47 ++
  .../browser_ui/site_settings/android/BUILD.gn |  17 +
  .../res/xml/site_settings_preferences.xml     |  37 ++
@@ -25,7 +26,7 @@ Require: bromite-build-utils.patch
  ...tomTriStateSiteSettingsPreferenceImpl.java |  24 +
  .../ContentSettingsResources.java             |  34 +-
  .../site_settings/SingleCategorySettings.java |  64 ++-
- .../site_settings/SingleWebsiteSettings.java  |  58 ++-
+ .../site_settings/SingleWebsiteSettings.java  |  60 ++-
  .../site_settings/SiteSettings.java           |  44 +-
  .../site_settings/SiteSettingsCategory.java   |  28 +-
  .../site_settings/SiteSettingsDelegate.java   |   2 +
@@ -63,7 +64,7 @@ Require: bromite-build-utils.patch
  .../platform/web_content_settings_client.h    |  13 +
  .../execution_context/execution_context.cc    |  16 +
  .../execution_context/execution_context.h     |   5 +
- 52 files changed, 1453 insertions(+), 70 deletions(-)
+ 53 files changed, 1460 insertions(+), 74 deletions(-)
  create mode 100644 components/browser_ui/settings/android/java/res/layout/preference_spinner_single_widget.xml
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSetting.java
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSettingImpl.java
@@ -258,6 +259,31 @@ new file mode 100644
 +    </LinearLayout>
 +
 +</LinearLayout>
+diff --git a/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/ChromeSwitchPreference.java b/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/ChromeSwitchPreference.java
+--- a/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/ChromeSwitchPreference.java
++++ b/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/ChromeSwitchPreference.java
+@@ -133,16 +133,17 @@ public class ChromeSwitchPreference extends SwitchPreferenceCompat implements Co
+                             event.getText().add(mSummaryOverrideForScreenReader);
+                         }
+                     };
+-            summary.setAccessibilityDelegate(summaryOverrideDelegate);
+         }
++        // Set on every bind: a recycled view may still hold the delegate of another
++        // preference.
++        summary.setAccessibilityDelegate(summaryOverrideDelegate);
++        title.setAccessibilityDelegate(null);
+ 
+         // Use summary as title if title is empty.
+         if (mUseSummaryAsTitle && TextUtils.isEmpty(getTitle())) {
+             title.setText(summary.getText());
+             title.setVisibility(View.VISIBLE);
+-            if (summaryOverrideDelegate != null) {
+-                title.setAccessibilityDelegate(summaryOverrideDelegate);
+-            }
++            title.setAccessibilityDelegate(summaryOverrideDelegate);
+             summary.setVisibility(View.GONE);
+         }
+ 
 diff --git a/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/SpinnerPreference.java b/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/SpinnerPreference.java
 --- a/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/SpinnerPreference.java
 +++ b/components/browser_ui/settings/android/widget/java/src/org/chromium/components/browser_ui/settings/SpinnerPreference.java
@@ -1452,7 +1478,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
          setUpPreferenceCommon(preference, value, permission);
          preference.setOnPreferenceChangeListener(this);
  
-@@ -1485,24 +1504,31 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
+@@ -1485,24 +1504,33 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
                  oneTimePreference.setBackgroundColor(mHighlightColor);
              }
          } else {
@@ -1469,7 +1495,9 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 +                BromiteCustomContentSettingImpl.setWebSitePreferenceValue(
 +                        contentType, preference, value);
 +            }
-+            if (preference instanceof ChromeSwitchPreference && !isEmbargoed) {
++            // A custom content setting row shows the text of its current state, so a
++            // screen reader reads that text instead of the allowed state's text.
++            if (preference instanceof ChromeSwitchPreference && !isEmbargoed && cs == null) {
                  String a11ySummary =
                          getString(
                                  ContentSettingsResources.getCategorySummary(
@@ -1493,7 +1521,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
              }
          }
          if (preference instanceof ChromeSwitchPreference && isSessionPermission(contentType)) {
-@@ -1847,7 +1873,13 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
+@@ -1847,7 +1875,13 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
          if (newValue instanceof Boolean) {
              permission = (Boolean) newValue ? getEnabledValue(type) : ContentSetting.BLOCK;
          } else {

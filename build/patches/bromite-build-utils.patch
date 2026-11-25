@@ -5,17 +5,17 @@ Subject: bromite build utils
 ---
  build/android/gyp/java_cpp_enum.py            |  34 ++++-
  build/android/gyp/util/build_utils.py         |  25 +++-
- build/bromite/bromite_utils.gni               |  85 +++++++++++++
- build/bromite/gyp/cpp_bromite_include.py      |  50 ++++++++
+ build/bromite/bromite_utils.gni               |  85 ++++++++++++
+ build/bromite/gyp/cpp_bromite_include.py      |  50 +++++++
  build/bromite/gyp/cpp_bromite_include.pydeps  |   9 ++
- build/bromite/gyp/java_bromite_impl.py        | 119 ++++++++++++++++++
+ build/bromite/gyp/java_bromite_impl.py        | 119 +++++++++++++++++
  build/bromite/gyp/java_bromite_impl.pydeps    |   9 ++
  build/config/BUILDCONFIG.gn                   |   2 +
  build/config/android/rules.gni                |   6 +-
  .../ChromeAccessibilitySettingsDelegate.java  |   5 +
  chrome/browser/flags/BUILD.gn                 |   8 +-
- .../flags/android/cromite_native_utils.cc     |  94 ++++++++++++++
- .../flags/android/cromite_native_utils.h      |  14 +++
+ .../flags/android/cromite_native_utils.cc     | 122 ++++++++++++++++++
+ .../flags/android/cromite_native_utils.h      |  14 ++
  .../browser/flags/CromiteNativeUtils.java     |  46 +++++++
  mojo/public/tools/mojom/mojom_parser.py       |  26 +++-
  tools/grit/grit/grd_reader.py                 |  31 ++++-
@@ -23,7 +23,7 @@ Subject: bromite build utils
  tools/grit/grit/tool/build.py                 |   7 +-
  tools/grit/grit_rule.gni                      |   2 +-
  tools/grit/preprocess_if_expr.py              |  32 ++++-
- 20 files changed, 585 insertions(+), 22 deletions(-)
+ 20 files changed, 613 insertions(+), 22 deletions(-)
  create mode 100644 build/bromite/bromite_utils.gni
  create mode 100644 build/bromite/gyp/cpp_bromite_include.py
  create mode 100644 build/bromite/gyp/cpp_bromite_include.pydeps
@@ -547,7 +547,7 @@ diff --git a/chrome/browser/flags/android/cromite_native_utils.cc b/chrome/brows
 new file mode 100755
 --- /dev/null
 +++ b/chrome/browser/flags/android/cromite_native_utils.cc
-@@ -0,0 +1,94 @@
+@@ -0,0 +1,122 @@
 +#include "chrome/browser/flags/android/cromite_native_utils.h"
 +
 +#include "chrome/browser/browser_process.h"
@@ -558,6 +558,34 @@ new file mode 100755
 +#include "base/android/jni_string.h"
 +
 +using base::android::JavaRef;
++
++namespace {
++
++// The state of a feature at Default, including the defaults this build changes,
++// as the flags page shows it.
++bool IsEnabledByDefault(const base::Feature& feature) {
++  return base::FeatureList::IsCromiteChanged(feature)
++             ? base::FeatureList::GetCromiteChange(feature)
++             : feature.default_state == base::FEATURE_ENABLED_BY_DEFAULT;
++}
++
++// The feature a switch controls: the feature of a feature entry, or a feature
++// of this build stored under its own name, which has no entry.
++const base::Feature* FindSwitchFeature(const flags_ui::FeatureEntry* entry,
++                                       const std::string& name) {
++  if (entry) {
++    return entry->type == flags_ui::FeatureEntry::FEATURE_VALUE ||
++                   entry->type ==
++                       flags_ui::FeatureEntry::FEATURE_WITH_PARAMS_VALUE
++               ? entry->feature.feature
++               : nullptr;
++  }
++  return base::FeatureList::IsCromiteFlag(name)
++             ? base::FeatureList::GetCromiteFlag(name)
++             : nullptr;
++}
++
++}  // namespace
 +
 +static void JNI_CromiteNativeUtils_SetEnabled(JNIEnv* env,
 +    const JavaRef<jstring>& featureName, bool isEnabled) {
@@ -571,9 +599,10 @@ new file mode 100755
 +  entries.erase(internal_name + "@2"); // disabled
 +
 +  bool is_switch = false;
-+  if (const flags_ui::FeatureEntry* entry =
-+        about_flags::GetCurrentFlagsState()->FindFeatureEntryByName(
-+          internal_name)) {
++  const flags_ui::FeatureEntry* entry =
++      about_flags::GetCurrentFlagsState()->FindFeatureEntryByName(
++          internal_name);
++  if (entry) {
 +    if (entry->type == flags_ui::FeatureEntry::SINGLE_DISABLE_VALUE) {
 +      entries.erase(entry->switches.command_line_switch);
 +      if (isEnabled) {
@@ -591,10 +620,10 @@ new file mode 100755
 +  }
 +
 +  if (!is_switch) {
-+    if (isEnabled) {
-+      entries.insert(internal_name + "@1");
-+    } else {
-+      entries.insert(internal_name + "@2");
++    // The default state is stored as Default, not as an explicit value.
++    const base::Feature* feature = FindSwitchFeature(entry, internal_name);
++    if (!feature || isEnabled != IsEnabledByDefault(*feature)) {
++      entries.insert(internal_name + (isEnabled ? "@1" : "@2"));
 +    }
 +  }
 +
@@ -630,12 +659,11 @@ new file mode 100755
 +  if (entries.count(disabled_entry))
 +    return false;
 +
-+  if (const flags_ui::FeatureEntry* entry =
-+        about_flags::GetCurrentFlagsState()->FindFeatureEntryByName(
++  if (const base::Feature* feature = FindSwitchFeature(
++          about_flags::GetCurrentFlagsState()->FindFeatureEntryByName(
++              internal_name),
 +          internal_name)) {
-+    if (const base::Feature* feature = entry->feature.feature) {
-+      return feature->default_state == base::FEATURE_ENABLED_BY_DEFAULT;
-+    }
++    return IsEnabledByDefault(*feature);
 +  }
 +
 +  return false;

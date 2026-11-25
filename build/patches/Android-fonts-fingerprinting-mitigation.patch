@@ -142,7 +142,7 @@ diff --git a/chrome/browser/flags/android/cromite_native_utils.cc b/chrome/brows
  #include "components/webui/flags/pref_service_flags_storage.h"
  
  #include "base/android/jni_string.h"
-@@ -91,4 +92,8 @@ static jboolean JNI_CromiteNativeUtils_IsFlagEnabled(JNIEnv* env,
+@@ -119,4 +120,8 @@ static jboolean JNI_CromiteNativeUtils_IsFlagEnabled(JNIEnv* env,
    return false;
  }
  
