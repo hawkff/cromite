@@ -28,15 +28,15 @@ Require: Content-settings-infrastructure.patch
  .../blink/renderer/core/frame/local_frame.cc  |  20 ++-
  .../blink/renderer/core/frame/local_frame.h   |   6 +-
  .../core/frame/local_frame_mojo_handler.cc    |   5 +-
- .../core/frame/screen_metrics_emulator.cc     |  18 ++-
+ .../core/frame/screen_metrics_emulator.cc     |  24 +++-
  .../core/frame/screen_metrics_emulator.h      |  14 ++
  .../core/frame/web_frame_widget_impl.cc       |   9 ++
  .../core/frame/web_remote_frame_impl.cc       |   3 +-
  .../blink/renderer/core/input/touch.cc        |  17 ++-
- third_party/blink/renderer/core/page/page.cc  | 129 ++++++++++++++++++
+ third_party/blink/renderer/core/page/page.cc  | 130 ++++++++++++++++++
  third_party/blink/renderer/core/page/page.h   |  10 ++
  .../renderer/core/style/computed_style.h      |   6 +
- 27 files changed, 501 insertions(+), 22 deletions(-)
+ 27 files changed, 508 insertions(+), 22 deletions(-)
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/impl/BromiteViewportContentSetting.java
  create mode 100644 components/browser_ui/strings/bromite_content_settings/viewport.grdp
  create mode 100644 components/content_settings/core/browser/bromite_content_settings/viewport.inc
@@ -640,7 +640,20 @@ diff --git a/third_party/blink/renderer/core/frame/screen_metrics_emulator.cc b/
    Apply(cache_behavior);
  }
  
-@@ -165,6 +175,9 @@ void ScreenMetricsEmulator::Apply(
+@@ -110,6 +120,12 @@ void ScreenMetricsEmulator::Apply(
+     // The emulated screen size overrides the real one, and moves the screen's
+     // origin to 0,0.
+     screen_rect = gfx::Rect(gfx::Size(emulation_params_.screen_size));
++  } else if (emulation_params_.force_mobile_calc) {
++    // The screen keeps the real screen size, scaled like the widget, so it does
++    // not change with the browser controls or other insets of the widget.
++    screen_rect = gfx::Rect(gfx::Size(
++        base::ClampRound(screen_rect.width() / emulation_params_.scale),
++        base::ClampRound(screen_rect.height() / emulation_params_.scale)));
+   } else if (!emulating_desktop()) {
+     // For mobile emulation, the screen is adjusted to match the position and
+     // size of the widget rect, if not explicitly specified.
+@@ -165,6 +181,9 @@ void ScreenMetricsEmulator::Apply(
    frame_widget_->SetScreenInfoAndSize(emulated_screen_infos,
                                        /*widget_size=*/widget_size,
                                        /*visible_viewport_size=*/widget_size);
@@ -650,7 +663,7 @@ diff --git a/third_party/blink/renderer/core/frame/screen_metrics_emulator.cc b/
  }
  
  void ScreenMetricsEmulator::UpdateVisualProperties(
-@@ -198,9 +211,8 @@ void ScreenMetricsEmulator::OnUpdateScreenRects(
+@@ -198,9 +217,8 @@ void ScreenMetricsEmulator::OnUpdateScreenRects(
      const gfx::Rect& window_screen_rect) {
    original_view_screen_rect_ = view_screen_rect;
    original_window_screen_rect_ = window_screen_rect;
@@ -810,7 +823,7 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
  }
  
  LocalFrame* Page::DeprecatedLocalMainFrame() const {
-@@ -1270,7 +1283,123 @@ void Page::UpdateAcceleratedCompositingSettings() {
+@@ -1270,7 +1283,124 @@ void Page::UpdateAcceleratedCompositingSettings() {
    }
  }
  
@@ -861,7 +874,8 @@ diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/re
 +
 +      // set emulation params
 +      DeviceEmulationParams params;
-+      // the screen size is changed to match the widget size with force_mobile_calc
++      // with force_mobile_calc the widget size and the real screen size are both
++      // scaled by the same factor
 +      params.force_mobile_calc = true;
 +      params.screen_type = mojom::EmulatedScreenType::kDesktop;
 +      // scale the widget size (and the screen size) by half_random scale factor
