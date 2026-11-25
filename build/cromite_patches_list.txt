@@ -335,5 +335,6 @@ Destroy-the-incognito-profile-after-its-tab-model.patch
 Remove-the-XR-feature-module.patch
 Move-settings-rows-to-their-pages.patch
 Enable-the-back-forward-cache-in-regular-profiles-on-4-GB-devices.patch
+Do-not-reuse-a-custom-tab-across-profiles.patch
 
 # extension patches
