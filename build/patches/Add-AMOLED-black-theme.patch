@@ -1,0 +1,820 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Wed, 25 Nov 2026 22:10:13 +0000
+Subject: Add an AMOLED black theme
+
+Settings > Theme gets a switch, "AMOLED black", off by default. While
+the browser is dark (the Dark theme, or System default while the system
+is dark), the browser's own screens use true black instead of dark gray:
+toolbar, status and navigation bars, tab switcher, new tab page, menus,
+dialogs, bottom sheets and settings.
+The address field, cards and search boxes, including the settings
+search field, keep a dark gray one step above black, so their edges stay
+visible. Incognito screens and separate incognito windows are always
+dark, so they turn black whenever the switch is on.
+
+Under the switch, the checkbox "Material You colors" (Android 12 and
+later, checked by default, usable only while the switch is on) chooses
+the accent colors of the black theme. Checked uses the wallpaper colors.
+Unchecked uses the browser's baseline palette. While the black theme is
+active, a color picked in the new tab page customization is not used.
+With the switch off, that color works as before.
+
+Wallpaper colors already follow Android's color contrast setting on
+Android 14 and later. With the baseline palette, medium and high
+contrast use the Material 3 contrast color roles of that palette, and a
+contrast listener recreates the affected screens when the setting
+changes.
+
+The theme is a set of theme overlays applied when an activity is
+created, after the wallpaper colors. Views that are prepared ahead of
+time for a custom tab record the AMOLED black state they were built
+with: the switch, dark mode, the palette choice and the contrast level.
+They are used only if the custom tab has the same state; otherwise the
+custom tab builds its views as it does without prepared views. Changing
+either setting recreates the open activities, as a theme change does.
+Both values are stored in the browser's own preferences, and both rows
+can be found in settings search. Web content is not affected: the color
+scheme reported to sites still follows the Dark setting as before, and
+no media feature or web API changes.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../browser/ChromeBaseAppCompatActivity.java  | 50 +++++++++++++++-
+ .../chrome/browser/ChromeTabbedActivity.java  |  5 ++
+ .../chrome/browser/WarmupManager.java         | 30 ++++++++++
+ .../browser/ntp/IncognitoNewTabPage.java      |  4 +-
+ .../browser/ntp/IncognitoNewTabPageView.java  |  4 +-
+ .../browser/settings/SettingsActivity.java    |  4 ++
+ .../settings/SettingsHostFragment.java        |  7 +++
+ .../SettingsPageFragmentDelegateImpl.java     |  9 ++-
+ .../search/SettingsSearchCoordinator.java     |  7 ++-
+ .../TabbedNavigationBarColorController.java   | 16 ++++-
+ .../chrome/browser/hub/HubColors.java         |  3 +-
+ .../settings/ChromeBaseSettingsFragment.java  |  8 +++
+ chrome/browser/ui/android/night_mode/BUILD.gn |  1 +
+ .../java/res/xml/theme_preferences.xml        | 12 ++++
+ .../settings/ThemeSettingsFragment.java       | 60 +++++++++++++++++++
+ .../Add-AMOLED-black-theme.grdp               | 18 ++++++
+ .../browser_ui/styles/ChromeColors.java       | 41 ++++++++++++-
+ .../browser_ui/styles/IncognitoColors.java    |  2 +-
+ .../android/templates/res/values/themes.xml   | 60 +++++++++++++++++++
+ 19 files changed, 329 insertions(+), 12 deletions(-)
+ create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-AMOLED-black-theme.grdp
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCompatActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCompatActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCompatActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCompatActivity.java
+@@ -10,6 +10,7 @@ import static org.chromium.chrome.browser.base.SplitCompatApplication.CHROME_SPL
+ 
+ import android.app.Activity;
+ import android.app.ActivityManager.TaskDescription;
++import android.app.UiModeManager;
+ import android.content.Context;
+ import android.content.SharedPreferences;
+ import android.content.res.Configuration;
+@@ -34,8 +35,11 @@ import androidx.annotation.VisibleForTesting;
+ import androidx.appcompat.app.AppCompatActivity;
+ import androidx.appcompat.widget.Toolbar;
+ 
++import com.google.android.material.color.ColorContrast;
++import com.google.android.material.color.ColorContrastOptions;
+ import com.google.android.material.color.DynamicColors;
+ 
++import org.chromium.base.ApplicationStatus;
+ import org.chromium.base.BundleUtils;
+ import org.chromium.base.CommandLine;
+ import org.chromium.base.ContextUtils;
+@@ -66,6 +70,7 @@ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeFieldTrialImpl;
+ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
+ import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
+ import org.chromium.chrome.browser.ui.edge_to_edge.SimpleEdgeToEdgeController;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.components.browser_ui.util.AutomotiveUtils;
+ import org.chromium.ui.base.ActivityResultTracker;
+@@ -150,6 +155,7 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+     private boolean mInMultiWindowMode;
+ 
+     private static boolean sIsTabletDeterminationMismatchRecord;
++    private static boolean sContrastListenerAdded;
+ 
+     @Override
+     protected void attachBaseContext(Context newBase) {
+@@ -601,11 +607,31 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+         // in org.chromium.chrome.browser.WarmupManager#applyContextOverrides for Custom Tabs
+         // UI that's pre-inflated using a themed application context as part of CCT warmup.
+         // Note: this should be called before any calls to `Window#getDecorView`.
+-        if (shouldApplyDynamicColors()) {
+-            if (!maybeApplyCustomizedColors()) {
++        boolean amoledBlack = ChromeColors.isAmoledBlackActive(this);
++        boolean wallpaperColors = !amoledBlack || ChromeColors.isAmoledDynamicColorsEnabled();
++        if (shouldApplyDynamicColors() && wallpaperColors) {
++            // In AMOLED black the checkbox chooses wallpaper colors, so the new tab page's custom
++            // color is not used.
++            if (amoledBlack || !maybeApplyCustomizedColors()) {
+                 DynamicColors.applyToActivityIfAvailable(this);
+             }
+         }
++        if (amoledBlack) {
++            // Wallpaper colors follow the system contrast setting on their own; the baseline
++            // palette needs its own contrast overlays.
++            if (!wallpaperColors) {
++                listenForContrastChanges();
++                ColorContrast.applyToActivityIfAvailable(
++                        this,
++                        new ColorContrastOptions.Builder()
++                                .setMediumContrastThemeOverlay(
++                                        R.style.ThemeOverlay_BrowserUI_AmoledBlack_MediumContrast)
++                                .setHighContrastThemeOverlay(
++                                        R.style.ThemeOverlay_BrowserUI_AmoledBlack_HighContrast)
++                                .build());
++            }
++            applySingleThemeOverlay(R.style.ThemeOverlay_BrowserUI_AmoledBlack);
++        }
+ 
+         // TODO(https://crbug.com/392634251): Explore setting elegantTextHeight to 'true' on older
+         // OS versions.
+@@ -630,6 +656,26 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+         }
+     }
+ 
++    /**
++     * Recreates the activities that use the AMOLED black baseline palette when Android's color
++     * contrast setting changes, so they pick the matching contrast overlay. Installed once.
++     */
++    private static void listenForContrastChanges() {
++        if (sContrastListenerAdded || VERSION.SDK_INT < VERSION_CODES.UPSIDE_DOWN_CAKE) return;
++        Context appContext = ContextUtils.getApplicationContext();
++        UiModeManager uiModeManager = appContext.getSystemService(UiModeManager.class);
++        if (uiModeManager == null) return;
++        sContrastListenerAdded = true;
++        uiModeManager.addContrastChangeListener(
++                appContext.getMainExecutor(),
++                _ -> {
++                    if (ChromeColors.isAmoledDynamicColorsEnabled()) return;
++                    for (Activity activity : ApplicationStatus.getRunningActivities()) {
++                        if (ChromeColors.isAmoledBlackActive(activity)) activity.recreate();
++                    }
++                });
++    }
++
+     protected void applySingleThemeOverlay(int themeOverlay) {
+         getTheme().applyStyle(themeOverlay, /* force= */ true);
+     }
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
+@@ -393,6 +393,7 @@ import org.chromium.components.bookmarks.BookmarkId;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+ import org.chromium.components.bookmarks.BookmarkItem;
+ import org.chromium.components.browser_ui.share.ShareParams;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.util.BrowserControlsVisibilityDelegate;
+ import org.chromium.components.browser_ui.util.ComposedBrowserControlsVisibilityDelegate;
+ import org.chromium.components.browser_ui.util.FirstDrawDetector;
+@@ -6237,6 +6238,10 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+             // This overlay is for incognito windowing. Any overlay that attempts to change color
+             // roles should be placed before this call in order to not alter incognito coloring.
+             applySingleThemeOverlay(R.style.ThemeOverlay_BrowserUI_TabbedMode_Incognito);
++            // Incognito is always dark, so it turns black whenever AMOLED black is on.
++            if (ChromeColors.isAmoledBlackEnabled()) {
++                applySingleThemeOverlay(R.style.ThemeOverlay_BrowserUI_AmoledBlack);
++            }
+         }
+     }
+ 
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java b/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.java
+@@ -7,6 +7,7 @@ package org.chromium.chrome.browser;
+ import static org.chromium.build.NullUtil.assumeNonNull;
+ 
+ import android.annotation.SuppressLint;
++import android.app.UiModeManager;
+ import android.content.Context;
+ import android.content.Intent;
+ import android.content.res.AssetManager;
+@@ -56,12 +57,14 @@ import org.chromium.chrome.browser.tab.TabLaunchType;
+ import org.chromium.chrome.browser.tab.TabObserver;
+ import org.chromium.chrome.browser.tab.TabSelectionType;
+ import org.chromium.chrome.browser.toolbar.ControlContainer;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.embedder_support.util.UrlConstants;
+ import org.chromium.content_public.browser.WebContents;
+ import org.chromium.ui.AsyncLayoutInflater;
+ import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.display.DisplayUtil;
++import org.chromium.ui.util.ColorUtils;
+ import org.chromium.url.GURL;
+ import org.chromium.url.Origin;
+ 
+@@ -70,6 +73,7 @@ import java.lang.annotation.RetentionPolicy;
+ import java.util.HashMap;
+ import java.util.HashSet;
+ import java.util.Map;
++import java.util.Objects;
+ import java.util.Set;
+ 
+ /**
+@@ -160,6 +164,7 @@ public class WarmupManager {
+     private final Map<String, Profile> mPendingPreconnectWithProfile;
+ 
+     private int mToolbarContainerId;
++    private @Nullable String mAmoledThemeState;
+     private @Nullable ViewGroup mMainView;
+ 
+     // Stores a prebuilt tab. To load a URL, this can be used if available instead of creating one
+@@ -382,6 +387,25 @@ public class WarmupManager {
+ 
+         mMainView = inflateViewHierarchy(context, toolbarContainerId, toolbarId);
+         mToolbarContainerId = toolbarContainerId;
++        mAmoledThemeState = getAmoledThemeState(context);
++    }
++
++    /**
++     * Returns the AMOLED black inputs that the colors of inflated views depend on, or "off" while
++     * the switch is off, so prepared views are reused only with the same inputs.
++     */
++    private static String getAmoledThemeState(Context context) {
++        if (!ChromeColors.isAmoledBlackEnabled()) return "off";
++        float contrast = 0;
++        if (Build.VERSION.SDK_INT >= VERSION_CODES.UPSIDE_DOWN_CAKE) {
++            UiModeManager uiModeManager = context.getSystemService(UiModeManager.class);
++            if (uiModeManager != null) contrast = uiModeManager.getContrast();
++        }
++        return ColorUtils.inNightMode(context)
++                + " "
++                + ChromeColors.isAmoledDynamicColorsEnabled()
++                + " "
++                + contrast;
+     }
+ 
+     @VisibleForTesting
+@@ -412,6 +436,10 @@ public class WarmupManager {
+             context.getTheme()
+                     .applyStyle(R.style.ThemeOverlay_BrowserUI_DefaultFontFamilyThemeOverlay, true);
+         }
++
++        if (ChromeColors.isAmoledBlackActive(context)) {
++            context.getTheme().applyStyle(R.style.ThemeOverlay_BrowserUI_AmoledBlack, true);
++        }
+     }
+ 
+     /**
+@@ -503,6 +531,8 @@ public class WarmupManager {
+         if (mMainView == null || mToolbarContainerId != toolbarContainerId) {
+             return false;
+         }
++        // Views built with other AMOLED black inputs would show the wrong colors.
++        if (!Objects.equals(mAmoledThemeState, getAmoledThemeState(context))) return false;
+         DisplayMetrics preDm = mMainView.getContext().getResources().getDisplayMetrics();
+         DisplayMetrics curDm = context.getResources().getDisplayMetrics();
+         // If following displayMetrics params don't match, toolbar is being shown on a display
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPage.java b/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPage.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPage.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPage.java
+@@ -31,6 +31,7 @@ import org.chromium.chrome.browser.ui.native_page.BasicNativePage;
+ import org.chromium.chrome.browser.ui.native_page.NativePageHost;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolver;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolverFactory;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.embedder_support.util.UrlConstants;
+ import org.chromium.ui.edge_to_edge.EdgeToEdgePadAdjuster;
+ 
+@@ -88,7 +89,8 @@ public class IncognitoNewTabPage extends BasicNativePage
+         }
+ 
+         Context context = host.getContext();
+-        mIncognitoNtpBackgroundColor = context.getColor(R.color.ntp_bg_incognito);
++        mIncognitoNtpBackgroundColor =
++                ChromeColors.getPrimaryBackgroundColor(context, /* isIncognito= */ true);
+ 
+         NativePageNavigationDelegate navigationDelegate =
+                 new NativePageNavigationDelegateImpl(
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPageView.java b/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPageView.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPageView.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ntp/IncognitoNewTabPageView.java
+@@ -19,6 +19,7 @@ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.chrome.R;
+ import org.chromium.chrome.browser.native_page.ContextMenuManager;
+ import org.chromium.chrome.browser.native_page.NativePageNavigationDelegate;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.widget.FadingShadow;
+ import org.chromium.components.browser_ui.widget.FadingShadowView;
+ import org.chromium.ui.base.ViewUtils;
+@@ -56,7 +57,8 @@ public class IncognitoNewTabPageView extends FrameLayout {
+     protected void onFinishInflate() {
+         super.onFinishInflate();
+ 
+-        @ColorInt int bgColor = getContext().getColor(R.color.ntp_bg_incognito);
++        @ColorInt
++        int bgColor = ChromeColors.getPrimaryBackgroundColor(getContext(), /* isIncognito= */ true);
+         mScrollView = findViewById(R.id.ntp_scrollview);
+         mScrollView.setBackgroundColor(bgColor);
+         setContentDescription(
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsActivity.java
+@@ -80,6 +80,7 @@ import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
+ import org.chromium.components.browser_ui.settings.PreferenceUpdateObserver;
+ import org.chromium.components.browser_ui.settings.SettingsFragment;
+ import org.chromium.components.browser_ui.settings.search.SettingsIndexData;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.components.browser_ui.util.ToolbarUtils;
+ import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
+@@ -548,6 +549,9 @@ public class SettingsActivity extends ChromeBaseAppCompatActivity
+     public void applyThemeOverlays() {
+         applySingleThemeOverlay(R.style.ThemeOverlay_Chromium_Settings_Containment);
+         super.applyThemeOverlays();
++        if (ChromeColors.isAmoledBlackActive(this)) {
++            applySingleThemeOverlay(R.style.ThemeOverlay_BrowserUI_AmoledBlack_Settings);
++        }
+     }
+ 
+     @Override
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsHostFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsHostFragment.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsHostFragment.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsHostFragment.java
+@@ -40,6 +40,7 @@ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+ import org.chromium.components.browser_ui.settings.PreferenceUpdateObserver;
+ import org.chromium.components.browser_ui.settings.SettingsNavigation;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.ui.base.ActivityResultTracker;
+ import org.chromium.ui.base.WindowAndroid;
+ import org.chromium.ui.modaldialog.ModalDialogManager;
+@@ -197,6 +198,12 @@ public class SettingsHostFragment extends Fragment
+         // Ensure child fragments inherit the same Chromium Settings theme used by SettingsActivity.
+         // For example, this ensures the left column category labels are styled correctly.
+         mThemedContext = new ContextThemeWrapper(context, R.style.ThemeOverlay_Chromium_Settings);
++        // As in SettingsActivity, AMOLED black also makes the settings page background black.
++        if (ChromeColors.isAmoledBlackActive(mThemedContext)) {
++            mThemedContext
++                    .getTheme()
++                    .applyStyle(R.style.ThemeOverlay_BrowserUI_AmoledBlack_Settings, true);
++        }
+         super.onAttach(mThemedContext);
+ 
+         mContainmentHelper = new SettingsContainmentHelper(mThemedContext, this);
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsPageFragmentDelegateImpl.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsPageFragmentDelegateImpl.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsPageFragmentDelegateImpl.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/SettingsPageFragmentDelegateImpl.java
+@@ -53,6 +53,7 @@ import org.chromium.chrome.browser.ui.messages.snackbar.SnackbarManager;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+ import org.chromium.components.browser_ui.settings.PreferenceUpdateObserver;
+ import org.chromium.components.browser_ui.settings.search.SettingsIndexData;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.components.browser_ui.widget.gesture.BackPressHandler;
+ import org.chromium.ui.UiUtils;
+@@ -222,6 +223,12 @@ public class SettingsPageFragmentDelegateImpl
+         // doesn't map directly to its own activity.
+         Context themedContext =
+                 new ContextThemeWrapper(mActivity, R.style.ThemeOverlay_Chromium_Settings);
++        // As in SettingsActivity, AMOLED black also makes the settings page background black.
++        if (ChromeColors.isAmoledBlackActive(themedContext)) {
++            themedContext
++                    .getTheme()
++                    .applyStyle(R.style.ThemeOverlay_BrowserUI_AmoledBlack_Settings, true);
++        }
+         View settingsView =
+                 LayoutInflater.from(themedContext).inflate(R.layout.settings_activity, null);
+ 
+@@ -240,7 +247,7 @@ public class SettingsPageFragmentDelegateImpl
+         mToolbar = settingsView.findViewById(R.id.action_bar);
+ 
+         // Apply semantic colors to the top-level container and app bar.
+-        int backgroundColor = SemanticColorUtils.getSettingsBackgroundColor(mActivity);
++        int backgroundColor = SemanticColorUtils.getSettingsBackgroundColor(themedContext);
+         fragmentContainer.setBackgroundColor(backgroundColor);
+         AppBarLayout appBarLayout = settingsView.findViewById(R.id.app_bar_layout);
+         appBarLayout.setBackgroundColor(backgroundColor);
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/search/SettingsSearchCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/search/SettingsSearchCoordinator.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/search/SettingsSearchCoordinator.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/search/SettingsSearchCoordinator.java
+@@ -82,6 +82,7 @@ import org.chromium.components.browser_ui.settings.search.SearchIndexProvider;
+ import org.chromium.components.browser_ui.settings.search.SettingsIndexData;
+ import org.chromium.components.browser_ui.settings.search.SettingsIndexData.SearchResults;
+ import org.chromium.components.browser_ui.site_settings.SiteSettings;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.components.browser_ui.util.ToolbarUtils;
+ import org.chromium.components.browser_ui.widget.displaystyle.UiConfig;
+@@ -398,7 +399,11 @@ public class SettingsSearchCoordinator
+ 
+         View query = requireViewById(R.id.search_query_container);
+         Drawable bg = ContextCompat.getDrawable(mActivity, R.drawable.pill_background);
+-        int tint = SemanticColorUtils.getSettingsContainerBackgroundColor(mActivity);
++        // AMOLED black makes the settings containers black; the field keeps one dark step.
++        int tint =
++                ChromeColors.isAmoledBlackActive(mActivity)
++                        ? SemanticColorUtils.getColorSurfaceContainer(mActivity)
++                        : SemanticColorUtils.getSettingsContainerBackgroundColor(mActivity);
+         bg.setTint(tint);
+         searchBox.setBackground(bg);
+         query.setBackground(bg);
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedNavigationBarColorController.java b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedNavigationBarColorController.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedNavigationBarColorController.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/tabbed_mode/TabbedNavigationBarColorController.java
+@@ -49,6 +49,7 @@ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeController;
+ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
+ import org.chromium.chrome.browser.ui.edge_to_edge.NavigationBarColorProvider;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.ui.edge_to_edge.EdgeToEdgeSupplier.ChangeObserver;
+ import org.chromium.ui.edge_to_edge.EdgeToEdgeSystemBarColorHelper;
+@@ -489,11 +490,24 @@ class TabbedNavigationBarColorController
+             return mActiveTab.getBackgroundColor();
+         } else {
+             return forceDarkNavigationBar
+-                    ? mContext.getColor(R.color.toolbar_background_primary_dark)
++                    ? getForcedDarkNavigationBarColor()
+                     : SemanticColorUtils.getBottomSystemNavColor(mContext);
+         }
+     }
+ 
++    /**
++     * Returns the forced dark color (incognito or fullscreen). It is black with AMOLED black on
++     * for incognito and for AMOLED black screens; light fullscreen keeps the dark gray.
++     */
++    private @ColorInt int getForcedDarkNavigationBarColor() {
++        boolean black =
++                assumeNonNull(mTabModelSelector).isIncognitoSelected()
++                        || ChromeColors.isAmoledBlackActive(mContext);
++        return black
++                ? ChromeColors.getPrimaryBackgroundColor(mContext, /* isIncognito= */ true)
++                : mContext.getColor(R.color.toolbar_background_primary_dark);
++    }
++
+     @VisibleForTesting
+     @ColorInt
+     int getNavigationBarDividerColor(boolean forceDarkNavigationBar, boolean forceShowDivider) {
+diff --git a/chrome/browser/hub/internal/android/java/src/org/chromium/chrome/browser/hub/HubColors.java b/chrome/browser/hub/internal/android/java/src/org/chromium/chrome/browser/hub/HubColors.java
+--- a/chrome/browser/hub/internal/android/java/src/org/chromium/chrome/browser/hub/HubColors.java
++++ b/chrome/browser/hub/internal/android/java/src/org/chromium/chrome/browser/hub/HubColors.java
+@@ -24,6 +24,7 @@ import org.chromium.chrome.browser.tab.Tab;
+ import org.chromium.chrome.browser.ui.bottombar.BottomBarConfigUtils;
+ import org.chromium.chrome.browser.ui.bottombar.BottomBarUtils;
+ import org.chromium.chrome.browser.ui.theme.BrandedColorScheme;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.styles.IncognitoColors;
+ import org.chromium.components.browser_ui.styles.SemanticColorUtils;
+ import org.chromium.ui.util.ColorUtils;
+@@ -75,7 +76,7 @@ public final class HubColors {
+         return switch (colorScheme) {
+             case HubColorScheme.DEFAULT -> SemanticColorUtils.getDefaultBgColor(context);
+             case HubColorScheme.INCOGNITO ->
+-                    ContextCompat.getColor(context, R.color.default_bg_color_dark);
++                    ChromeColors.getPrimaryBackgroundColor(context, /* isIncognito= */ true);
+             default -> assertFalseAndReturn(Color.TRANSPARENT);
+         };
+     }
+diff --git a/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java b/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java
+--- a/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java
++++ b/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java
+@@ -24,6 +24,7 @@ import org.chromium.components.browser_ui.settings.CustomDividerFragment;
+ import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
+ import org.chromium.components.browser_ui.settings.PreferenceUpdateObserver;
+ import org.chromium.components.browser_ui.settings.SettingsCustomTabLauncher;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ 
+ import java.util.function.Supplier;
+ 
+@@ -111,6 +112,13 @@ public abstract class ChromeBaseSettingsFragment extends PreferenceFragmentCompa
+         // Ensure settings fragments inherit the same Chromium Settings theme used by
+         // SettingsActivity, even though they are hosted in ChromeTabbedActivity.
+         mThemedContext = new ContextThemeWrapper(context, R.style.ThemeOverlay_Chromium_Settings);
++        // The host already has the AMOLED black surfaces; settings also draw their page with the
++        // high container role, as in SettingsActivity.
++        if (ChromeColors.isAmoledBlackActive(mThemedContext)) {
++            mThemedContext
++                    .getTheme()
++                    .applyStyle(R.style.ThemeOverlay_BrowserUI_AmoledBlack_Settings, true);
++        }
+         super.onAttach(mThemedContext);
+     }
+ 
+diff --git a/chrome/browser/ui/android/night_mode/BUILD.gn b/chrome/browser/ui/android/night_mode/BUILD.gn
+--- a/chrome/browser/ui/android/night_mode/BUILD.gn
++++ b/chrome/browser/ui/android/night_mode/BUILD.gn
+@@ -39,6 +39,7 @@ android_library("java") {
+     "//components/browser_ui/settings/android:java",
+     "//components/browser_ui/site_settings/android:java",
+     "//components/browser_ui/strings/android:browser_ui_strings_grd",
++    "//components/browser_ui/styles/android:java",
+     "//components/browser_ui/widget/android:java",
+     "//components/content_settings/android:content_settings_enums_java",
+     "//components/feature_engagement/public:public_java",
+diff --git a/chrome/browser/ui/android/night_mode/java/res/xml/theme_preferences.xml b/chrome/browser/ui/android/night_mode/java/res/xml/theme_preferences.xml
+--- a/chrome/browser/ui/android/night_mode/java/res/xml/theme_preferences.xml
++++ b/chrome/browser/ui/android/night_mode/java/res/xml/theme_preferences.xml
+@@ -8,4 +8,16 @@ found in the LICENSE file.
+ <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+     <org.chromium.chrome.browser.night_mode.settings.RadioButtonGroupThemePreference
+         android:key="ui_theme_pref" />
++    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
++        android:key="amoled_black"
++        android:title="@string/amoled_black_title"
++        android:summary="@string/amoled_black_summary"
++        android:defaultValue="false" />
++    <org.chromium.components.browser_ui.settings.ChromeBaseCheckBoxPreference
++        android:key="amoled_dynamic_colors"
++        android:dependency="amoled_black"
++        android:title="@string/amoled_dynamic_colors_title"
++        android:summaryOn="@string/amoled_dynamic_colors_summary_on"
++        android:summaryOff="@string/amoled_dynamic_colors_summary_off"
++        android:defaultValue="true" />
+ </PreferenceScreen>
+\ No newline at end of file
+diff --git a/chrome/browser/ui/android/night_mode/java/src/org/chromium/chrome/browser/night_mode/settings/ThemeSettingsFragment.java b/chrome/browser/ui/android/night_mode/java/src/org/chromium/chrome/browser/night_mode/settings/ThemeSettingsFragment.java
+--- a/chrome/browser/ui/android/night_mode/java/src/org/chromium/chrome/browser/night_mode/settings/ThemeSettingsFragment.java
++++ b/chrome/browser/ui/android/night_mode/java/src/org/chromium/chrome/browser/night_mode/settings/ThemeSettingsFragment.java
+@@ -4,12 +4,19 @@
+ 
+ package org.chromium.chrome.browser.night_mode.settings;
+ 
++import android.app.Activity;
+ import android.content.Context;
++import android.os.Build;
+ import android.os.Bundle;
+ 
++import androidx.preference.Preference;
++
++import org.chromium.base.ApplicationStatus;
+ import org.chromium.base.supplier.MonotonicObservableSupplier;
+ import org.chromium.base.supplier.ObservableSuppliers;
+ import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
++import org.chromium.base.task.PostTask;
++import org.chromium.base.task.TaskTraits;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+@@ -22,6 +29,7 @@ import org.chromium.chrome.browser.settings.ChromeBaseSettingsFragment;
+ import org.chromium.chrome.browser.settings.search.ChromeBaseSearchIndexProvider;
+ import org.chromium.components.browser_ui.settings.CustomDividerFragment;
+ import org.chromium.components.browser_ui.settings.SettingsUtils;
++import org.chromium.components.browser_ui.styles.ChromeColors;
+ import org.chromium.components.browser_ui.settings.search.SettingsIndexData;
+ 
+ /** Fragment to manage the theme user settings. */
+@@ -69,6 +77,27 @@ public class ThemeSettingsFragment extends ChromeBaseSettingsFragment
+                 ChromeFeatureList.DARKEN_WEBSITES_CHECKBOX_IN_THEMES_SETTING)) {
+             WebContentsDarkModeMessageController.notifyEventSettingsOpened(getProfile());
+         }
++
++        // Activities apply the AMOLED black theme when they are created. Recreate them after the
++        // new value is saved, as a theme change does.
++        Preference.OnPreferenceChangeListener recreateActivities =
++                (_, _) -> {
++                    PostTask.postTask(
++                            TaskTraits.UI_DEFAULT, ThemeSettingsFragment::recreateActivities);
++                    return true;
++                };
++        findPreference(ChromeColors.PREF_AMOLED_BLACK)
++                .setOnPreferenceChangeListener(recreateActivities);
++        Preference dynamicColors = findPreference(ChromeColors.PREF_AMOLED_DYNAMIC_COLORS);
++        dynamicColors.setOnPreferenceChangeListener(recreateActivities);
++        // Wallpaper colors exist only on Android 12 and later.
++        dynamicColors.setVisible(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S);
++    }
++
++    private static void recreateActivities() {
++        for (Activity activity : ApplicationStatus.getRunningActivities()) {
++            activity.recreate();
++        }
+     }
+ 
+     @Override
+@@ -128,6 +157,37 @@ public class ThemeSettingsFragment extends ChromeBaseSettingsFragment
+                             2,
+                             darkTitle,
+                             null);
++
++                    addRowEntry(
++                            indexData,
++                            prefFragment,
++                            ChromeColors.PREF_AMOLED_BLACK,
++                            context.getString(R.string.amoled_black_title),
++                            context.getString(R.string.amoled_black_summary));
++                    // Wallpaper colors exist only on Android 12 and later.
++                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
++                        addRowEntry(
++                                indexData,
++                                prefFragment,
++                                ChromeColors.PREF_AMOLED_DYNAMIC_COLORS,
++                                context.getString(R.string.amoled_dynamic_colors_title),
++                                null);
++                    }
++                }
++
++                /** Adds a plain row, as the preference XML parser does for keyed rows. */
++                private void addRowEntry(
++                        SettingsIndexData indexData,
++                        String parentFragment,
++                        String key,
++                        String title,
++                        @Nullable String summary) {
++                    String id = getUniqueId(key);
++                    indexData.addEntry(
++                            id,
++                            new SettingsIndexData.Entry.Builder(id, key, title, parentFragment)
++                                    .setSummary(summary)
++                                    .build());
+                 }
+ 
+                 private void addEntryForKey(
+diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-AMOLED-black-theme.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-AMOLED-black-theme.grdp
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-AMOLED-black-theme.grdp
+@@ -0,0 +1,18 @@
++<?xml version="1.0" encoding="utf-8"?>
++<grit-part>
++    <message name="IDS_AMOLED_BLACK_TITLE" desc="Title of the switch on the Theme settings page that makes the browser's dark screens true black.">
++        AMOLED black
++    </message>
++    <message name="IDS_AMOLED_BLACK_SUMMARY" desc="Summary of the AMOLED black switch on the Theme settings page.">
++        Uses black instead of dark gray when the browser is dark, and in incognito
++    </message>
++    <message name="IDS_AMOLED_DYNAMIC_COLORS_TITLE" desc="Title of the checkbox under AMOLED black that takes accent colors from the wallpaper (Material 3 dynamic color).">
++        Material You colors
++    </message>
++    <message name="IDS_AMOLED_DYNAMIC_COLORS_SUMMARY_ON" desc="Summary of the Material You colors checkbox while it is checked.">
++        Buttons, switches and highlights use your wallpaper colors
++    </message>
++    <message name="IDS_AMOLED_DYNAMIC_COLORS_SUMMARY_OFF" desc="Summary of the Material You colors checkbox while it is not checked.">
++        Buttons, switches and highlights use the standard colors
++    </message>
++</grit-part>
+diff --git a/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java b/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java
+--- a/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java
++++ b/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java
+@@ -6,19 +6,54 @@ package org.chromium.components.browser_ui.styles;
+ 
+ import android.content.Context;
+ import android.content.res.ColorStateList;
++import android.graphics.Color;
+ 
+ import androidx.annotation.ColorInt;
+ import androidx.annotation.ColorRes;
+ 
+ import com.google.android.material.color.MaterialColors;
+ 
++import org.chromium.base.ContextUtils;
+ import org.chromium.build.annotations.NullMarked;
++import org.chromium.ui.util.ColorUtils;
+ 
+ /** Provides common default colors for Chrome UI. */
+ @NullMarked
+ public class ChromeColors {
+     private static final String TAG = "ChromeColors";
+ 
++    /** Key of the "AMOLED black" switch on the Theme settings page. */
++    public static final String PREF_AMOLED_BLACK = "amoled_black";
++
++    /** Key of the "Material You colors" checkbox on the Theme settings page. */
++    public static final String PREF_AMOLED_DYNAMIC_COLORS = "amoled_dynamic_colors";
++
++    /** Returns whether dark browser screens, incognito included, use true black surfaces. */
++    public static boolean isAmoledBlackEnabled() {
++        return ContextUtils.getAppSharedPreferences().getBoolean(PREF_AMOLED_BLACK, false);
++    }
++
++    /**
++     * Returns whether {@code context} shows the AMOLED black theme: the switch is on and the
++     * context resolves its theme in night mode.
++     */
++    public static boolean isAmoledBlackActive(Context context) {
++        return isAmoledBlackEnabled() && ColorUtils.inNightMode(context);
++    }
++
++    /** Returns whether the AMOLED black theme takes its accent colors from the wallpaper. */
++    public static boolean isAmoledDynamicColorsEnabled() {
++        return ContextUtils.getAppSharedPreferences().getBoolean(PREF_AMOLED_DYNAMIC_COLORS, true);
++    }
++
++    /**
++     * Returns an incognito surface color. Incognito screens are always dark, so they turn black
++     * whenever AMOLED black is on.
++     */
++    static @ColorInt int getIncognitoSurfaceColor(Context context, @ColorRes int colorRes) {
++        return isAmoledBlackEnabled() ? Color.BLACK : context.getColor(colorRes);
++    }
++
+     /**
+      * Determines the default theme color used for toolbar based on the provided parameters.
+      *
+@@ -29,7 +64,7 @@ public class ChromeColors {
+      */
+     public static @ColorInt int getDefaultThemeColor(Context context, boolean isIncognito) {
+         return isIncognito
+-                ? context.getColor(R.color.toolbar_background_incognito)
++                ? getIncognitoSurfaceColor(context, R.color.toolbar_background_incognito)
+                 : MaterialColors.getColor(context, R.attr.colorSurface, TAG);
+     }
+ 
+@@ -44,7 +79,7 @@ public class ChromeColors {
+      */
+     public static @ColorInt int getPrimaryBackgroundColor(Context context, boolean isIncognito) {
+         return isIncognito
+-                ? context.getColor(R.color.default_bg_color_dark)
++                ? getIncognitoSurfaceColor(context, R.color.default_bg_color_dark)
+                 : SemanticColorUtils.getDefaultBgColor(context);
+     }
+ 
+@@ -136,7 +171,7 @@ public class ChromeColors {
+      */
+     public static @ColorInt int getDefaultBgColor(Context context, boolean isIncognito) {
+         if (isIncognito) {
+-            return context.getColor(R.color.default_bg_color_dark);
++            return getIncognitoSurfaceColor(context, R.color.default_bg_color_dark);
+         }
+         return SemanticColorUtils.getDefaultBgColor(context);
+     }
+diff --git a/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/IncognitoColors.java b/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/IncognitoColors.java
+--- a/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/IncognitoColors.java
++++ b/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/IncognitoColors.java
+@@ -23,7 +23,7 @@ public class IncognitoColors {
+     /** {@link SemanticColorUtils#getColorSurface} */
+     public static @ColorInt int getColorSurface(Context context, boolean isIncognito) {
+         return isIncognito
+-                ? context.getColor(R.color.gm3_baseline_surface_dark)
++                ? ChromeColors.getIncognitoSurfaceColor(context, R.color.gm3_baseline_surface_dark)
+                 : SemanticColorUtils.getColorSurface(context);
+     }
+ 
+diff --git a/components/browser_ui/theme/android/templates/res/values/themes.xml b/components/browser_ui/theme/android/templates/res/values/themes.xml
+--- a/components/browser_ui/theme/android/templates/res/values/themes.xml
++++ b/components/browser_ui/theme/android/templates/res/values/themes.xml
+@@ -433,6 +433,66 @@ Note: This is a jinja2 template, processed at build time into the final resource
+         <!-- TODO(crbug.com/438804527): Update Incognito theme overlay with missing attributes. -->
+     </style>
+ 
++    <!-- AMOLED black: true black surfaces for dark mode. Controls drawn as a filled area on a
++         surface (address field, cards, search boxes) keep one dark step above black so their
++         edges stay visible. -->
++    <style name="ThemeOverlay.BrowserUI.AmoledBlack" parent="">
++        <item name="android:colorBackground">@android:color/black</item>
++        <item name="colorSurface">@android:color/black</item>
++        <item name="colorSurfaceDim">@android:color/black</item>
++        <item name="colorSurfaceBright">@android:color/black</item>
++        <item name="colorSurfaceContainerLowest">@android:color/black</item>
++        <item name="colorSurfaceContainerLow">@android:color/black</item>
++        <item name="colorSurfaceContainer">@color/gm3_baseline_surface_dark</item>
++        <item name="colorSurfaceContainerHigh">@color/gm3_baseline_surface_container_dark</item>
++        <item name="colorSurfaceContainerHighest">@color/gm3_baseline_surface_container_high_dark</item>
++        <!-- Elevated surfaces would otherwise be tinted above black. -->
++        <item name="elevationOverlayEnabled">false</item>
++    </style>
++
++    <!-- Settings pages draw their background with colorSurfaceContainerHigh. -->
++    <style name="ThemeOverlay.BrowserUI.AmoledBlack.Settings" parent="">
++        <item name="colorSurfaceContainerHigh">@android:color/black</item>
++    </style>
++
++    <!-- Medium and high contrast for the baseline dark palette, used by AMOLED black without
++         wallpaper colors when Android's color contrast setting is raised. Material 3 color roles
++         computed from the baseline key colors at contrast levels 0.5 and 1.0. -->
++    <style name="ThemeOverlay.BrowserUI.AmoledBlack.MediumContrast" parent="">
++        <item name="colorPrimary">#D1DBFF</item>
++        <item name="colorPrimaryInverse">#0041A3</item>
++        <item name="colorOnPrimary">#00225C</item>
++        <item name="colorPrimaryContainer">#5B8CFF</item>
++        <item name="colorOnPrimaryContainer">#000000</item>
++        <item name="colorSecondaryContainer">#5096D1</item>
++        <item name="colorOnSecondaryContainer">#000000</item>
++        <item name="colorOnSurface">#FFFFFF</item>
++        <item name="colorOnSurfaceVariant">#DBDDDA</item>
++        <item name="colorOnSurfaceInverse">#292A2A</item>
++        <item name="colorOutline">#B0B2B0</item>
++        <item name="colorOutlineVariant">#8E918F</item>
++        <item name="colorTertiaryContainer">#50A15C</item>
++        <item name="colorOnTertiaryContainer">#000000</item>
++        <item name="colorError">#FFD2CC</item>
++    </style>
++    <style name="ThemeOverlay.BrowserUI.AmoledBlack.HighContrast" parent="">
++        <item name="colorPrimary">#EDEFFF</item>
++        <item name="colorPrimaryInverse">#0041A3</item>
++        <item name="colorOnPrimary">#000000</item>
++        <item name="colorPrimaryContainer">#ACC1FF</item>
++        <item name="colorOnPrimaryContainer">#000926</item>
++        <item name="colorSecondaryContainer">#8EC8FF</item>
++        <item name="colorOnSecondaryContainer">#000C19</item>
++        <item name="colorOnSurface">#FFFFFF</item>
++        <item name="colorOnSurfaceVariant">#FFFFFF</item>
++        <item name="colorOnSurfaceInverse">#000000</item>
++        <item name="colorOutline">#EEF0EE</item>
++        <item name="colorOutlineVariant">#C1C3C1</item>
++        <item name="colorTertiaryContainer">#82D58A</item>
++        <item name="colorOnTertiaryContainer">#000F02</item>
++        <item name="colorError">#FFECE9</item>
++    </style>
++
+     <!-- Test only theme, forcing light colors. -->
+     <style name="ThemeOverlay.BrowserUI.ForcedLightForTesting" parent="">
+         {{ color_palette_light_attributes() }}
+--

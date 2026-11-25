@@ -338,5 +338,6 @@ Enable-the-back-forward-cache-in-regular-profiles-on-4-GB-devices.patch
 Do-not-reuse-a-custom-tab-across-profiles.patch
 Do-not-block-the-first-frame-for-the-new-tab-page.patch
 Show-no-icon-on-the-browser-start-screen.patch
+Add-AMOLED-black-theme.patch
 
 # extension patches
