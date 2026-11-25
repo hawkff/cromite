@@ -1,0 +1,148 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Wed, 25 Nov 2026 17:37:52 +0000
+Subject: Do not block the first frame for the new tab page
+
+On a phone, a cold start whose first tab is expected to be the new tab
+page holds every draw of the browser window until the native library,
+the profile, the saved tabs and the new tab page itself are ready. The
+hold exists for a new tab page that draws the location bar inside the
+page: without it, the toolbar's own location bar would show for a moment
+first. This new tab page never draws the location bar inside the page.
+The toolbar keeps its location bar on the new tab page, so the hold
+hides no change of the location bar. It mainly keeps the system splash
+screen up about a second longer than a start on a web page.
+
+Skip the hold for the new tab page. The window now draws the toolbar as
+soon as the layout is inflated, as it already does when the first tab is
+a web page, and the new tab page appears when it is ready. In a light
+theme the toolbar and the status bar then change once to the background
+color of the new tab page. The holds for incognito restore, activity
+recreation and the tab layout do not change.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+---
+ .../browser/ui/AppLaunchDrawBlocker.java      |  3 ++
+ .../ui/AppLaunchDrawBlockerUnitTest.java      | 51 +++----------------
+ 2 files changed, 10 insertions(+), 44 deletions(-)
+
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlocker.java b/chrome/android/java/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlocker.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlocker.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlocker.java
+@@ -222,6 +222,9 @@ public class AppLaunchDrawBlocker {
+ 
+     /** Only block the draw if we believe the initial tab will be the NTP. */
+     private void maybeBlockDrawForInitialTab() {
++        // The new tab page never shows the location bar inline, so the location bar drawn before
++        // the tab is ready does not move, and the first frame does not wait for the page.
++        if ((true)) return;
+         @ActiveTabState int tabState = TabPersistentStoreImpl.readLastKnownActiveTabStatePref();
+         boolean singleUrlBarMode = NewTabPage.isInSingleUrlBarMode(mIsTabletSupplier.get());
+ 
+diff --git a/chrome/android/junit/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlockerUnitTest.java b/chrome/android/junit/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlockerUnitTest.java
+--- a/chrome/android/junit/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlockerUnitTest.java
++++ b/chrome/android/junit/src/org/chromium/chrome/browser/ui/AppLaunchDrawBlockerUnitTest.java
+@@ -158,17 +158,8 @@ public class AppLaunchDrawBlockerUnitTest {
+ 
+         mInflationObserver.onPostInflationStartup();
+ 
+-        verify(mViewTreeObserver).addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
+-        assertFalse(
+-                "Draw is not blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-
+-        SystemClock.setCurrentTimeMillis(INITIAL_TIME + 10);
++        verify(mViewTreeObserver, never()).addOnPreDrawListener(any());
+         mAppLaunchDrawBlocker.onActiveTabAvailable();
+-
+-        assertTrue(
+-                "Draw is still blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-        verify(mViewTreeObserver)
+-                .removeOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.getValue());
+     }
+ 
+     @Test
+@@ -181,17 +172,8 @@ public class AppLaunchDrawBlockerUnitTest {
+ 
+         mInflationObserver.onPostInflationStartup();
+ 
+-        verify(mViewTreeObserver).addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
+-        assertFalse(
+-                "Draw is not blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-
+-        SystemClock.setCurrentTimeMillis(INITIAL_TIME + 20);
++        verify(mViewTreeObserver, never()).addOnPreDrawListener(any());
+         mAppLaunchDrawBlocker.onActiveTabAvailable();
+-
+-        assertTrue(
+-                "Draw is still blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-        verify(mViewTreeObserver)
+-                .removeOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.getValue());
+     }
+ 
+     @Test
+@@ -238,17 +220,8 @@ public class AppLaunchDrawBlockerUnitTest {
+ 
+         mInflationObserver.onPostInflationStartup();
+ 
+-        verify(mViewTreeObserver).addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
+-        assertFalse(
+-                "Draw is not blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-
+-        SystemClock.setCurrentTimeMillis(INITIAL_TIME + 16);
++        verify(mViewTreeObserver, never()).addOnPreDrawListener(any());
+         mAppLaunchDrawBlocker.onActiveTabAvailable();
+-
+-        assertTrue(
+-                "Draw is still blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-        verify(mViewTreeObserver)
+-                .removeOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.getValue());
+     }
+ 
+     @Test
+@@ -261,17 +234,8 @@ public class AppLaunchDrawBlockerUnitTest {
+ 
+         mInflationObserver.onPostInflationStartup();
+ 
+-        verify(mViewTreeObserver).addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
+-        assertFalse(
+-                "Draw is not blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-
+-        SystemClock.setCurrentTimeMillis(INITIAL_TIME + 20);
++        verify(mViewTreeObserver, never()).addOnPreDrawListener(any());
+         mAppLaunchDrawBlocker.onActiveTabAvailable();
+-
+-        assertTrue(
+-                "Draw is still blocked.", mOnPreDrawListenerArgumentCaptor.getValue().onPreDraw());
+-        verify(mViewTreeObserver)
+-                .removeOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.getValue());
+     }
+ 
+     @Test
+@@ -340,7 +304,7 @@ public class AppLaunchDrawBlockerUnitTest {
+     public void testShouldBlockDrawForIncognitoRestore_AddsOnPreDrawListener() {
+         when(mIncognitoRestoreAppLaunchDrawBlockerMock.shouldBlockDraw()).thenReturn(true);
+         mInflationObserver.onPostInflationStartup();
+-        verify(mViewTreeObserver, times(2))
++        verify(mViewTreeObserver, times(1))
+                 .addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
+         verify(mIncognitoRestoreAppLaunchDrawBlockerMock, times(1)).shouldBlockDraw();
+     }
+@@ -349,8 +313,7 @@ public class AppLaunchDrawBlockerUnitTest {
+     public void testShouldNotBlockDrawForIncognitoRestore_DoesNotAddOnPreDrawListener() {
+         when(mIncognitoRestoreAppLaunchDrawBlockerMock.shouldBlockDraw()).thenReturn(false);
+         mInflationObserver.onPostInflationStartup();
+-        verify(mViewTreeObserver, times(1))
+-                .addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
++        verify(mViewTreeObserver, never()).addOnPreDrawListener(any());
+         verify(mIncognitoRestoreAppLaunchDrawBlockerMock, times(1)).shouldBlockDraw();
+     }
+ 
+@@ -358,7 +321,7 @@ public class AppLaunchDrawBlockerUnitTest {
+     public void testOnPreDrawListenerRemoved_WhenNoLongerNeedToBlockDrawForIncognitoRestore() {
+         when(mIncognitoRestoreAppLaunchDrawBlockerMock.shouldBlockDraw()).thenReturn(true);
+         mInflationObserver.onPostInflationStartup();
+-        verify(mViewTreeObserver, times(2))
++        verify(mViewTreeObserver, times(1))
+                 .addOnPreDrawListener(mOnPreDrawListenerArgumentCaptor.capture());
+ 
+         // No longer need to block draw.
+--

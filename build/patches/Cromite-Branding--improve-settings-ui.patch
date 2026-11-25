@@ -125,7 +125,7 @@ new file mode 100644
 +    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
 +        android:title="@string/uses_separate_storagepartition_for_cct_title"
 +        android:summary="@string/uses_separate_storagepartition_for_cct_summary"
-+        app:featureName="maylaunchurl-uses-separate-storage-partition"
++        app:featureName="MayLaunchUrlUsesSeparateStoragePartition"
 +        app:needRestart="true" />
 +    <org.chromium.components.browser_ui.settings.ChromeSwitchPreference
 +        android:key="allow_external_intent_requests"
