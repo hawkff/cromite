@@ -10,14 +10,18 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  build/config/freetype/freetype.gni            |    2 +-
  .../java/res/xml/developer_preferences.xml    |    5 +
  .../browser/component_updater/registration.cc |   10 +
- ...droid-fonts-fingerprinting-mitigation.grdp |    9 +
+ chrome/browser/flags/BUILD.gn                 |    1 +
+ .../flags/android/cromite_native_utils.cc     |    5 +
+ .../browser/flags/CromiteNativeUtils.java     |    7 +
+ ...droid-fonts-fingerprinting-mitigation.grdp |   15 +
  chrome/browser/ui/prefs/prefs_tab_helper.cc   |    9 +-
  chrome/renderer/BUILD.gn                      |    4 +
+ .../component_updater_paths.h                 |    2 +
  .../installer_policies/BUILD.gn               |   14 +
- .../fonts_pack_component_installer.cc         |   96 +
- .../fonts_pack_component_installer.h          |   60 +
+ .../fonts_pack_component_installer.cc         |  134 ++
+ .../fonts_pack_component_installer.h          |   64 +
  components/services/font/BUILD.gn             |   10 +
- components/services/font/font_service_app.cc  |   46 +
+ components/services/font/font_service_app.cc  |  108 ++
  components/services/font/font_service_app.h   |    1 +
  .../services/font/public/cpp/font_loader.cc   |    9 +
  .../services/font/public/cpp/font_loader.h    |    1 +
@@ -44,7 +48,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  .../skia/src/ports/SkFontMgr_android_ndk.cpp  |    2 +-
  .../src/ports/SkFontMgr_android_parser.cpp    |   69 +-
  .../skia/src/ports/SkFontMgr_android_parser.h |    5 +-
- 38 files changed, 2446 insertions(+), 89 deletions(-)
+ 42 files changed, 2571 insertions(+), 89 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Android-fonts-fingerprinting-mitigation.grdp
  create mode 100644 components/component_updater/installer_policies/fonts_pack_component_installer.cc
  create mode 100644 components/component_updater/installer_policies/fonts_pack_component_installer.h
@@ -116,11 +120,62 @@ diff --git a/chrome/browser/component_updater/registration.cc b/chrome/browser/c
  
    if ((true)) return;
  
+diff --git a/chrome/browser/flags/BUILD.gn b/chrome/browser/flags/BUILD.gn
+--- a/chrome/browser/flags/BUILD.gn
++++ b/chrome/browser/flags/BUILD.gn
+@@ -83,6 +83,7 @@ static_library("flags_android") {
+     ":jni_headers",
+     "//base",
+     "//chrome/browser:browser_process",
++    "//components/component_updater/installer_policies:installer_policies_no_content_deps",
+     "//components/prefs",
+     "//content/public/browser",
+     "//content/public/common",
+diff --git a/chrome/browser/flags/android/cromite_native_utils.cc b/chrome/browser/flags/android/cromite_native_utils.cc
+--- a/chrome/browser/flags/android/cromite_native_utils.cc
++++ b/chrome/browser/flags/android/cromite_native_utils.cc
+@@ -3,6 +3,7 @@
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/about_flags.h"
+ #include "chrome/browser/flags/jni_headers/CromiteNativeUtils_jni.h"
++#include "components/component_updater/installer_policies/fonts_pack_component_installer.h"
+ #include "components/webui/flags/pref_service_flags_storage.h"
+ 
+ #include "base/android/jni_string.h"
+@@ -91,4 +92,8 @@ static jboolean JNI_CromiteNativeUtils_IsFlagEnabled(JNIEnv* env,
+   return false;
+ }
+ 
++static jboolean JNI_CromiteNativeUtils_IsFontsPackInstalled(JNIEnv* env) {
++  return component_updater::IsFontsPackInstalled();
++}
++
+ DEFINE_JNI(CromiteNativeUtils)
+diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/CromiteNativeUtils.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/CromiteNativeUtils.java
+--- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/CromiteNativeUtils.java
++++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/CromiteNativeUtils.java
+@@ -38,9 +38,16 @@ public class CromiteNativeUtils {
+         return CromiteNativeUtilsJni.get().isFlagEnabled(featureName);
+     }
+ 
++    /** Returns whether the font pack the font service uses is installed. */
++    public static boolean isFontsPackInstalled() {
++        return CromiteNativeUtilsJni.get().isFontsPackInstalled();
++    }
++
+     @NativeMethods
+     public interface Natives {
+         void setEnabled(String featureName, boolean newValue);
+         boolean isFlagEnabled(String featureName);
++
++        boolean isFontsPackInstalled();
+     }
+ }
 diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Android-fonts-fingerprinting-mitigation.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Android-fonts-fingerprinting-mitigation.grdp
 new file mode 100644
 --- /dev/null
 +++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Android-fonts-fingerprinting-mitigation.grdp
-@@ -0,0 +1,9 @@
+@@ -0,0 +1,15 @@
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +    <message name="IDS_ANDROID_FONTS_FINGERPRINTING_MITIGATION_TITLE" desc="Text for 'Android fonts fingerprinting mitigation' settings option.">
@@ -128,6 +183,12 @@ new file mode 100644
 +    </message>
 +    <message name="IDS_ANDROID_FONTS_FINGERPRINTING_MITIGATION_SUMMARY" desc="Summary text for 'Android fonts fingerprinting mitigation' settings option.">
 +        Replaces all system fonts with the same for all devices
++    </message>
++    <message name="IDS_ANDROID_FONTS_FINGERPRINTING_MITIGATION_SUMMARY_INSTALLED" desc="Summary text for 'Android fonts fingerprinting mitigation' settings option when it is on and the font pack is installed. Tabs whose page process started before the install may still use the device fonts.">
++        Replaces all system fonts with the same for all devices. Font pack installed. It applies to all tabs after the browser restarts.
++    </message>
++    <message name="IDS_ANDROID_FONTS_FINGERPRINTING_MITIGATION_SUMMARY_PENDING" desc="Summary text for 'Android fonts fingerprinting mitigation' settings option when it is on and the font pack is not ready in this browser session: not downloaded yet, or not loaded because the option was off when the browser started.">
++        Replaces all system fonts with the same for all devices. Starts when the font pack is ready. Tabs already open may keep the device fonts until the browser restarts.
 +    </message>
 +</grit-part>
 diff --git a/chrome/browser/ui/prefs/prefs_tab_helper.cc b/chrome/browser/ui/prefs/prefs_tab_helper.cc
@@ -170,6 +231,18 @@ diff --git a/chrome/renderer/BUILD.gn b/chrome/renderer/BUILD.gn
    if (enable_pdf) {
      deps += [
        "//components/pdf/renderer",
+diff --git a/components/component_updater/component_updater_paths.h b/components/component_updater/component_updater_paths.h
+--- a/components/component_updater/component_updater_paths.h
++++ b/components/component_updater/component_updater_paths.h
+@@ -23,6 +23,8 @@ enum {
+   DIR_COMPONENT_CLD2,  // The Compact Language Detector.
+   DIR_RECOVERY_BASE,   // The Recovery.
+   DIR_SWIFT_SHADER,    // The SwiftShader.
++  DIR_FONTS_PACK,      // The fonts pack version the installer selected. It has
++                       // no default: it is set when the component is ready.
+   PATH_END
+ };
+ 
 diff --git a/components/component_updater/installer_policies/BUILD.gn b/components/component_updater/installer_policies/BUILD.gn
 --- a/components/component_updater/installer_policies/BUILD.gn
 +++ b/components/component_updater/installer_policies/BUILD.gn
@@ -205,7 +278,7 @@ diff --git a/components/component_updater/installer_policies/fonts_pack_componen
 new file mode 100644
 --- /dev/null
 +++ b/components/component_updater/installer_policies/fonts_pack_component_installer.cc
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,134 @@
 +#include "fonts_pack_component_installer.h"
 +
 +#include <optional>
@@ -214,12 +287,15 @@ new file mode 100644
 +#include "base/logging.h"
 +#include "base/files/file_path.h"
 +#include "base/files/file_util.h"
++#include "base/functional/bind.h"
 +#include "base/functional/callback.h"
 +#include "base/memory/ref_counted.h"
 +#include "base/path_service.h"
 +#include "base/values.h"
 +#include "base/version.h"
 +#include "components/component_updater/component_updater_paths.h"
++#include "components/component_updater/component_updater_service.h"
++#include "components/update_client/utils.h"
 +
 +using component_updater::ComponentUpdateService;
 +
@@ -233,6 +309,13 @@ new file mode 100644
 +
 +const char kFontsPackSetFetcherManifestName[] =
 +    "System Fonts Pack";
++
++namespace {
++
++// The renderers read the pack through this file; a pack without it is unusable.
++constexpr char kFontsPackConfigFile[] = "cromite_fonts.xml";
++
++}  // namespace
 +
 +FontsPackComponentInstallerPolicy::
 +    FontsPackComponentInstallerPolicy() = default;
@@ -265,13 +348,17 @@ new file mode 100644
 +    base::DictValue manifest) {
 +  DCHECK(!install_dir.empty());
 +  LOG(INFO) << "Fonts Pack Version Ready: " << install_dir.value();
++  // The font service reads the pack from the directory the installer selected.
++  base::PathService::OverrideAndCreateIfNeeded(DIR_FONTS_PACK, install_dir,
++                                               /*is_absolute=*/true,
++                                               /*create=*/false);
 +}
 +
 +// Called during startup and installation before ComponentReady().
 +bool FontsPackComponentInstallerPolicy::VerifyInstallation(
 +    const base::DictValue& manifest,
 +    const base::FilePath& install_dir) const {
-+  return base::PathExists(install_dir);
++  return base::PathExists(install_dir.AppendASCII(kFontsPackConfigFile));
 +}
 +
 +base::FilePath
@@ -295,10 +382,34 @@ new file mode 100644
 +  return attributes;
 +}
 +
++namespace {
++
++// Without the font pack, pages see the device's own fonts. So when it is not
++// installed, ask for it at once instead of waiting for the first periodic
++// check. Runs on the UI thread, after the registration.
++void RequestFontsPackIfMissing(ComponentUpdateService* cus) {
++  // ComponentReady() runs before this callback when a valid pack is installed.
++  if (IsFontsPackInstalled()) {
++    return;
++  }
++  cus->GetOnDemandUpdater().OnDemandUpdate(
++      update_client::GetCrxIdFromPublicKeyHash(kFontsPackPublicKeySHA256),
++      OnDemandUpdater::Priority::FOREGROUND, Callback());
++}
++
++}  // namespace
++
 +void RegisterFontsPackComponent(ComponentUpdateService* cus) {
 +  auto installer = base::MakeRefCounted<ComponentInstaller>(
 +      std::make_unique<FontsPackComponentInstallerPolicy>());
-+  installer->Register(cus, base::OnceClosure(), /*allowed*/true);
++  installer->Register(
++      cus, base::BindOnce(&RequestFontsPackIfMissing, base::Unretained(cus)),
++      /*allowed*/ true);
++}
++
++bool IsFontsPackInstalled() {
++  base::FilePath install_dir;
++  return base::PathService::Get(DIR_FONTS_PACK, &install_dir);
 +}
 +
 +}  // namespace component_updater
@@ -306,7 +417,7 @@ diff --git a/components/component_updater/installer_policies/fonts_pack_componen
 new file mode 100644
 --- /dev/null
 +++ b/components/component_updater/installer_policies/fonts_pack_component_installer.h
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,64 @@
 +#ifndef COMPONENTS_COMPONENT_UPDATER_INSTALLER_POLICIES_FONTS_PACK_COMPONENT_INSTALLER_H_
 +#define COMPONENTS_COMPONENT_UPDATER_INSTALLER_POLICIES_FONTS_PACK_COMPONENT_INSTALLER_H_
 +
@@ -364,6 +475,10 @@ new file mode 100644
 +
 +void RegisterFontsPackComponent(ComponentUpdateService* cus);
 +
++// Whether the installer has selected an installed fonts pack, the one the font
++// service uses.
++bool IsFontsPackInstalled();
++
 +}  // namespace component_updater
 +
 +#endif  // COMPONENTS_COMPONENT_UPDATER_INSTALLER_POLICIES_FONTS_PACK_COMPONENT_INSTALLER_H_
@@ -390,7 +505,7 @@ diff --git a/components/services/font/BUILD.gn b/components/services/font/BUILD.
 diff --git a/components/services/font/font_service_app.cc b/components/services/font/font_service_app.cc
 --- a/components/services/font/font_service_app.cc
 +++ b/components/services/font/font_service_app.cc
-@@ -4,7 +4,9 @@
+@@ -4,8 +4,11 @@
  
  #include "components/services/font/font_service_app.h"
  
@@ -398,22 +513,77 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
  #include <fontconfig/fontconfig.h>
 +#endif
  
++#include <optional>
  #include <set>
  #include <utility>
-@@ -26,6 +28,12 @@
+ #include <vector>
+@@ -26,6 +29,16 @@
  #include "ui/gfx/font_fallback_linux.h"
  #include "ui/gfx/font_render_params.h"
  
 +#if BUILDFLAG(IS_ANDROID)
 +#include "base/path_service.h"
++#include "base/files/file_enumerator.h"
 +#include "base/files/file_util.h"
++#include "base/json/json_reader.h"
++#include "base/strings/string_util.h"
++#include "base/version.h"
 +#include "components/component_updater/component_updater_paths.h"
 +#endif
 +
  #if BUILDFLAG(ENABLE_PDF)
  #include "components/services/font/pdf_fontconfig_matching.h"  // nogncheck
  #endif
-@@ -101,6 +109,7 @@ void FontServiceApp::BindReceiver(
+@@ -85,6 +98,48 @@ font_service::mojom::RenderStyleSwitch ConvertSubpixelRendering(
+ // The maximum number of entries to keep in the font family matching cache.
+ constexpr int kCacheFontFamilyMaxSize = 3000;
+ 
++#if BUILDFLAG(IS_ANDROID)
++// Before the installer publishes its choice at this start: the version
++// directory, if it is the only one and the installer would accept it
++// (ComponentInstaller::GetValidInstallationManifest with the policy's
++// VerifyInstallation; a manifest with "accept_arch" is not accepted here).
++// Then the installer has nothing else to select or delete. Otherwise return
++// nothing: this renderer keeps the default fonts, later ones get the published
++// choice.
++base::FilePath FindOnlyFontsPackDir(const base::FilePath& fonts_dir) {
++  base::FilePath only_dir;
++  base::FileEnumerator dirs(fonts_dir, /*recursive=*/false,
++                            base::FileEnumerator::DIRECTORIES);
++  for (base::FilePath dir = dirs.Next(); !dir.empty(); dir = dirs.Next()) {
++    if (!base::Version(dir.BaseName().MaybeAsASCII()).IsValid()) {
++      continue;
++    }
++    if (!only_dir.empty()) {
++      return base::FilePath();
++    }
++    only_dir = dir;
++  }
++  if (only_dir.empty()) {
++    return only_dir;
++  }
++  std::string manifest_text;
++  if (!base::ReadFileToString(only_dir.AppendASCII("manifest.json"),
++                              &manifest_text)) {
++    return base::FilePath();
++  }
++  // The same options as update_client::ReadManifest.
++  std::optional<base::DictValue> manifest = base::JSONReader::ReadDict(
++      manifest_text, base::JSON_PARSE_CHROMIUM_EXTENSIONS);
++  // shortcut: packs with accept_arch wait for the installer's choice, mirror
++  // GetValidInstallationManifest's arch test if the pack ever declares one.
++  if (!manifest || manifest->Find("accept_arch") ||
++      !base::PathExists(only_dir.AppendASCII("cromite_fonts.xml"))) {
++    return base::FilePath();
++  }
++  return only_dir;
++}
++#endif
++
+ }  // namespace
+ 
+ namespace font_service {
+@@ -101,6 +156,7 @@ void FontServiceApp::BindReceiver(
  void FontServiceApp::MatchFamilyName(const std::string& family_name,
                                       mojom::TypefaceStylePtr requested_style,
                                       MatchFamilyNameCallback callback) {
@@ -421,7 +591,7 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
    TRACE_EVENT0("fonts", "FontServiceApp::MatchFamilyName");
  
    SkFontConfigInterface::FontIdentity result_identity;
-@@ -161,6 +170,7 @@ void FontServiceApp::MatchFamilyName(const std::string& family_name,
+@@ -161,6 +217,7 @@ void FontServiceApp::MatchFamilyName(const std::string& family_name,
  
    std::move(callback).Run(std::move(identity), result_family_cppstring,
                            std::move(style));
@@ -429,7 +599,7 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
  }
  
  void FontServiceApp::OpenStream(uint32_t id_number,
-@@ -175,12 +185,43 @@ void FontServiceApp::OpenStream(uint32_t id_number,
+@@ -175,12 +232,58 @@ void FontServiceApp::OpenStream(uint32_t id_number,
    std::move(callback).Run(std::move(file));
  }
  
@@ -445,10 +615,25 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
 +    std::move(callback).Run(std::move(empty_file));
 +    return;
 +  }
-+  local_install_path = local_install_path
-+    .Append("fonts")
-+    .Append("1.0.0")
-+    .AppendASCII(name);
++  // Use the installation the component installer selected.
++  base::FilePath version_dir;
++  if (!base::PathService::Get(component_updater::DIR_FONTS_PACK,
++                              &version_dir)) {
++    version_dir = FindOnlyFontsPackDir(local_install_path.Append("fonts"));
++  }
++  // The name comes from the renderer: it must stay inside the pack.
++  if (!base::IsStringASCII(name)) {
++    std::move(callback).Run(std::move(empty_file));
++    return;
++  }
++  const base::FilePath relative_path = base::FilePath::FromASCII(name);
++  if (version_dir.empty() || relative_path.empty() ||
++      relative_path.IsAbsolute() || relative_path.ReferencesParent()) {
++    LOG(ERROR) << "Font pack file " << name << " not available";
++    std::move(callback).Run(std::move(empty_file));
++    return;
++  }
++  local_install_path = version_dir.Append(relative_path);
 +
 +  if (!base::PathExists(local_install_path)) {
 +    LOG(ERROR) << "System font " << local_install_path << " not found";
@@ -473,7 +658,7 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
    gfx::FallbackFontData fallback_font;
    if (gfx::GetFallbackFontForChar(character, locale, &fallback_font)) {
      size_t index = FindOrAddPath(fallback_font.filepath);
-@@ -195,6 +236,7 @@ void FontServiceApp::FallbackFontForCharacter(
+@@ -195,6 +298,7 @@ void FontServiceApp::FallbackFontForCharacter(
    } else {
      std::move(callback).Run(nullptr, "", false, false);
    }
@@ -481,7 +666,7 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
  }
  
  void FontServiceApp::FontRenderStyleForStrike(
-@@ -238,6 +280,9 @@ void FontServiceApp::MatchFontByPostscriptNameOrFullFontName(
+@@ -238,6 +342,9 @@ void FontServiceApp::MatchFontByPostscriptNameOrFullFontName(
    TRACE_EVENT0("fonts",
                 "FontServiceApp::MatchFontByPostscriptNameOrFullFontName");
  
@@ -491,7 +676,7 @@ diff --git a/components/services/font/font_service_app.cc b/components/services/
    std::optional<FontConfigLocalMatching::FontConfigMatchResult> match_result =
        FontConfigLocalMatching::FindFontByPostscriptNameOrFullFontName(family);
    if (match_result) {
-@@ -249,6 +294,7 @@ void FontServiceApp::MatchFontByPostscriptNameOrFullFontName(
+@@ -249,6 +356,7 @@ void FontServiceApp::MatchFontByPostscriptNameOrFullFontName(
      return;
    }
    std::move(callback).Run(nullptr);

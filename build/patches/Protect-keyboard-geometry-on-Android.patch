@@ -2308,12 +2308,12 @@ new file mode 100644
 +
 +    @Override
 +    public int getAllowedGroupHeading() {
-+        return R.string.website_settings_category_protected_keyboard_geometry_enabled;
++        return R.string.settings_site_settings_protected_keyboard_geometry_allowed_exceptions;
 +    }
 +
 +    @Override
 +    public int getBlockedGroupHeading() {
-+        return R.string.website_settings_category_protected_keyboard_geometry_disabled;
++        return R.string.settings_site_settings_protected_keyboard_geometry_blocked_exceptions;
 +    }
 +
 +    @Override
@@ -2346,10 +2346,10 @@ new file mode 100644
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_PROTECTED_KEYBOARD_GEOMETRY_DISABLED" desc="Summary text explaining that is full disabled." formatter_data="android_java">
 +    Disabled
 +  </message>
-+  <message name="IDS_SETTINGS_SITE_SETTINGS_PROTECTED_KEYBOARD_GEOMETRY_ALLOWED_EXCEPTIONS" desc="Label for the allowed exceptions site list.">
++  <message name="IDS_SETTINGS_SITE_SETTINGS_PROTECTED_KEYBOARD_GEOMETRY_ALLOWED_EXCEPTIONS" desc="Label for the allowed exceptions site list." formatter_data="android_java">
 +    Keyboard size is protected
 +  </message>
-+  <message name="IDS_SETTINGS_SITE_SETTINGS_PROTECTED_KEYBOARD_GEOMETRY_BLOCKED_EXCEPTIONS" desc="Label for the blocked exceptions site list.">
++  <message name="IDS_SETTINGS_SITE_SETTINGS_PROTECTED_KEYBOARD_GEOMETRY_BLOCKED_EXCEPTIONS" desc="Label for the blocked exceptions site list." formatter_data="android_java">
 +    Keyboard size is not protected
 +  </message>
 +</grit-part>
@@ -2925,7 +2925,7 @@ diff --git a/third_party/blink/renderer/core/frame/web_frame_widget_impl.h b/thi
 diff --git a/third_party/blink/renderer/core/page/page.cc b/third_party/blink/renderer/core/page/page.cc
 --- a/third_party/blink/renderer/core/page/page.cc
 +++ b/third_party/blink/renderer/core/page/page.cc
-@@ -1279,6 +1279,31 @@ void Page::UpdateAcceleratedCompositingSettings() {
+@@ -1285,6 +1285,31 @@ void Page::UpdateAcceleratedCompositingSettings() {
    }
  }
  

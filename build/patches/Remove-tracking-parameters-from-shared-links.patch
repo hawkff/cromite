@@ -87,7 +87,7 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrom
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedActivity.java
-@@ -423,6 +423,7 @@ import org.chromium.content_public.common.ContentSwitches;
+@@ -424,6 +424,7 @@ import org.chromium.content_public.common.ContentSwitches;
  import org.chromium.ui.base.ActivityWindowAndroid;
  import org.chromium.ui.base.Clipboard;
  import org.chromium.ui.base.DeviceFormFactor;
@@ -95,7 +95,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeTabbedAct
  import org.chromium.ui.base.PageTransition;
  import org.chromium.ui.base.SelectFileDialog;
  import org.chromium.ui.base.WindowAndroid;
-@@ -4599,7 +4600,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
+@@ -4609,7 +4610,7 @@ public class ChromeTabbedActivity extends ChromeActivity implements PreAttachInt
              Clipboard.getInstance()
                      .setText(
                              currentTab.getTitle(),

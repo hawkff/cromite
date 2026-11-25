@@ -170,7 +170,6 @@ add-browser-policy.patch
 Always-open-browser-controls-in-new-tab.patch
 Partitioning-all-cookies-by-top-frame-domain.patch
 Disable-FedCm.patch
-Disable-BackForwardCache.patch
 Disable-visited-pseudo-class.patch
 Add-setting-to-clear-data-on-exit.patch
 Improve-the-browser-sandbox.patch
@@ -335,5 +334,6 @@ Remove-tracking-parameters-from-shared-links.patch
 Destroy-the-incognito-profile-after-its-tab-model.patch
 Remove-the-XR-feature-module.patch
 Move-settings-rows-to-their-pages.patch
+Enable-the-back-forward-cache-in-regular-profiles-on-4-GB-devices.patch
 
 # extension patches

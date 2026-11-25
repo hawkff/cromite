@@ -13,6 +13,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../browser/privacy/settings/PrivacySettings.java   |  1 +
  .../chrome/browser/settings/SettingsActivity.java   |  2 ++
  .../chrome/browser/settings/SettingsMenuHelper.java |  1 +
+ .../browser/settings/search/EmptyFragment.java      |  2 +-
  .../sync/settings/GoogleServicesSettings.java       |  1 +
  .../browser/sync/settings/ManageSyncSettings.java   |  1 +
  .../TabbedAppMenuPropertiesDelegate.java            |  2 +-
@@ -20,7 +21,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../settings/options/AutofillOptionsFragment.java   |  5 +----
  .../settings/PreloadPagesSettingsFragmentBase.java  |  1 +
  .../settings/SafeBrowsingSettingsFragmentBase.java  |  1 +
- 16 files changed, 12 insertions(+), 30 deletions(-)
+ 17 files changed, 13 insertions(+), 31 deletions(-)
 
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/KeyboardShortcuts.java b/chrome/android/java/src/org/chromium/chrome/browser/KeyboardShortcuts.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/KeyboardShortcuts.java
@@ -156,6 +157,18 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/Settin
      }
  
      /**
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/settings/search/EmptyFragment.java b/chrome/android/java/src/org/chromium/chrome/browser/settings/search/EmptyFragment.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/settings/search/EmptyFragment.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/settings/search/EmptyFragment.java
+@@ -80,7 +80,7 @@ public class EmptyFragment extends Fragment implements EmbeddableSettingsPage {
+         Context context = view.getContext();
+         if (mImageSrc == R.drawable.settings_no_match) {
+             guideMsgId = R.string.search_in_settings_no_match;
+-            linkVisibility = View.VISIBLE;
++            // The help center link stays hidden: this browser has no help center.
+             linkHelpCenter.setText(context.getString(R.string.search_in_settings_help_center));
+             linkHelpCenter.setOnClickListener(v -> mOpenHelpCenter.run());
+         } else {
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/sync/settings/GoogleServicesSettings.java b/chrome/android/java/src/org/chromium/chrome/browser/sync/settings/GoogleServicesSettings.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/sync/settings/GoogleServicesSettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/sync/settings/GoogleServicesSettings.java
