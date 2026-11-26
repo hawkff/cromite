@@ -325,6 +325,7 @@ Check-for-updates-in-the-hawkff-cromite-releases.patch
 Build-the-WebAssembly-interpreter-on-Android.patch
 Add-a-flag-to-run-WebAssembly-in-the-interpreter-when-JIT-is-blocked.patch
 Download-filter-lists-and-components-from-the-project-site.patch
+Download-filter-lists-from-their-publishers.patch
 Point-document-links-at-the-hawkff-cromite-repository.patch
 Add-an-executable-memory-rule-to-the-Android-seccomp-policy.patch
 Restrict-executable-memory-in-JIT-less-renderers.patch
@@ -339,5 +340,9 @@ Do-not-reuse-a-custom-tab-across-profiles.patch
 Do-not-block-the-first-frame-for-the-new-tab-page.patch
 Show-no-icon-on-the-browser-start-screen.patch
 Add-AMOLED-black-theme.patch
+Match-the-start-screen-to-the-browser-theme.patch
+Show-settings-section-headers-in-the-primary-color.patch
+Shorten-the-address-bar-hint-to-fit.patch
+Disable-the-toolbar-sign-in-button.patch
 
 # extension patches

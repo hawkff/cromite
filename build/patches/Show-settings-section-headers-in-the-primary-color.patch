@@ -1,0 +1,35 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 19:55:41 +0000
+Subject: Show settings section headers in the primary color
+
+Settings pages that group their rows into cards color their section
+headers, such as "Basics" and "Advanced", with the color of row
+summaries, and rely on the cards to set them apart. On dark backgrounds
+the cards can have no visible edge, and with a black theme they are
+black on black, so a header reads as one more row.
+
+Use the primary color for those headers, as settings pages without
+cards already do. Size, weight and spacing stay as they are: a smaller,
+medium-weight label with space above it.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../browser_ui/styles/android/java/res/values/colors.xml      | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/components/browser_ui/styles/android/java/res/values/colors.xml b/components/browser_ui/styles/android/java/res/values/colors.xml
+--- a/components/browser_ui/styles/android/java/res/values/colors.xml
++++ b/components/browser_ui/styles/android/java/res/values/colors.xml
+@@ -35,7 +35,9 @@ found in the LICENSE file.
+     <color name="bottom_system_nav_divider_color_light">@color/divider_color_light</color>
+ 
+     <!-- Settings containment colors -->
+-    <macro name="preference_category_text_color_contained">?attr/colorOnSurfaceVariant</macro>
++    <!-- Section headers keep the primary color on grouped pages too: on dark and black
++         backgrounds the groups have no visible edge, and the summary color reads as a row. -->
++    <macro name="preference_category_text_color_contained">?attr/colorPrimary</macro>
+     <macro name="preference_category_text_color_standard">?attr/colorPrimary</macro>
+ 
+     <!-- This is the color that will appear on the system recents UI. It is a neutral background
+--

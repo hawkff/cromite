@@ -78,7 +78,7 @@ Require: bromite-build-utils.patch
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
-@@ -808,6 +808,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -781,6 +781,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
                          indexData.removeEntry(getUniqueId(PREF_UNIVERSAL_OPT_OUT));
                      }
  

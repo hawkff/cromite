@@ -7,10 +7,25 @@ Also fixes a crash on startup.
 Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
+ .../org/chromium/chrome/browser/flags/ChromeFeatureList.java  | 3 ++-
  .../chrome_browser_main_extra_parts_segmentation_platform.cc  | 4 ++++
  components/segmentation_platform/public/features.cc           | 4 ++++
- 2 files changed, 8 insertions(+)
+ 3 files changed, 10 insertions(+), 1 deletion(-)
 
+diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
+--- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
++++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
+@@ -1338,8 +1338,9 @@ public abstract class ChromeFeatureList {
+                     /* defaultValueInTests= */ true);
+     public static final CachedFlag sNewTabPageCustomizationThemeSync =
+             newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC, /* defaultValue= */ false);
++    // Off like the native feature: a first run reads this before the native value is cached.
+     public static final CachedFlag sNewTabPageCustomizationV2 =
+-            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_V2, true);
++            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_V2, false, /* defaultValueInTests= */ true);
+     public static final CachedFlag sNotificationTrampoline =
+             newCachedFlag(NOTIFICATION_TRAMPOLINE, false);
+     public static final CachedFlag sNotificationTrampolineNoNewTask =
 diff --git a/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc b/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc
 --- a/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc
 +++ b/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc

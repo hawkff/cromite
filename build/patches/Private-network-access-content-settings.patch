@@ -184,16 +184,16 @@ new file mode 100644
 +<?xml version="1.0" encoding="utf-8"?>
 +<grit-part>
 +  <message name="IDS_INSECURE_PRIVATE_NETWORK_PERMISSION_TITLE" desc="" formatter_data="android_java">
-+    Access to private network
++    Local network without asking
 +  </message>
 +  <message name="IDS_SETTINGS_SITE_SETTINGS_INSECURE_PRIVATE_NETWORK_DESCRIPTION" desc="" formatter_data="android_java">
-+    Lets sites reach devices and services on your private network
++    Sites you allow here can reach devices on your local network and apps on this device without asking, even on pages without HTTPS. Other sites follow the Local network and Apps on device settings.
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_INSECURE_PRIVATE_NETWORK_ALLOWED" desc="" formatter_data="android_java">
-+    Allow access to private network
++    Sites can reach your local network without asking
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_INSECURE_PRIVATE_NETWORK_BLOCKED" desc="" formatter_data="android_java">
-+    Block access to private network
++    Sites follow the Local network and Apps on device settings
 +  </message>
 +  <message name="IDS_WEBSITE_SETTINGS_CATEGORY_INSECURE_PRIVATE_NETWORK_ASK" desc="" formatter_data="android_java">
 +    Ask before sites access private network

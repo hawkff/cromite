@@ -147,7 +147,7 @@ diff --git a/chrome/android/java/res/xml/privacy_preferences_cromite.xml b/chrom
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/PrivacySettings.java
-@@ -39,6 +39,7 @@ import org.chromium.build.annotations.Nullable;
+@@ -38,6 +38,7 @@ import org.chromium.build.annotations.Nullable;
  import org.chromium.chrome.R;
  import org.chromium.chrome.browser.enterprise.util.ManagedBrowserUtils;
  import org.chromium.chrome.browser.flags.ChromeFeatureList;
@@ -155,7 +155,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  import org.chromium.chrome.browser.incognito.reauth.IncognitoReauthSettingSwitchPreference;
  import org.chromium.chrome.browser.preferences.ChromePreferenceKeys;
  import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
-@@ -140,6 +141,8 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -130,6 +131,8 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
      private static final String PREF_PROXY_OPTIONS = "proxy";
      private static final String PREF_INCOGNITO_LOCK = "incognito_lock";
      private static final String PREF_JAVASCRIPT_OPTIMIZER = "javascript_optimizer";
@@ -164,7 +164,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
      @VisibleForTesting static final String PREF_DO_NOT_TRACK = "do_not_track";
      @VisibleForTesting static final String PREF_UNIVERSAL_OPT_OUT = "universal_opt_out";
      // moved from SyncAndServicesSettings.java
-@@ -659,6 +662,17 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -632,6 +635,17 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
                                  getProfile(), ContentSettingsType.JAVASCRIPT_OPTIMIZER)
                          ? R.string.website_settings_category_javascript_optimizer_allowed_list
                          : R.string.website_settings_category_javascript_optimizer_blocked_list);

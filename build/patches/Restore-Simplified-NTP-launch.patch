@@ -27,7 +27,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../identity_disc/IdentityDiscController.java |   2 +-
  .../native_page/NativePageFactory.java        |  17 +-
  .../NativePageNavigationDelegateImpl.java     |   2 +-
- .../chrome/browser/ntp/NewTabPage.java        |   7 +-
+ .../chrome/browser/ntp/NewTabPage.java        |   8 +-
  .../browser/ntp/NewTabPageCoordinator.java    |  47 ++-
  .../ntp/SearchProviderInfoDelegate.java       |   2 +-
  .../ntp/search/SearchBoxViewBinder.java       |   1 +
@@ -40,12 +40,16 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../tile/TileDragDelegateImpl.java            |  18 +-
  .../suggestions/tile/TileRenderer.java        |  12 +-
  .../suggestions/tile/TilesLinearLayout.java   |   2 +-
+ .../browser/toolbar/ToolbarManager.java       |   4 +-
  .../engagement/important_sites_util.cc        |   2 +-
  .../flags/android/chrome_feature_list.cc      |   1 +
  .../browser/flags/ChromeFeatureList.java      |   1 +
  .../chrome_most_visited_sites_factory.cc      |   4 -
  .../client_util/HomeModulesRankingHelper.java |   1 +
+ .../browser/ui/native_page/NativePage.java    |   5 +
  .../strings/android_chrome_strings.grd        |   6 +
+ .../toolbar/ToolbarPositionController.java    |   7 +-
+ .../ToolbarPositionControllerTest.java        |  20 ++
  .../core/browser/top_sites_constants.h        |   2 +-
  components/ntp_tiles/custom_links_store.cc    |   2 -
  components/omnibox/common/omnibox_features.cc |   2 +
@@ -53,7 +57,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../Restore-Simplified-NTP-launch.inc         |  12 +
  .../Restore-Simplified-NTP-launch.inc         |   3 +
  .../Restore-Simplified-NTP-launch.inc         |   1 +
- 47 files changed, 658 insertions(+), 74 deletions(-)
+ 51 files changed, 693 insertions(+), 76 deletions(-)
  create mode 100644 chrome/android/java/res/drawable-hdpi/ic_most_visited_placeholder.png
  create mode 100644 chrome/android/java/res/drawable-mdpi/ic_most_visited_placeholder.png
  create mode 100644 chrome/android/java/res/drawable-xhdpi/ic_most_visited_placeholder.png
@@ -838,6 +842,14 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPage.
          mNewTabPageManager =
                  new NewTabPageManagerImpl(
                          navigationDelegate, profile, nativePageHost, snackbarManager);
+@@ -977,6 +980,7 @@ public class NewTabPage
+     /**
+      * @return Whether the location bar is shown in the NTP.
+      */
++    @Override
+     public boolean isLocationBarShownInNtp() {
+         return mNewTabPageManager.isLocationBarShownInNtp();
+     }
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPageCoordinator.java b/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPageCoordinator.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPageCoordinator.java
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPageCoordinator.java
@@ -1582,6 +1594,20 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/suggestions/til
      private final List<TileView> mTileList = new ArrayList<>();
  
      protected int mTileAndUiViewCount;
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/toolbar/ToolbarManager.java b/chrome/android/java/src/org/chromium/chrome/browser/toolbar/ToolbarManager.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/toolbar/ToolbarManager.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/toolbar/ToolbarManager.java
+@@ -3811,7 +3811,9 @@ public class ToolbarManager
+     private void checkIfNtpShowingWithNoPendingLoad() {
+         boolean isNtpUrl = UrlUtilities.isNtpUrl(mLocationBarModel.getCurrentGurl());
+         if (isNtpUrl && getNewTabPageForCurrentTab() != null) {
+-            mIsNtpWithFakeboxShowingSupplier.set(NewTabPage.isInSingleUrlBarMode(mIsTablet));
++            // Only a new tab page that shows its own search box keeps the toolbar at the top.
++            mIsNtpWithFakeboxShowingSupplier.set(
++                    assumeNonNull(getNewTabPageForCurrentTab()).isLocationBarShownInNtp());
+         } else {
+             mIsNtpWithFakeboxShowingSupplier.set(false);
+             maybeShowBottomToolbarIph();
 diff --git a/chrome/browser/engagement/important_sites_util.cc b/chrome/browser/engagement/important_sites_util.cc
 --- a/chrome/browser/engagement/important_sites_util.cc
 +++ b/chrome/browser/engagement/important_sites_util.cc
@@ -1641,6 +1667,21 @@ diff --git a/chrome/browser/segmentation_platform/android/java/src/org/chromium/
          HomeModulesRankingHelperJni.get()
                  .getClassificationResult(
                          profile,
+diff --git a/chrome/browser/ui/android/native_page/java/src/org/chromium/chrome/browser/ui/native_page/NativePage.java b/chrome/browser/ui/android/native_page/java/src/org/chromium/chrome/browser/ui/native_page/NativePage.java
+--- a/chrome/browser/ui/android/native_page/java/src/org/chromium/chrome/browser/ui/native_page/NativePage.java
++++ b/chrome/browser/ui/android/native_page/java/src/org/chromium/chrome/browser/ui/native_page/NativePage.java
+@@ -134,6 +134,11 @@ public interface NativePage {
+         return 0;
+     }
+ 
++    /** Whether this is a new tab page that shows its own search box in place of the toolbar's. */
++    default boolean isLocationBarShownInNtp() {
++        return false;
++    }
++
+     /** Updates the native page based on the given url. */
+     void updateForUrl(String url);
+ 
 diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chrome/browser/ui/android/strings/android_chrome_strings.grd
 --- a/chrome/browser/ui/android/strings/android_chrome_strings.grd
 +++ b/chrome/browser/ui/android/strings/android_chrome_strings.grd
@@ -1657,6 +1698,71 @@ diff --git a/chrome/browser/ui/android/strings/android_chrome_strings.grd b/chro
        <message name="IDS_MOST_VISITED_ITEM_REMOVED" desc="Snackbar text shown after invoking context menu item &quot;Remove&quot; of a Top Sites Tile in the Most Visited Tiles area in the New Tab Page.">
          This site won&apos;t be shown again
        </message>
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionController.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionController.java
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionController.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionController.java
+@@ -805,11 +805,16 @@ public class ToolbarPositionController implements OnSharedPreferenceChangeListen
+     /** Returns whether the toolbar will be shown on top for the supplied tab. */
+     public static boolean shouldShowToolbarOnTop(@Nullable Tab tab) {
+         // TODO(https://g-issues.chromium.org/issues/420271795): consider fakebox presence here.
++        // Same rule as the live toolbar: only a new tab page that shows its own search box keeps
++        // the toolbar at the top.
++        var nativePage = tab != null ? tab.getNativePage() : null;
+         boolean isRegularNtp =
+                 (tab != null)
+                         && (tab.getUrl() != null)
+                         && UrlUtilities.isNtpUrl(tab.getUrl())
+-                        && !tab.isIncognitoBranded();
++                        && !tab.isIncognitoBranded()
++                        && nativePage != null
++                        && nativePage.isLocationBarShownInNtp();
+ 
+         return calculateStateTransition(
+                         /* prefStateChanged= */ false,
+diff --git a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionControllerTest.java b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionControllerTest.java
+--- a/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionControllerTest.java
++++ b/chrome/browser/ui/android/toolbar/java/src/org/chromium/chrome/browser/toolbar/ToolbarPositionControllerTest.java
+@@ -77,6 +77,7 @@ import org.chromium.chrome.browser.toolbar.settings.AddressBarPreference;
+ import org.chromium.chrome.browser.toolbar.top.ToolbarLayout;
+ import org.chromium.chrome.browser.toolbar.top.ToolbarPhone;
+ import org.chromium.chrome.browser.ui.edge_to_edge.TopInsetProvider;
++import org.chromium.chrome.browser.ui.native_page.NativePage;
+ import org.chromium.chrome.browser.url_constants.UrlConstantResolver;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetContent;
+ import org.chromium.components.browser_ui.bottomsheet.BottomSheetController;
+@@ -938,6 +939,9 @@ public class ToolbarPositionControllerTest {
+     public void shouldShowToolbarOnTop_withNtpUrl() {
+         Tab tab = mock(Tab.class);
+         doReturn(new GURL(UrlConstantResolver.getOriginalNativeNtpUrl())).when(tab).getUrl();
++        NativePage ntp = mock(NativePage.class);
++        doReturn(true).when(ntp).isLocationBarShownInNtp();
++        doReturn(ntp).when(tab).getNativePage();
+ 
+         // By default, Toolbar should be anchored on top.
+         setUserToolbarAnchorPreference(/* showToolbarOnTop= */ null);
+@@ -953,6 +957,22 @@ public class ToolbarPositionControllerTest {
+         assertTrue(ToolbarPositionController.shouldShowToolbarOnTop(tab));
+     }
+ 
++    @Test
++    public void shouldShowToolbarOnTop_withNtpWithoutOwnSearchBox() {
++        Tab tab = mock(Tab.class);
++        doReturn(new GURL(UrlConstantResolver.getOriginalNativeNtpUrl())).when(tab).getUrl();
++        doReturn(mock(NativePage.class)).when(tab).getNativePage();
++
++        // A new tab page that keeps the toolbar's own search box follows the user's choice.
++        setUserToolbarAnchorPreference(/* showToolbarOnTop= */ false);
++        ToolbarPositionController.resetCachedToolbarConfigurationForTesting();
++        assertFalse(ToolbarPositionController.shouldShowToolbarOnTop(tab));
++
++        setUserToolbarAnchorPreference(/* showToolbarOnTop= */ true);
++        ToolbarPositionController.resetCachedToolbarConfigurationForTesting();
++        assertTrue(ToolbarPositionController.shouldShowToolbarOnTop(tab));
++    }
++
+     @Test
+     public void shouldShowToolbarOnTop_withIncognitoNtpUrl() {
+         Tab tab = mock(Tab.class);
 diff --git a/components/history/core/browser/top_sites_constants.h b/components/history/core/browser/top_sites_constants.h
 --- a/components/history/core/browser/top_sites_constants.h
 +++ b/components/history/core/browser/top_sites_constants.h

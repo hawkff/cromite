@@ -1,0 +1,667 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 19:55:45 +0000
+Subject: Download filter lists from their publishers
+
+Filter lists that cannot run page scripts are now downloaded from the
+address their publisher gives, so they stay current. The two lists that
+may run snippets, "ABP filters" and "Cromite experimental filters", are
+still downloaded from the project site.
+
+When a list that was never downloaded cannot be fetched, the retries
+alternate between the publisher's address and a fallback: the copy on
+the project site, or for HaGeZi lists the jsDelivr mirror their
+publisher names. Installed lists stay in use when an update fails.
+
+Settings offer 44 HaGeZi DNS blocklists in Adblock format. All are off
+by default.
+
+List downloads send no cookies and store none.
+
+At startup, a subscription to the project site's copy of a list that its
+publisher now serves moves to the publisher's address.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../factories/subscription_service_factory.cc |  20 ++
+ .../core/net/adblock_resource_request.h       |   4 +
+ .../core/net/adblock_resource_request_impl.cc |  19 +-
+ .../core/net/adblock_resource_request_impl.h  |   5 +
+ .../core/subscription/subscription_config.cc  | 254 +++++++++++++-----
+ .../core/subscription/subscription_config.h   |  10 +-
+ .../subscription_downloader_impl.cc           |   2 +
+ 7 files changed, 246 insertions(+), 68 deletions(-)
+
+diff --git a/components/adblock/content/browser/factories/subscription_service_factory.cc b/components/adblock/content/browser/factories/subscription_service_factory.cc
+--- a/components/adblock/content/browser/factories/subscription_service_factory.cc
++++ b/components/adblock/content/browser/factories/subscription_service_factory.cc
+@@ -17,6 +17,7 @@
+ 
+ #include "components/adblock/content/browser/factories/subscription_service_factory.h"
+ 
++#include <algorithm>
+ #include <fstream>
+ #include <memory>
+ #include <string_view>
+@@ -346,6 +347,23 @@ void TranslateCombinedFilterListsToStandalone(
+   }
+ }
+ 
++// A subscription to the project site's copy of a list that its publisher
++// serves is moved to the publisher's address.
++void MoveSubscriptionsToPublishers(
++    FilteringConfiguration* adblock_filtering_configuration) {
++  const std::vector<GURL> filter_lists =
++      adblock_filtering_configuration->GetFilterLists();
++  for (const auto& known : config::GetKnownSubscriptions()) {
++    if (known.fallback_url.host() == AdblockBaseFilterListUrl().host() &&
++        std::ranges::contains(filter_lists, known.fallback_url)) {
++      VLOG(1) << "[eyeo] Moving subscription " << known.fallback_url << " to "
++              << known.url;
++      adblock_filtering_configuration->RemoveFilterList(known.fallback_url);
++      adblock_filtering_configuration->AddFilterList(known.url);
++    }
++  }
++}
++
+ void CheckAdblockCliSwitches(
+     FilteringConfiguration* adblock_filtering_configuration) {
+   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+@@ -404,6 +422,7 @@ SubscriptionServiceFactory::BuildServiceInstanceForBrowserContext(
+         kAdblockFilteringConfigurationName) {
+       CheckAdblockCliSwitches(persisted_configuration.get());
+       TranslateCombinedFilterListsToStandalone(persisted_configuration.get());
++      MoveSubscriptionsToPublishers(persisted_configuration.get());
+     }
+     subscription_service->InstallFilteringConfiguration(
+         std::move(persisted_configuration));
+@@ -426,6 +445,7 @@ SubscriptionServiceFactory::BuildServiceInstanceForBrowserContext(
+       }
+       TranslateCombinedFilterListsToStandalone(
+           adblock_filtering_configuration.get());
++      MoveSubscriptionsToPublishers(adblock_filtering_configuration.get());
+       subscription_service->InstallFilteringConfiguration(
+           std::move(adblock_filtering_configuration));
+     }
+diff --git a/components/adblock/core/net/adblock_resource_request.h b/components/adblock/core/net/adblock_resource_request.h
+--- a/components/adblock/core/net/adblock_resource_request.h
++++ b/components/adblock/core/net/adblock_resource_request.h
+@@ -54,6 +54,10 @@ class AdblockResourceRequest {
+                         const std::string extra_query_params = "") = 0;
+ 
+   virtual size_t GetNumberOfRedirects() const = 0;
++
++  // Sets a second address for the resource. Retries alternate between the
++  // address given to Start() and this one. Must be called before Start().
++  virtual void SetFallbackUrl(const GURL& fallback_url) {}
+ };
+ 
+ }  // namespace adblock
+diff --git a/components/adblock/core/net/adblock_resource_request_impl.cc b/components/adblock/core/net/adblock_resource_request_impl.cc
+--- a/components/adblock/core/net/adblock_resource_request_impl.cc
++++ b/components/adblock/core/net/adblock_resource_request_impl.cc
+@@ -77,6 +77,7 @@ void AdblockResourceRequestImpl::Start(GURL url,
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+   DCHECK(!IsStarted()) << "Start() called twice";
+   url_ = BuildUrlWithParams(url, extra_query_params);
++  original_url_ = url_;
+   method_ = method;
+   retry_policy_ = retry_policy;
+   response_callback_ = std::move(response_callback);
+@@ -92,6 +93,9 @@ void AdblockResourceRequestImpl::Redirect(
+   VLOG(1) << "[eyeo] Will redirect " << url_ << " to " << redirect_url;
+   ++number_of_redirects_;
+   url_ = BuildUrlWithParams(redirect_url, extra_query_params);
++  original_url_ = url_;
++  // The fallback is a copy of the list at the address before the redirect.
++  fallback_url_ = GURL();
+   StartWhenRequestsAllowed();
+ }
+ 
+@@ -99,6 +103,12 @@ size_t AdblockResourceRequestImpl::GetNumberOfRedirects() const {
+   return number_of_redirects_;
+ }
+ 
++void AdblockResourceRequestImpl::SetFallbackUrl(const GURL& fallback_url) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  DCHECK(!IsStarted()) << "SetFallbackUrl() called after Start()";
++  fallback_url_ = fallback_url;
++}
++
+ void AdblockResourceRequestImpl::StartWhenRequestsAllowed() {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+   request_throttle_->RunWhenRequestsAllowed(base::BindOnce(
+@@ -118,7 +128,9 @@ void AdblockResourceRequestImpl::StartInternal() {
+   auto request = std::make_unique<network::ResourceRequest>();
+   request->url = url_;
+   request->method = MethodToString();
+-  request->load_flags = net::LOAD_BYPASS_CACHE | net::LOAD_DISABLE_CACHE;
++  request->load_flags = net::LOAD_BYPASS_CACHE | net::LOAD_DISABLE_CACHE |
++                        net::LOAD_DO_NOT_SAVE_COOKIES;
++  request->credentials_mode = network::mojom::CredentialsMode::kOmit;
+   loader_ =
+       network::SimpleURLLoader::Create(std::move(request), kTrafficAnnotation);
+ 
+@@ -145,6 +157,9 @@ void AdblockResourceRequestImpl::Retry() {
+     return;
+   }
+   backoff_entry_->InformOfRequest(false);
++  if (fallback_url_.is_valid()) {
++    url_ = url_ == original_url_ ? fallback_url_ : original_url_;
++  }
+   VLOG(1) << "[eyeo] Will retry downloading " << url_ << " in "
+           << backoff_entry_->GetTimeUntilRelease();
+   retry_timer_->Start(
+@@ -167,7 +182,7 @@ void AdblockResourceRequestImpl::OnDownloadFinished(
+   }
+ 
+   response_callback_.Run(
+-      url_, std::move(downloaded_file),
++      original_url_, std::move(downloaded_file),
+       loader_->ResponseInfo() ? loader_->ResponseInfo()->headers : nullptr);
+   // response_callback_ may delete this, do not call any member variables now.
+ }
+diff --git a/components/adblock/core/net/adblock_resource_request_impl.h b/components/adblock/core/net/adblock_resource_request_impl.h
+--- a/components/adblock/core/net/adblock_resource_request_impl.h
++++ b/components/adblock/core/net/adblock_resource_request_impl.h
+@@ -49,6 +49,7 @@ class AdblockResourceRequestImpl final : public AdblockResourceRequest {
+                 const std::string extra_query_params = "") final;
+ 
+   size_t GetNumberOfRedirects() const final;
++  void SetFallbackUrl(const GURL& fallback_url) final;
+ 
+  private:
+   bool IsStarted() const;
+@@ -64,6 +65,10 @@ class AdblockResourceRequestImpl final : public AdblockResourceRequest {
+   scoped_refptr<network::SharedURLLoaderFactory> url_loader_factory_;
+   raw_ptr<AdblockRequestThrottle> request_throttle_;
+   GURL url_;
++  // The address given to Start() or Redirect(). Responses are reported for it
++  // even when |url_| is |fallback_url_|.
++  GURL original_url_;
++  GURL fallback_url_;
+   Method method_ = Method::GET;
+   RetryPolicy retry_policy_;
+   ResponseCallback response_callback_;
+diff --git a/components/adblock/core/subscription/subscription_config.cc b/components/adblock/core/subscription/subscription_config.cc
+--- a/components/adblock/core/subscription/subscription_config.cc
++++ b/components/adblock/core/subscription/subscription_config.cc
+@@ -18,9 +18,11 @@
+ #include "components/adblock/core/subscription/subscription_config.h"
+ 
+ #include <map>
++#include <utility>
+ 
+ #include "base/no_destructor.h"
+ #include "base/strings/string_number_conversions.h"
++#include "base/strings/strcat.h"
+ #include "base/strings/string_split.h"
+ #include "base/strings/string_util.h"
+ #include "components/adblock/core/common/adblock_constants.h"
+@@ -41,6 +43,36 @@ std::string GetHost() {
+   replacements.SetPortStr(port_str);
+   return url.ReplaceComponents(replacements).spec();
+ }
++
++// A list published on eyeo's download server.
++GURL EasylistDownloadsUrl(std::string_view file) {
++  return GURL(
++      base::StrCat({"https://easylist-downloads.adblockplus.org/", file}));
++}
++
++// The copy of a list on the project site.
++GURL ProjectCopyUrl(std::string_view file) {
++  return GURL(base::StrCat({GetHost(), file}));
++}
++
++// An optional HaGeZi list, with the jsDelivr mirror named by its publisher as
++// the fallback.
++adblock::KnownSubscriptionInfo HageziList(std::string_view file,
++                                          std::string title) {
++  return {GURL(base::StrCat(
++              {"https://raw.githubusercontent.com/hagezi/dns-blocklists/main/"
++               "adblock/",
++               file})),
++          std::move(title),
++          {},
++          adblock::SubscriptionUiVisibility::Visible,
++          adblock::SubscriptionFirstRunBehavior::Ignore,
++          adblock::SubscriptionPrivilegedFilterStatus::Forbidden,
++          GURL(base::StrCat(
++              {"https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/"
++               "adblock/",
++               file}))};
++}
+ }  // namespace
+ 
+ namespace adblock {
+@@ -61,7 +93,8 @@ const GURL& AntiCVUrl() {
+ }
+ 
+ const GURL& DefaultSubscriptionUrl() {
+-  static const base::NoDestructor<GURL> kEasylistUrl(GetHost() + "easylist.txt");
++  static const base::NoDestructor<GURL> kEasylistUrl(
++      EasylistDownloadsUrl("easylist.txt"));
+   return *kEasylistUrl;
+ }
+ 
+@@ -87,13 +120,15 @@ KnownSubscriptionInfo::KnownSubscriptionInfo(
+     std::vector<std::string> languages_param,
+     SubscriptionUiVisibility ui_visibility_param,
+     SubscriptionFirstRunBehavior first_run_param,
+-    SubscriptionPrivilegedFilterStatus privileged_status_param)
++    SubscriptionPrivilegedFilterStatus privileged_status_param,
++    GURL fallback_url_param)
+     : url(url_param),
+       title(title_param),
+       languages(languages_param),
+       ui_visibility(ui_visibility_param),
+       first_run(first_run_param),
+-      privileged_status(privileged_status_param) {}
++      privileged_status(privileged_status_param),
++      fallback_url(fallback_url_param) {}
+ 
+ const std::vector<KnownSubscriptionInfo>& config::GetKnownSubscriptions() {
+   // The current list of subscriptions can be downloaded from:
+@@ -112,170 +147,199 @@ const std::vector<KnownSubscriptionInfo>& config::GetKnownSubscriptions() {
+        {"en"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeAtFirstRun,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "badblock_lite.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylist.txt")},
++      {GURL("https://badblock.celenity.dev/abp/badblock_lite.txt"),
+        "Celenity/BadBlock Lite",
+        {"en"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeAtFirstRun,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "badmojr-1Hosts-master-Lite-adblock.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("badblock_lite.txt")},
++      {GURL("https://raw.githubusercontent.com/badmojr/1Hosts/master/Lite/"
++            "adblock.txt"),
+        "badmojr/1Hosts",
+        {"en"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeAtFirstRun,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "abpindo.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("badmojr-1Hosts-master-Lite-adblock.txt")},
++      {EasylistDownloadsUrl("abpindo.txt"),
+        "ABPindo",
+        {"id", "ms"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "abpvn.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("abpindo.txt")},
++      {EasylistDownloadsUrl("abpvn.txt"),
+        "ABPVN List",
+        {"vi"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "bulgarian_list.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("abpvn.txt")},
++      {EasylistDownloadsUrl("bulgarian_list.txt"),
+        "Bulgarian list",
+        {"bg"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "dandelion_sprouts_nordic_filters.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("bulgarian_list.txt")},
++      {EasylistDownloadsUrl("dandelion_sprouts_nordic_filters.txt"),
+        "Dandelion Sprout's Nordic Filters",
+        {"no", "nb", "nn", "da", "is", "fo", "kl"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistchina.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("dandelion_sprouts_nordic_filters.txt")},
++      {EasylistDownloadsUrl("easylistchina.txt"),
+        "EasyList China",
+        {"zh"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistczechslovak.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistchina.txt")},
++      {EasylistDownloadsUrl("easylistczechslovak.txt"),
+        "EasyList Czech and Slovak",
+        {"cs", "sk"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistdutch.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistczechslovak.txt")},
++      {EasylistDownloadsUrl("easylistdutch.txt"),
+        "EasyList Dutch",
+        {"nl"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistgermany.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistdutch.txt")},
++      {EasylistDownloadsUrl("easylistgermany.txt"),
+        "EasyList Germany",
+        {"de"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "israellist.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistgermany.txt")},
++      {EasylistDownloadsUrl("israellist.txt"),
+        "EasyList Hebrew",
+        {"he"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "hufilter.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("israellist.txt")},
++      {EasylistDownloadsUrl("hufilter.txt"),
+        "EasyList Hungarian",
+        {"hu"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistitaly.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("hufilter.txt")},
++      {EasylistDownloadsUrl("easylistitaly.txt"),
+        "EasyList Italy",
+        {"it"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistlithuania.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistitaly.txt")},
++      {EasylistDownloadsUrl("easylistlithuania.txt"),
+        "EasyList Lithuania",
+        {"lt"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistpolish.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistlithuania.txt")},
++      {EasylistDownloadsUrl("easylistpolish.txt"),
+        "EasyList Polish",
+        {"pl"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistportuguese.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistpolish.txt")},
++      {EasylistDownloadsUrl("easylistportuguese.txt"),
+        "EasyList Portuguese",
+        {"pt"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easylistspanish.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistportuguese.txt")},
++      {EasylistDownloadsUrl("easylistspanish.txt"),
+        "EasyList Spanish",
+        {"es"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "global-filters.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easylistspanish.txt")},
++      {EasylistDownloadsUrl("global-filters.txt"),
+        "Global Filters",
+        {"th", "el", "sl", "hr", "sr", "bs", "fil"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "indianlist.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("global-filters.txt")},
++      {EasylistDownloadsUrl("indianlist.txt"),
+        "IndianList",
+        {"bn", "gu", "hi", "pa", "as", "mr", "ml", "te", "kn", "or", "ne", "si",
+         "ta", "mai"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "japanese-filters.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("indianlist.txt")},
++      {EasylistDownloadsUrl("japanese-filters.txt"),
+        "Japanese Filters",
+        {"ja"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "koreanlist.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("japanese-filters.txt")},
++      {EasylistDownloadsUrl("koreanlist.txt"),
+        "KoreanList",
+        {"ko"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "latvianlist.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("koreanlist.txt")},
++      {EasylistDownloadsUrl("latvianlist.txt"),
+        "Latvian List",
+        {"lv"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "liste_ar.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("latvianlist.txt")},
++      {EasylistDownloadsUrl("liste_ar.txt"),
+        "Liste AR",
+        {"ar"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "liste_fr.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("liste_ar.txt")},
++      {EasylistDownloadsUrl("liste_fr.txt"),
+        "Liste FR",
+        {"ar", "fr"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "rolist.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("liste_fr.txt")},
++      {EasylistDownloadsUrl("rolist.txt"),
+        "ROList",
+        {"ro"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "ruadlist.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("rolist.txt")},
++      {EasylistDownloadsUrl("ruadlist.txt"),
+        "RuAdList",
+        {"ru", "uk", "uz", "kk"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "turkish-filters.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("ruadlist.txt")},
++      {EasylistDownloadsUrl("turkish-filters.txt"),
+        "Turkish Filters",
+        {"tr"},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeIfLocaleMatch,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("turkish-filters.txt")},
+       {AcceptableAdsUrl(),
+        "Acceptable Ads",                      // Always disable
+        {},
+@@ -294,25 +358,76 @@ const std::vector<KnownSubscriptionInfo>& config::GetKnownSubscriptions() {
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::SubscribeAtFirstRun,
+        SubscriptionPrivilegedFilterStatus::AllowedAndChecked},
+-      {GURL(GetHost() + ""
+-                        "fanboy-notifications.txt"),
++      {EasylistDownloadsUrl("fanboy-notifications.txt"),
+        "Fanboy's Notifications Blocking List",
+        {},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::Ignore,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "easyprivacy.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("fanboy-notifications.txt")},
++      {EasylistDownloadsUrl("easyprivacy.txt"),
+        "EasyPrivacy",
+        {},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::Ignore,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
+-      {GURL(GetHost() + "fanboy-social.txt"),
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("easyprivacy.txt")},
++      {EasylistDownloadsUrl("fanboy-social.txt"),
+        "Fanboy's Social Blocking List",
+        {},
+        SubscriptionUiVisibility::Visible,
+        SubscriptionFirstRunBehavior::Ignore,
+-       SubscriptionPrivilegedFilterStatus::Forbidden},
++       SubscriptionPrivilegedFilterStatus::Forbidden,
++       ProjectCopyUrl("fanboy-social.txt")},
++      HageziList("light.txt", "HaGeZi Multi Light"),
++      HageziList("multi.txt", "HaGeZi Multi Normal"),
++      HageziList("pro.txt", "HaGeZi Multi Pro"),
++      HageziList("pro.mini.txt", "HaGeZi Multi Pro mini"),
++      HageziList("pro.plus.txt", "HaGeZi Multi Pro++"),
++      HageziList("pro.plus.mini.txt", "HaGeZi Multi Pro++ mini"),
++      HageziList("ultimate.txt", "HaGeZi Multi Ultimate"),
++      HageziList("ultimate.mini.txt", "HaGeZi Multi Ultimate mini"),
++      HageziList("tif.txt", "HaGeZi Threat Intelligence Feeds"),
++      HageziList("tif.medium.txt", "HaGeZi Threat Intelligence Feeds medium"),
++      HageziList("tif.mini.txt", "HaGeZi Threat Intelligence Feeds mini"),
++      HageziList("fake.txt", "HaGeZi Fake"),
++      HageziList("popupads.txt", "HaGeZi Pop-Up Ads"),
++      HageziList("hoster.txt", "HaGeZi Badware Hoster"),
++      HageziList("dyndns.txt", "HaGeZi DynDNS"),
++      HageziList("spam-tlds-adblock.txt", "HaGeZi Most Abused TLDs"),
++      HageziList("spam-tlds-adblock-aggressive.txt",
++                 "HaGeZi Most Abused TLDs aggressive"),
++      HageziList("spam-tlds-adblock-allow.txt",
++                 "HaGeZi Most Abused TLDs allowlist"),
++      HageziList("urlshortener.txt", "HaGeZi URL Shortener"),
++      HageziList("whitelist-urlshortener.txt",
++                 "HaGeZi URL Shortener allowlist"),
++      HageziList("blocklist-referral-native.txt", "HaGeZi Referral blocklist"),
++      HageziList("whitelist-referral.txt", "HaGeZi Referral allowlist"),
++      HageziList("doh.txt", "HaGeZi Encrypted DNS"),
++      HageziList("doh.top.txt", "HaGeZi Encrypted DNS top sites"),
++      HageziList("doh-vpn-proxy-bypass.txt",
++                 "HaGeZi Encrypted DNS, VPN, Tor and Proxy"),
++      HageziList("anti.piracy.txt", "HaGeZi Anti-Piracy"),
++      HageziList("gambling.txt", "HaGeZi Gambling"),
++      HageziList("gambling.medium.txt", "HaGeZi Gambling medium"),
++      HageziList("gambling.mini.txt", "HaGeZi Gambling mini"),
++      HageziList("nsfw.txt", "HaGeZi NSFW"),
++      HageziList("social.txt", "HaGeZi Social Networks"),
++      HageziList("nosafesearch.txt", "HaGeZi SafeSearch not supported"),
++      HageziList("native.amazon.txt", "HaGeZi Amazon Tracker"),
++      HageziList("native.apple.txt", "HaGeZi Apple Tracker"),
++      HageziList("native.huawei.txt", "HaGeZi Huawei Tracker"),
++      HageziList("native.lgwebos.txt", "HaGeZi LG webOS Tracker"),
++      HageziList("native.oppo-realme.txt", "HaGeZi OPPO and Realme Tracker"),
++      HageziList("native.roku.txt", "HaGeZi Roku Tracker"),
++      HageziList("native.samsung.txt", "HaGeZi Samsung Tracker"),
++      HageziList("native.tiktok.txt", "HaGeZi TikTok Tracker"),
++      HageziList("native.tiktok.extended.txt",
++                 "HaGeZi TikTok Tracker extended"),
++      HageziList("native.vivo.txt", "HaGeZi Vivo Tracker"),
++      HageziList("native.winoffice.txt", "HaGeZi Microsoft Tracker"),
++      HageziList("native.xiaomi.txt", "HaGeZi Xiaomi Tracker"),
+       {CustomFiltersUrl(),
+        "User filters",
+        {},
+@@ -368,6 +483,15 @@ bool config::AllowPrivilegedFilters(const GURL& url) {
+   return false;
+ }
+ 
++GURL config::GetFallbackUrl(const GURL& url) {
++  for (const auto& cur : GetKnownSubscriptions()) {
++    if (cur.url == url) {
++      return cur.fallback_url;
++    }
++  }
++  return GURL();
++}
++
+ const std::vector<PreloadedSubscriptionInfo>&
+ config::GetPreloadedSubscriptionConfiguration() {
+   static const std::vector<PreloadedSubscriptionInfo> preloaded_subscriptions =
+diff --git a/components/adblock/core/subscription/subscription_config.h b/components/adblock/core/subscription/subscription_config.h
+--- a/components/adblock/core/subscription/subscription_config.h
++++ b/components/adblock/core/subscription/subscription_config.h
+@@ -62,7 +62,8 @@ struct KnownSubscriptionInfo {
+                         std::vector<std::string> languages,
+                         SubscriptionUiVisibility ui_visibility,
+                         SubscriptionFirstRunBehavior first_run,
+-                        SubscriptionPrivilegedFilterStatus privileged_status);
++                        SubscriptionPrivilegedFilterStatus privileged_status,
++                        GURL fallback_url = GURL());
+   ~KnownSubscriptionInfo();
+   KnownSubscriptionInfo(const KnownSubscriptionInfo&);
+   KnownSubscriptionInfo(KnownSubscriptionInfo&&);
+@@ -77,6 +78,9 @@ struct KnownSubscriptionInfo {
+       SubscriptionFirstRunBehavior::Ignore;
+   SubscriptionPrivilegedFilterStatus privileged_status =
+       SubscriptionPrivilegedFilterStatus::Forbidden;
++  // Address tried in turn with |url| when a list that was never downloaded
++  // cannot be fetched. Empty when there is none.
++  GURL fallback_url;
+ };
+ 
+ // Describes an available preloaded subscription that will be used to provide
+@@ -111,6 +115,10 @@ const std::vector<KnownSubscriptionInfo>& GetKnownSubscriptions();
+ // privileged filters.
+ bool AllowPrivilegedFilters(const GURL& url);
+ 
++// Returns the fallback address of the known subscription at |url|, or an
++// empty GURL.
++GURL GetFallbackUrl(const GURL& url);
++
+ // Returns the configuration of available preloaded subscriptions. Used by
+ // PreloadedSubscriptionProvider.
+ const std::vector<PreloadedSubscriptionInfo>&
+diff --git a/components/adblock/core/subscription/subscription_downloader_impl.cc b/components/adblock/core/subscription/subscription_downloader_impl.cc
+--- a/components/adblock/core/subscription/subscription_downloader_impl.cc
++++ b/components/adblock/core/subscription/subscription_downloader_impl.cc
+@@ -107,6 +107,8 @@ void SubscriptionDownloaderImpl::StartDownload(
+ 
+   ongoing_downloads_[subscription_url] =
+       OngoingDownload{request_maker_.Run(), std::move(on_finished)};
++  std::get<ResourceRequestPtr>(ongoing_downloads_[subscription_url])
++      ->SetFallbackUrl(config::GetFallbackUrl(subscription_url));
+   std::get<ResourceRequestPtr>(ongoing_downloads_[subscription_url])
+       ->Start(
+           subscription_url, AdblockResourceRequest::Method::GET,
+--
