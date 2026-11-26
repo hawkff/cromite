@@ -35,7 +35,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../SuggestionsNavigationDelegate.java        |  27 +-
  .../tile/MostVisitedTilesCoordinator.java     |   4 +-
  .../tile/MostVisitedTilesGridLayout.java      | 287 ++++++++++++++++++
- .../tile/MostVisitedTilesMediator.java        |  19 +-
+ .../tile/MostVisitedTilesMediator.java        |  28 +-
  .../tile/MostVisitedTilesViewBinder.java      |   8 +-
  .../tile/TileDragDelegateImpl.java            |  18 +-
  .../suggestions/tile/TileRenderer.java        |  12 +-
@@ -57,7 +57,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../Restore-Simplified-NTP-launch.inc         |  12 +
  .../Restore-Simplified-NTP-launch.inc         |   3 +
  .../Restore-Simplified-NTP-launch.inc         |   1 +
- 51 files changed, 693 insertions(+), 76 deletions(-)
+ 51 files changed, 700 insertions(+), 78 deletions(-)
  create mode 100644 chrome/android/java/res/drawable-hdpi/ic_most_visited_placeholder.png
  create mode 100644 chrome/android/java/res/drawable-mdpi/ic_most_visited_placeholder.png
  create mode 100644 chrome/android/java/res/drawable-xhdpi/ic_most_visited_placeholder.png
@@ -528,7 +528,7 @@ new file mode 100644
 +            android:textAppearance="@style/TextAppearance.TextSmall.Secondary"
 +            app:drawableHeight="20sp"
 +            app:drawableWidth="20sp"
-+            app:chromeDrawableTint="@color/default_icon_color_light"  />
++            app:chromeDrawableTint="@color/default_icon_color_secondary_tint_list" />
 +    </FrameLayout>
 +
 +    <FrameLayout
@@ -552,7 +552,7 @@ new file mode 100644
 +            android:textAppearance="@style/TextAppearance.TextSmall.Secondary"
 +            app:drawableHeight="20sp"
 +            app:drawableWidth="20sp"
-+            app:chromeDrawableTint="@color/default_icon_color_light"  />
++            app:chromeDrawableTint="@color/default_icon_color_secondary_tint_list" />
 +    </FrameLayout>
 +</LinearLayout>
 diff --git a/chrome/android/java/res/values/attrs.xml b/chrome/android/java/res/values/attrs.xml
@@ -1399,7 +1399,32 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/suggestions/til
  
          mTileViewLandscapePadding =
                  mResources.getDimensionPixelSize(R.dimen.tile_view_padding_landscape);
-@@ -190,12 +189,10 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
+@@ -152,6 +151,7 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
+         mRenderer.renderTileSection(tiles, mMvTilesLayout, mTileGroup.getTileSetupDelegate());
+         mTileGroup.notifyTilesRendered();
+         updateTilesView();
++        updateMvtVisibility();
+ 
+         if (mSnapshotTileGridChangedRunnable != null) mSnapshotTileGridChangedRunnable.run();
+         MostVisitedSitesMetadataUtils.getInstance().saveSuggestionListsToFile(tiles);
+@@ -170,10 +170,14 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
+      * Sets the visibility of the Most Visited Tiles (MVT) section.
+      *
+      * <p>The visibility of MVT is controlled by a user accessible toggle. The section will be
+-     * visible if and only if the user has the toggle turned on.
++     * visible if and only if the user has the toggle turned on and there is at least one tile,
++     * so a new profile shows no empty card.
+      */
+     void updateMvtVisibility() {
+-        mModel.set(IS_VISIBLE, NtpCustomizationConfigManager.getInstance().getPrefIsMvtToggleOn());
++        mModel.set(
++                IS_VISIBLE,
++                NtpCustomizationConfigManager.getInstance().getPrefIsMvtToggleOn()
++                        && mMvTilesLayout.getTileCount() > 0);
+     }
+ 
+     @Override
+@@ -190,12 +194,10 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
  
      @Override
      public void onCustomTileCreation(Tile tile) {
@@ -1412,7 +1437,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/suggestions/til
      }
  
      public void onConfigurationChanged() {
-@@ -240,13 +237,7 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
+@@ -240,13 +242,7 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
          marginLayoutParams.leftMargin = lateralMargin;
          marginLayoutParams.rightMargin = lateralMargin;
  
@@ -1427,7 +1452,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/suggestions/til
      }
  
      /**
-@@ -339,7 +330,5 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
+@@ -339,7 +335,5 @@ public class MostVisitedTilesMediator implements TileGroup.Observer {
  
          double firstTileScore = mTileGroup.getSuggestionScore(firstTile.getUrl());
          if (firstTileScore < MVT_CUSTOMIZATION_IPH_TILE_SCORE_THRESHOULD) return;
@@ -1645,7 +1670,7 @@ diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/f
 diff --git a/chrome/browser/ntp_tiles/chrome_most_visited_sites_factory.cc b/chrome/browser/ntp_tiles/chrome_most_visited_sites_factory.cc
 --- a/chrome/browser/ntp_tiles/chrome_most_visited_sites_factory.cc
 +++ b/chrome/browser/ntp_tiles/chrome_most_visited_sites_factory.cc
-@@ -68,10 +68,6 @@ ChromeMostVisitedSitesFactory::NewForProfile(Profile* profile) {
+@@ -60,10 +60,6 @@ ChromeMostVisitedSitesFactory::NewForProfile(Profile* profile) {
  
    std::unique_ptr<data_decoder::DataDecoder> data_decoder;
  
