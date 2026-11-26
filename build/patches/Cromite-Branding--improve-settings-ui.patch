@@ -244,7 +244,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  import static org.chromium.components.content_settings.PrefNames.COOKIE_CONTROLS_MODE;
  
  import android.content.Context;
-@@ -200,7 +199,7 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -190,7 +189,7 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
      public void onCreatePreferencesCromite(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
          mPageTitle.set(getString(R.string.prefs_privacy_security));
  
@@ -253,7 +253,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  
          mSnackbar = Snackbar.make(
                          getActivity().getString(R.string.ui_relaunch_notice),
-@@ -273,7 +272,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -263,7 +262,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
  
          ChromeSwitchPreference passwordLeakTogglePref =
                  (ChromeSwitchPreference) findPreference(PREF_PASSWORD_LEAK_DETECTION);
@@ -264,7 +264,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
  
          mSearchSuggestions = (ChromeSwitchPreference) findPreference(PREF_SEARCH_SUGGESTIONS);
          mSearchSuggestions.setOnPreferenceChangeListener(this);
-@@ -400,20 +401,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -390,20 +391,9 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
              scrollToPreference(PREF_ADVANCED_PROTECTION_INFO);
          }
  
@@ -285,7 +285,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
      private static boolean isAdvancedProtectionEnabled() {
          return AdvancedProtectionStatusManagerAndroidBridge.isUnderAdvancedProtection();
      }
-@@ -857,9 +847,8 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
+@@ -830,9 +820,8 @@ public class PrivacySettings extends ChromeBaseSettingsFragment
                                  frag, PREF_HTTPS_FIRST_MODE_LEGACY, textId);
                      }
  

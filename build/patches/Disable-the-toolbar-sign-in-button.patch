@@ -1,0 +1,49 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 19:55:43 +0000
+Subject: Disable the toolbar sign-in button
+
+The browser has no accounts or sign-in, but the toolbar showed a
+sign-in button (a person icon) on the new tab page, on tablets on
+every page, and it took space from the address bar.
+
+Disable kSigninLevelUpButton by default, and make the Java cached
+flag default match, so the button is not created on the first run
+either. The account button that the toolbar uses without this
+feature is already never shown.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../src/org/chromium/components/signin/SigninFeatureMap.java   | 3 ++-
+ components/signin/public/base/signin_switches.cc               | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java b/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java
+--- a/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java
++++ b/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java
+@@ -34,11 +34,12 @@ public final class SigninFeatureMap extends FeatureMap {
+                     SigninFeatures.PROFILE_DISC_ON_ALL_PAGES,
+                     /* defaultValue= */ true,
+                     /* defaultValueInTests= */ true);
++    // Off like the native feature: a first run reads this before the native value is cached.
+     public static final CachedFlag sSigninLevelUpButton =
+             new CachedFlag(
+                     sInstance,
+                     SigninFeatures.SIGNIN_LEVEL_UP_BUTTON,
+-                    /* defaultValue= */ true,
++                    /* defaultValue= */ false,
+                     /* defaultValueInTests= */ true);
+     public static final CachedFlag sSupportForcedSigninPolicy =
+             new CachedFlag(
+diff --git a/components/signin/public/base/signin_switches.cc b/components/signin/public/base/signin_switches.cc
+--- a/components/signin/public/base/signin_switches.cc
++++ b/components/signin/public/base/signin_switches.cc
+@@ -892,6 +892,7 @@ BASE_FEATURE(kSigninInterceptGraphicUpdate, base::FEATURE_DISABLED_BY_DEFAULT);
+ 
+ #if BUILDFLAG(IS_ANDROID)
+ BASE_FEATURE(kSigninLevelUpButton, base::FEATURE_ENABLED_BY_DEFAULT);
++SET_CROMITE_FEATURE_DISABLED(kSigninLevelUpButton);
+ #endif  // BUILDFLAG(IS_ANDROID)
+ 
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+--

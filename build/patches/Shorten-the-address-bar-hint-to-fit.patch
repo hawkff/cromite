@@ -1,0 +1,141 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 19:55:42 +0000
+Subject: Shorten the address bar hint to fit
+
+The address bar hint names the search engine ("Search DuckDuckGo or
+type URL"). When it is wider than the field, for example in the
+toolbar of the new tab page or with a large font size, it was cut off
+in the middle of a word, because an editable text field does not
+ellipsize its hint.
+
+Shorten the hint to the field width with a trailing ellipsis, and
+again whenever the width changes. Screen readers still get the whole
+hint.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../chrome/browser/omnibox/UrlBar.java        | 29 +++++++++++++++++++
+ .../browser/omnibox/UrlBarUnitTest.java       | 22 ++++++++++++++
+ .../browser/omnibox/UrlBarViewBinder.java     |  6 ++--
+ 3 files changed, 54 insertions(+), 3 deletions(-)
+
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBar.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBar.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBar.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBar.java
+@@ -214,6 +214,9 @@ public class UrlBar extends AutocompleteEditText {
+      */
+     private @Nullable String mAccessibilityWarning;
+ 
++    /** The hint before it is shortened to the width of the field. */
++    private @Nullable CharSequence mFullHint;
++
+     protected boolean mRequestingAutofillStructure;
+ 
+     /** Delegate used to communicate with the content side and the parent layout. */
+@@ -1034,9 +1037,35 @@ public class UrlBar extends AutocompleteEditText {
+         sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED);
+     }
+ 
++    /**
++     * Sets the hint. A hint wider than the field ends with an ellipsis instead of being cut off,
++     * because an editable field does not ellipsize its hint.
++     */
++    public void setHintFittingWidth(@Nullable CharSequence hint) {
++        mFullHint = hint;
++        setHint(fitHintToWidth(hint));
++    }
++
++    private @Nullable CharSequence fitHintToWidth(@Nullable CharSequence hint) {
++        int width = getWidthWithoutCompoundPadding();
++        if (hint == null || width <= 0) return hint;
++        return TextUtils.ellipsize(hint, getPaint(), width, TextUtils.TruncateAt.END);
++    }
++
++    @Override
++    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
++        super.onSizeChanged(w, h, oldw, oldh);
++        if (w != oldw && mFullHint != null) setHint(fitHintToWidth(mFullHint));
++    }
++
+     @Override
+     public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+         super.onInitializeAccessibilityNodeInfo(info);
++        // Screen readers get the whole hint, not the shortened one.
++        if (mFullHint != null && getHint() != null) {
++            if (TextUtils.isEmpty(getText())) info.setText(mFullHint);
++            info.setHintText(mFullHint);
++        }
+         if (!TextUtils.isEmpty(mAccessibilityWarning)) {
+             CharSequence text = info.getText();
+             if (text != null) {
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarUnitTest.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarUnitTest.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarUnitTest.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarUnitTest.java
+@@ -48,6 +48,7 @@ import android.view.MotionEvent;
+ import android.view.View;
+ import android.view.View.MeasureSpec;
+ import android.view.ViewStructure;
++import android.view.accessibility.AccessibilityNodeInfo;
+ import android.view.inputmethod.EditorInfo;
+ import android.widget.FrameLayout;
+ import android.widget.FrameLayout.LayoutParams;
+@@ -2293,6 +2294,27 @@ public class UrlBarUnitTest {
+         assertTrue(textWidth > 0);
+     }
+ 
++    @Test
++    @GraphicsMode(GraphicsMode.Mode.NATIVE)
++    public void testSetHintFittingWidth_endsWithEllipsisOnlyWhenTooWide() {
++        // Measure with the real paint; the fixture's mocked paint cannot shape text.
++        mUrlBar.mCustomPaint = null;
++        String hint = "Search DuckDuckGo or type URL";
++        mUrlBar.setText("");
++        mUrlBar.setHintFittingWidth(hint);
++        measureAndLayoutUrlBar();
++        String shownHint = mUrlBar.getHint().toString();
++        assertNotEquals(hint, shownHint);
++        assertTrue(shownHint.endsWith("\u2026"));
++
++        AccessibilityNodeInfo info = AccessibilityNodeInfo.obtain();
++        mUrlBar.onInitializeAccessibilityNodeInfo(info);
++        assertEquals(hint, info.getHintText().toString());
++
++        measureAndLayoutUrlBarForSize(URL_BAR_WIDTH * 20, URL_BAR_HEIGHT);
++        assertEquals(hint, mUrlBar.getHint().toString());
++    }
++
+     @Test
+     public void testTextWidth_ignoresBoundsEllipsisSpanToPreventLayoutLoop() {
+         String text = "https://example.com/a_fairly_long_url_that_exceeds_screen_width";
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarViewBinder.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarViewBinder.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarViewBinder.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/UrlBarViewBinder.java
+@@ -73,7 +73,7 @@ class UrlBarViewBinder {
+                                 : 0);
+             }
+         } else if (propertyKey == UrlBarProperties.HINT_TEXT) {
+-            view.setHint(getHintForModelState(model));
++            view.setHintFittingWidth(getHintForModelState(model));
+         } else if (propertyKey == UrlBarProperties.HINT_TEXT_COLOR) {
+             view.setHintTextColor(model.get(UrlBarProperties.HINT_TEXT_COLOR));
+         } else if (propertyKey == UrlBarProperties.INCOGNITO_COLORS_ENABLED) {
+@@ -93,7 +93,7 @@ class UrlBarViewBinder {
+         } else if (propertyKey == UrlBarProperties.SELECT_ALL_ON_FOCUS) {
+             view.setSelectAllOnFocus(model.get(UrlBarProperties.SELECT_ALL_ON_FOCUS));
+         } else if (propertyKey == UrlBarProperties.SHOW_HINT_TEXT) {
+-            view.setHint(getHintForModelState(model));
++            view.setHintFittingWidth(getHintForModelState(model));
+         } else if (propertyKey == UrlBarProperties.TEXT_CHANGE_LISTENER) {
+             view.setTextChangeListener(model.get(UrlBarProperties.TEXT_CHANGE_LISTENER));
+         } else if (propertyKey == UrlBarProperties.TEXT_COLOR) {
+@@ -143,7 +143,7 @@ class UrlBarViewBinder {
+             view.setPaddingRelative(
+                     view.getPaddingStart(), verticalPadding, view.getPaddingEnd(), verticalPadding);
+             view.setUseSmallTextHeight(useSmallText);
+-            view.setHint(getHintForModelState(model));
++            view.setHintFittingWidth(getHintForModelState(model));
+             ConstraintLayout.LayoutParams layoutParams =
+                     (ConstraintLayout.LayoutParams) view.getLayoutParams();
+             layoutParams.width =
+--
