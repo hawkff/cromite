@@ -9,6 +9,11 @@ The parsing follows the browser's own code in this series, so the verdicts
   SnippetTokenizer::Tokenize (eyeo-133.0.6943.49-base.patch) and
   FlatbufferSerializer::SerializeSnippetFilter (Eyeo-Adblock-for-Cromite.patch).
 
+After the counts and the added rules that do not run, it prints in full every
+removed snippet rule (with what it did in the published copy) and every added
+rule that runs (with its domains and snippet names): the changes that alter
+what runs on pages.
+
 Every added rule still has to be read by a person. Exit status 1 means: stop,
 do not publish (a self-check failed, or the new copy adds a header filter).
 
@@ -162,51 +167,99 @@ def self_test():
     return not failed
 
 
-def rules(path):
+def rules(text_lines):
     out = {}
-    for line in open(path, encoding="utf-8", errors="replace"):
+    for line in text_lines:
         c = classify(line)
         if c is not None:
             out[line.strip(ASCII_WHITESPACE)] = c
     return out
 
 
-def lines(path):
-    return {l.strip(ASCII_WHITESPACE)
-            for l in open(path, encoding="utf-8", errors="replace")}
+def read(path):
+    return open(path, encoding="utf-8", errors="replace").read().splitlines()
 
 
-def main():
-    if not self_test():
-        sys.exit(1)
-    if sys.argv[1:] == ["--self-test"]:
-        print("self-checks passed")
-        return
-    old_path, new_path = sys.argv[1], sys.argv[2]
-    old, new = rules(old_path), rules(new_path)
+def review(old_lines, new_lines):
+    """Compares two copies of a list. Returns (report lines, stop)."""
+    out = []
+    old, new = rules(old_lines), rules(new_lines)
     added = [l for l in new if l not in old]
     removed = [l for l in old if l not in new]
-    print(f"snippet rules: {len(old)} -> {len(new)}, "
-          f"added {len(added)}, removed {len(removed)}")
+    out.append(f"snippet rules: {len(old)} -> {len(new)}, "
+               f"added {len(added)}, removed {len(removed)}")
     counts = {"runs": 0, "dropped": 0, "rejected": 0}
     for l in added:
         verdict, reason, _ = new[l]
         counts[verdict] += 1
         if verdict != "runs":
-            print(f"{verdict.upper()} ({reason}): {l[:200]}")
-    print("added rules that run: {runs}, dropped by the serializer: {dropped}, "
-          "rejected by the parser: {rejected}".format(**counts))
+            out.append(f"{verdict.upper()} ({reason}): {l[:200]}")
+    out.append("added rules that run: {runs}, dropped by the serializer: "
+               "{dropped}, rejected by the parser: {rejected}".format(**counts))
     stop = False
-    old_lines = lines(old_path)
-    for l in lines(new_path) - old_lines:
+    old_set = {l.strip(ASCII_WHITESPACE) for l in old_lines}
+    new_set = {l.strip(ASCII_WHITESPACE) for l in new_lines}
+    for l in sorted(new_set - old_set):
         if not l.startswith("!") and ("$header=" in l or ",header=" in l):
-            print("NEW HEADER FILTER (privileged):", l[:200])
+            out.append(f"NEW HEADER FILTER (privileged): {l[:200]}")
             stop = True
     old_domains = {d for v in old.values() if v[0] == "runs" for d in v[2]}
     first = sorted({d for l in added if new[l][0] == "runs" for d in new[l][2]}
                    - old_domains)
-    print(f"domains that get running snippets for the first time ({len(first)}):",
-          " ".join(first[:200]))
+    out.append(f"domains that get running snippets for the first time "
+               f"({len(first)}): " + " ".join(first[:200]))
+    # The executable changes, in full: what stops running and what starts.
+    out.append(f"== removed snippet rules ({len(removed)}) ==")
+    for l in removed:
+        out.append(f"REMOVED (was {old[l][0]}): {l}")
+    running = [l for l in added if new[l][0] == "runs"]
+    out.append(f"== added snippet rules that run ({len(running)}) ==")
+    for l in running:
+        _, names, domains = new[l]
+        out.append(f"RUNS [domains: {', '.join(sorted(domains))}] "
+                   f"[snippets: {names}]: {l}")
+    return out, stop
+
+
+def self_test_review():
+    old = ["a.example#$#log x", "b.example#$#log y", "! comment"]
+    new = ["a.example#$#log x",
+           "c.example,d.example#$#cookie-remover z; skip-video v",
+           "e.example#$#simulate-mouse-event q"]
+    out, stop = review(old, new)
+    checks = [
+        (out[0], "snippet rules: 2 -> 3, added 2, removed 1"),
+        ("== removed snippet rules (1) ==" in out, True),
+        ("REMOVED (was runs): b.example#$#log y" in out, True),
+        ("== added snippet rules that run (1) ==" in out, True),
+        ("RUNS [domains: c.example, d.example] [snippets: cookie-remover, "
+         "skip-video]: c.example,d.example#$#cookie-remover z; skip-video v"
+         in out, True),
+        # A dropped rule is reported as before, not as running.
+        (any(l.startswith("RUNS") and "simulate-mouse-event" in l
+             for l in out), False),
+        (any(l.startswith("DROPPED (snippet not allowed: simulate-mouse-event)")
+             for l in out), True),
+        (stop, False),
+        # A new header filter still stops.
+        (review(old, old + ["||x.example^$header=via=1"])[1], True),
+        (review(old, old)[0][-1], "== added snippet rules that run (0) =="),
+    ]
+    failed = [i for i, (got, want) in enumerate(checks) if got != want]
+    for i in failed:
+        print(f"REVIEW SELF-CHECK {i} FAILED: got {checks[i][0]!r}, "
+              f"want {checks[i][1]!r}")
+    return not failed
+
+
+def main():
+    if not (self_test() and self_test_review()):
+        sys.exit(1)
+    if sys.argv[1:] == ["--self-test"]:
+        print("self-checks passed")
+        return
+    out, stop = review(read(sys.argv[1]), read(sys.argv[2]))
+    print("\n".join(out))
     sys.exit(1 if stop else 0)
 
 
