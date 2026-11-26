@@ -11,7 +11,7 @@ Pre-requisites: eyeo Browser Ad filtering Solution: Base Module
  .../browser/adblock/TabIdTranslator.java      |  36 ++
  chrome/browser/BUILD.gn                       |   5 +
  .../android/adblock/tab_id_translator_jni.cc  |  43 ++
- components/adblock/android/BUILD.gn           | 107 +++++
+ components/adblock/android/BUILD.gn           |  68 +++
  .../adblock/android/adblock_controller_jni.cc | 133 ++++++
  .../filtering_configuration_android.cc        | 246 ++++++++++
  .../android/filtering_configuration_android.h |  94 ++++
@@ -23,7 +23,7 @@ Pre-requisites: eyeo Browser Ad filtering Solution: Base Module
  .../adblock/ResourceFilteringCounters.java    | 111 +++++
  ...esource_classification_notifier_android.cc | 166 +++++++
  ...resource_classification_notifier_android.h |  72 +++
- 17 files changed, 2052 insertions(+)
+ 17 files changed, 2013 insertions(+)
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/adblock/TabIdTranslator.java
  create mode 100644 chrome/browser/android/adblock/tab_id_translator_jni.cc
  create mode 100644 components/adblock/android/BUILD.gn
@@ -217,7 +217,7 @@ diff --git a/components/adblock/android/BUILD.gn b/components/adblock/android/BU
 new file mode 100644
 --- /dev/null
 +++ b/components/adblock/android/BUILD.gn
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,68 @@
 +# This file is part of eyeo Chromium SDK,
 +# Copyright (C) 2006-present eyeo GmbH
 +# eyeo Chromium SDK is free software: you can redistribute it and/or modify
@@ -285,45 +285,6 @@ new file mode 100644
 +  ]
 +
 +  resources_package = "org.chromium.components.adblock.controller"
-+}
-+
-+android_library("adblock_java_tests_base") {
-+  testonly = true
-+  sources = [
-+    "javatests/src/org/chromium/components/adblock/AdblockControllerTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/DefaultSettingsTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/FilteringConfigurationTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesCircumventionTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesCspTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesElemhideEmuInvTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesElemhideEmuTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesElemhideTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesExceptionTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesFilterTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesHeaderFilterTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesHelperBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesInlineCssTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesRemoveTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesRewriteTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesServiceWorkersTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesSiteKeyTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesSnippetsTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesWebsocketTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestPagesWildcardDomainTestBase.java",
-+    "javatests/src/org/chromium/components/adblock/TestResourceFilteringObserver.java",
-+    "javatests/src/org/chromium/components/adblock/TestVerificationUtils.java",
-+  ]
-+  deps = [
-+    ":adblock_controller_java",
-+    "//base:base_java",
-+    "//base:base_java_test_support",
-+    "//content/public/android:content_full_java",
-+    "//content/public/test/android:content_java_test_support",
-+    "//net/android:net_java_test_support",
-+    "//third_party/androidx:androidx_test_monitor_java",
-+    "//third_party/androidx:androidx_test_runner_java",
-+    "//third_party/junit:junit",
-+  ]
 +}
 diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/adblock/android/adblock_controller_jni.cc
 new file mode 100644
