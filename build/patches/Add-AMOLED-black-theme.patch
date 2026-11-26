@@ -41,29 +41,30 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 
 ---
  .../tasks/tab_management/TabUiThemeUtil.java  | 14 +++
- .../browser/ChromeBaseAppCompatActivity.java  | 91 ++++++++++++++++++-
+ .../browser/ChromeBaseAppCompatActivity.java  | 99 ++++++++++++++++++-
  .../chrome/browser/ChromeTabbedActivity.java  |  5 +
- .../chrome/browser/WarmupManager.java         | 30 ++++++
+ .../chrome/browser/WarmupManager.java         | 40 ++++++++
  .../browser/ntp/IncognitoNewTabPage.java      |  4 +-
  .../browser/ntp/IncognitoNewTabPageView.java  |  4 +-
  .../browser/settings/SettingsActivity.java    |  4 +
  .../settings/SettingsHostFragment.java        |  7 ++
  .../SettingsPageFragmentDelegateImpl.java     |  9 +-
  .../search/SettingsSearchCoordinator.java     |  7 +-
- .../TabbedNavigationBarColorController.java   | 16 +++-
+ .../TabbedNavigationBarColorController.java   | 16 ++-
  .../chrome/browser/hub/HubColors.java         |  3 +-
+ .../android/java/res/values/styles.xml        |  2 +-
  .../settings/ChromeBaseSettingsFragment.java  |  8 ++
  chrome/browser/ui/android/night_mode/BUILD.gn |  2 +
  .../java/res/xml/theme_preferences.xml        | 12 +++
- .../settings/ThemeSettingsFragment.java       | 67 ++++++++++++++
+ .../settings/ThemeSettingsFragment.java       | 67 +++++++++++++
  .../Add-AMOLED-black-theme.grdp               | 18 ++++
  .../res/color-night/bottom_sheet_bg_color.xml |  2 +-
  .../java/res/color-night/dialog_bg_color.xml  |  2 +-
- .../styles/android/java/res/values/attrs.xml  |  3 +
- .../browser_ui/styles/ChromeColors.java       | 41 ++++++++-
+ .../styles/android/java/res/values/attrs.xml  |  6 ++
+ .../browser_ui/styles/ChromeColors.java       | 41 +++++++-
  .../browser_ui/styles/IncognitoColors.java    |  2 +-
- .../android/templates/res/values/themes.xml   | 65 +++++++++++++
- 23 files changed, 402 insertions(+), 14 deletions(-)
+ .../android/templates/res/values/themes.xml   | 68 +++++++++++++
+ 24 files changed, 427 insertions(+), 15 deletions(-)
  create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-AMOLED-black-theme.grdp
 
 diff --git a/chrome/android/features/tab_ui/public/android/java/src/org/chromium/chrome/browser/tasks/tab_management/TabUiThemeUtil.java b/chrome/android/features/tab_ui/public/android/java/src/org/chromium/chrome/browser/tasks/tab_management/TabUiThemeUtil.java
@@ -115,7 +116,14 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
  import android.content.Context;
  import android.content.SharedPreferences;
  import android.content.res.Configuration;
-@@ -36,6 +37,8 @@ import androidx.appcompat.widget.Toolbar;
+@@ -30,12 +31,15 @@ import androidx.annotation.CheckResult;
+ import androidx.annotation.ColorInt;
+ import androidx.annotation.IntDef;
+ import androidx.annotation.LayoutRes;
++import androidx.annotation.StyleRes;
+ import androidx.annotation.VisibleForTesting;
+ import androidx.appcompat.app.AppCompatActivity;
+ import androidx.appcompat.widget.Toolbar;
  
  import com.google.android.material.color.DynamicColors;
  
@@ -124,7 +132,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
  import org.chromium.base.BundleUtils;
  import org.chromium.base.CommandLine;
  import org.chromium.base.ContextUtils;
-@@ -46,6 +49,8 @@ import org.chromium.base.supplier.ObservableSuppliers;
+@@ -46,6 +50,8 @@ import org.chromium.base.supplier.ObservableSuppliers;
  import org.chromium.base.supplier.OneshotSupplier;
  import org.chromium.base.supplier.OneshotSupplierImpl;
  import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
@@ -133,7 +141,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
  import org.chromium.build.annotations.NullMarked;
  import org.chromium.build.annotations.Nullable;
  import org.chromium.chrome.R;
-@@ -66,6 +71,7 @@ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeFieldTrialImpl;
+@@ -66,6 +72,7 @@ import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeFieldTrialImpl;
  import org.chromium.chrome.browser.ui.edge_to_edge.EdgeToEdgeUtils;
  import org.chromium.chrome.browser.preferences.ChromeSharedPreferences;
  import org.chromium.chrome.browser.ui.edge_to_edge.SimpleEdgeToEdgeController;
@@ -141,7 +149,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
  import org.chromium.components.browser_ui.styles.SemanticColorUtils;
  import org.chromium.components.browser_ui.util.AutomotiveUtils;
  import org.chromium.ui.base.ActivityResultTracker;
-@@ -150,6 +156,14 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+@@ -150,6 +157,14 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
      private boolean mInMultiWindowMode;
  
      private static boolean sIsTabletDeterminationMismatchRecord;
@@ -156,7 +164,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
  
      @Override
      protected void attachBaseContext(Context newBase) {
-@@ -279,6 +293,11 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+@@ -279,6 +294,11 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
                  NtpThemeStateProvider.getInstance().addObserver(mNtpThemeStateObserver);
              }
          }
@@ -168,7 +176,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
      }
  
      @Override
-@@ -601,11 +620,31 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+@@ -601,11 +621,26 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
          // in org.chromium.chrome.browser.WarmupManager#applyContextOverrides for Custom Tabs
          // UI that's pre-inflated using a themed application context as part of CCT warmup.
          // Note: this should be called before any calls to `Window#getDecorView`.
@@ -189,20 +197,15 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
 +            if (!wallpaperColors) {
 +                listenForContrastChanges();
 +                mAmoledContrastLevel = getContrastLevel();
-+                if (mAmoledContrastLevel == 1) {
-+                    applySingleThemeOverlay(
-+                            R.style.ThemeOverlay_BrowserUI_AmoledBlack_MediumContrast);
-+                } else if (mAmoledContrastLevel == 2) {
-+                    applySingleThemeOverlay(
-+                            R.style.ThemeOverlay_BrowserUI_AmoledBlack_HighContrast);
-+                }
++                @StyleRes int contrastOverlay = getAmoledContrastOverlay(mAmoledContrastLevel);
++                if (contrastOverlay != 0) applySingleThemeOverlay(contrastOverlay);
 +            }
 +            applySingleThemeOverlay(R.style.ThemeOverlay_BrowserUI_AmoledBlack);
 +        }
  
          // TODO(https://crbug.com/392634251): Explore setting elegantTextHeight to 'true' on older
          // OS versions.
-@@ -630,6 +669,54 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
+@@ -630,6 +665,66 @@ public class ChromeBaseAppCompatActivity extends AppCompatActivity
          }
      }
  
@@ -210,13 +213,25 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ChromeBaseAppCo
 +     * Returns Android's color contrast setting as 0 (standard), 1 (medium) or 2 (high), with the
 +     * thresholds of Material's ColorContrast.
 +     */
-+    private static int getContrastLevel() {
++    static int getContrastLevel() {
 +        if (VERSION.SDK_INT < VERSION_CODES.UPSIDE_DOWN_CAKE) return 0;
 +        UiModeManager uiModeManager =
 +                ContextUtils.getApplicationContext().getSystemService(UiModeManager.class);
 +        if (uiModeManager == null) return 0;
 +        float contrast = uiModeManager.getContrast();
 +        return contrast >= 2 / 3f ? 2 : contrast >= 1 / 3f ? 1 : 0;
++    }
++
++    /**
++     * Returns the overlay of the AMOLED black baseline palette for a contrast level from {@link
++     * #getContrastLevel()}, or 0 at standard contrast. Also used by {@link WarmupManager}.
++     */
++    static @StyleRes int getAmoledContrastOverlay(int contrastLevel) {
++        return switch (contrastLevel) {
++            case 1 -> R.style.ThemeOverlay_BrowserUI_AmoledBlack_MediumContrast;
++            case 2 -> R.style.ThemeOverlay_BrowserUI_AmoledBlack_HighContrast;
++            default -> 0;
++        };
 +    }
 +
 +    /**
@@ -290,7 +305,15 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.j
  import android.content.Context;
  import android.content.Intent;
  import android.content.res.AssetManager;
-@@ -56,12 +57,14 @@ import org.chromium.chrome.browser.tab.TabLaunchType;
+@@ -27,6 +28,7 @@ import android.view.ViewStub;
+ import android.widget.FrameLayout;
+ 
+ import androidx.annotation.IntDef;
++import androidx.annotation.StyleRes;
+ import androidx.annotation.VisibleForTesting;
+ import androidx.core.content.res.ResourcesCompat;
+ 
+@@ -56,12 +58,14 @@ import org.chromium.chrome.browser.tab.TabLaunchType;
  import org.chromium.chrome.browser.tab.TabObserver;
  import org.chromium.chrome.browser.tab.TabSelectionType;
  import org.chromium.chrome.browser.toolbar.ControlContainer;
@@ -305,7 +328,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.j
  import org.chromium.url.GURL;
  import org.chromium.url.Origin;
  
-@@ -70,6 +73,7 @@ import java.lang.annotation.RetentionPolicy;
+@@ -70,6 +74,7 @@ import java.lang.annotation.RetentionPolicy;
  import java.util.HashMap;
  import java.util.HashSet;
  import java.util.Map;
@@ -313,7 +336,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.j
  import java.util.Set;
  
  /**
-@@ -160,6 +164,7 @@ public class WarmupManager {
+@@ -160,6 +165,7 @@ public class WarmupManager {
      private final Map<String, Profile> mPendingPreconnectWithProfile;
  
      private int mToolbarContainerId;
@@ -321,7 +344,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.j
      private @Nullable ViewGroup mMainView;
  
      // Stores a prebuilt tab. To load a URL, this can be used if available instead of creating one
-@@ -382,6 +387,25 @@ public class WarmupManager {
+@@ -382,6 +388,25 @@ public class WarmupManager {
  
          mMainView = inflateViewHierarchy(context, toolbarContainerId, toolbarId);
          mToolbarContainerId = toolbarContainerId;
@@ -347,18 +370,27 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/WarmupManager.j
      }
  
      @VisibleForTesting
-@@ -412,6 +436,10 @@ public class WarmupManager {
+@@ -412,6 +437,19 @@ public class WarmupManager {
              context.getTheme()
                      .applyStyle(R.style.ThemeOverlay_BrowserUI_DefaultFontFamilyThemeOverlay, true);
          }
 +
 +        if (ChromeColors.isAmoledBlackActive(context)) {
++            // The same order as ChromeBaseAppCompatActivity: the baseline palette's contrast
++            // overlay, then the black surfaces.
++            if (!ChromeColors.isAmoledDynamicColorsEnabled()) {
++                @StyleRes
++                int contrastOverlay =
++                        ChromeBaseAppCompatActivity.getAmoledContrastOverlay(
++                                ChromeBaseAppCompatActivity.getContrastLevel());
++                if (contrastOverlay != 0) context.getTheme().applyStyle(contrastOverlay, true);
++            }
 +            context.getTheme().applyStyle(R.style.ThemeOverlay_BrowserUI_AmoledBlack, true);
 +        }
      }
  
      /**
-@@ -503,6 +531,8 @@ public class WarmupManager {
+@@ -503,6 +541,8 @@ public class WarmupManager {
          if (mMainView == null || mToolbarContainerId != toolbarContainerId) {
              return false;
          }
@@ -568,6 +600,18 @@ diff --git a/chrome/browser/hub/internal/android/java/src/org/chromium/chrome/br
              default -> assertFalseAndReturn(Color.TRANSPARENT);
          };
      }
+diff --git a/chrome/browser/quick_delete/android/java/res/values/styles.xml b/chrome/browser/quick_delete/android/java/res/values/styles.xml
+--- a/chrome/browser/quick_delete/android/java/res/values/styles.xml
++++ b/chrome/browser/quick_delete/android/java/res/values/styles.xml
+@@ -8,7 +8,7 @@ found in the LICENSE file.
+     <style name="MoreOptionsButton" parent="FilledButton" >
+         <item name="android:textAppearance">@style/TextAppearance.TextLarge.Primary</item>
+         <item name="android:textAlignment">viewStart</item>
+-        <item name="buttonColor">@color/color_primary_with_alpha_5</item>
++        <item name="buttonColor">?attr/dialogTonalButtonColor</item>
+         <item name="buttonTextColor">@macro/default_text_color</item>
+         <item name="verticalInset">0dp</item>
+         <item name="drawableHeight">@dimen/qd_dialog_button_icon_size</item>
 diff --git a/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java b/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java
 --- a/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java
 +++ b/chrome/browser/settings/android/java/src/org/chromium/chrome/browser/settings/ChromeBaseSettingsFragment.java
@@ -787,13 +831,16 @@ diff --git a/components/browser_ui/styles/android/java/res/color-night/dialog_bg
 diff --git a/components/browser_ui/styles/android/java/res/values/attrs.xml b/components/browser_ui/styles/android/java/res/values/attrs.xml
 --- a/components/browser_ui/styles/android/java/res/values/attrs.xml
 +++ b/components/browser_ui/styles/android/java/res/values/attrs.xml
-@@ -12,4 +12,7 @@ found in the LICENSE file.
+@@ -12,4 +12,10 @@ found in the LICENSE file.
  
      <attr name="iconRowButtonSizeOverlay" format="reference" />
      <attr name="colorButtonSizeOverlay" format="reference" />
 +
 +    <!-- Background of dialogs and bottom sheets in night mode. -->
 +    <attr name="dialogAndSheetBackgroundColor" format="color|reference" />
++
++    <!-- Fill of tonal option buttons inside dialogs, such as quick delete's "More options". -->
++    <attr name="dialogTonalButtonColor" format="color|reference" />
  </resources>
 diff --git a/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java b/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java
 --- a/components/browser_ui/styles/android/java/src/org/chromium/components/browser_ui/styles/ChromeColors.java
@@ -895,17 +942,18 @@ diff --git a/components/browser_ui/styles/android/java/src/org/chromium/componen
 diff --git a/components/browser_ui/theme/android/templates/res/values/themes.xml b/components/browser_ui/theme/android/templates/res/values/themes.xml
 --- a/components/browser_ui/theme/android/templates/res/values/themes.xml
 +++ b/components/browser_ui/theme/android/templates/res/values/themes.xml
-@@ -77,6 +77,9 @@ Note: This is a jinja2 template, processed at build time into the final resource
+@@ -77,6 +77,10 @@ Note: This is a jinja2 template, processed at build time into the final resource
          <item name="globalOutlinedButtonBorderColor">@color/divider_color</item>
          <item name="globalLinkTextColor">?attr/colorPrimary</item>
          <item name="globalClickableSpanColor">?attr/colorPrimary</item>
 +
 +        <!-- Read by the night variants of dialog_bg_color and bottom_sheet_bg_color. -->
 +        <item name="dialogAndSheetBackgroundColor">?attr/colorSurfaceContainerHigh</item>
++        <item name="dialogTonalButtonColor">@color/color_primary_with_alpha_5</item>
          {% endmacro %}
          {{ other_color_attributes() }}
  
-@@ -433,6 +436,68 @@ Note: This is a jinja2 template, processed at build time into the final resource
+@@ -433,6 +437,70 @@ Note: This is a jinja2 template, processed at build time into the final resource
          <!-- TODO(crbug.com/438804527): Update Incognito theme overlay with missing attributes. -->
      </style>
  
@@ -924,6 +972,8 @@ diff --git a/components/browser_ui/theme/android/templates/res/values/themes.xml
 +        <item name="colorSurfaceContainerHighest">@color/gm3_baseline_surface_container_high_dark</item>
 +        <!-- Dialogs and bottom sheets are black too. -->
 +        <item name="dialogAndSheetBackgroundColor">@android:color/black</item>
++        <!-- A faint tint is not visible on black; dialog buttons keep one step of gray. -->
++        <item name="dialogTonalButtonColor">?attr/colorSurfaceContainerHighest</item>
 +        <!-- Elevated surfaces would otherwise be tinted above black. -->
 +        <item name="elevationOverlayEnabled">false</item>
 +    </style>
