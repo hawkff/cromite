@@ -348,5 +348,8 @@ Read-ad-blocking-filter-lists-at-profile-creation.patch
 Hold-navigations-until-ad-blocking-filter-lists-are-read.patch
 Add-a-site-not-working-page-to-page-info.patch
 Show-page-info-from-the-address-bar.patch
+Use-the-ads-site-setting-as-the-allowed-sites-list.patch
+Give-the-ad-blocking-subpages-a-settings-page-title.patch
+Let-the-keyboard-reach-every-remove-button-in-ad-blocking-lists.patch
 
 # extension patches

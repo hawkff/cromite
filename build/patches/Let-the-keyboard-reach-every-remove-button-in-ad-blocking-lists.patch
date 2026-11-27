@@ -1,0 +1,37 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 12:15:11 +0000
+Subject: Let the keyboard reach every remove button in ad blocking lists
+
+On the Allowed sites, Custom filters and Custom filter lists pages, the
+keyboard could not reach the remove buttons in order: the list moved a
+selection over its rows, and as a focus target of its own it took Tab
+and Shift+Tab focus and sent it to the row nearest to the previous
+control. The remove buttons now take focus, and the list itself does
+not, so Tab enters at the first row, moves row by row, and leaves the
+list at either end.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../adblock/settings/AdblockCustomItemFragment.java       | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
+@@ -91,6 +91,14 @@ public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCom
+         mAddButton = rootView.findViewById(R.id.fragment_adblock_custom_item_add_button);
+         mAddButton.setContentDescription(getCustomItemAddButtonContentDescription());
+         mListView = rootView.findViewById(R.id.fragment_adblock_custom_item_listview);
++        // Otherwise the list moves a selection over its rows and the keyboard reaches the remove
++        // button of one row only.
++        mListView.setItemsCanFocus(true);
++        // A focusable list takes Tab and Shift+Tab focus itself and then selects the row nearest
++        // to the previous focus, so focus would enter at a middle row and Shift+Tab could not
++        // leave at the top. Without it, focus enters at the first row's button; inside the list,
++        // the list moves it row by row, and at either end it leaves to the next control.
++        mListView.setFocusable(false);
+         String addDisabledReason = getAddDisabledReason();
+         if (addDisabledReason != null) {
+             mItem.setHint(addDisabledReason);
+--

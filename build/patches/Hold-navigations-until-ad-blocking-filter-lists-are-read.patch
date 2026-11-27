@@ -24,9 +24,9 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  ...filtering_configuration_maintainer_impl.cc |  18 +++
  .../filtering_configuration_maintainer_impl.h |   5 +-
  .../core/subscription/subscription_service.h  |   6 +
- .../subscription/subscription_service_impl.cc |  54 +++++++-
+ .../subscription/subscription_service_impl.cc |  60 ++++++++-
  .../subscription/subscription_service_impl.h  |   4 +
- 8 files changed, 212 insertions(+), 2 deletions(-)
+ 8 files changed, 218 insertions(+), 2 deletions(-)
 
 diff --git a/chrome/browser/adblock/adblock_chrome_content_browser_client.cc b/chrome/browser/adblock/adblock_chrome_content_browser_client.cc
 --- a/chrome/browser/adblock/adblock_chrome_content_browser_client.cc
@@ -300,7 +300,7 @@ diff --git a/components/adblock/core/subscription/subscription_service_impl.cc b
  }
  
  void SubscriptionServiceImpl::StartUpdate() {
-@@ -310,6 +313,45 @@ void SubscriptionServiceImpl::RemoveObserver(SubscriptionObserver* o) {
+@@ -310,6 +313,51 @@ void SubscriptionServiceImpl::RemoveObserver(SubscriptionObserver* o) {
    observers_.RemoveObserver(o);
  }
  
@@ -334,19 +334,25 @@ diff --git a/components/adblock/core/subscription/subscription_service_impl.cc b
 +
 +void SubscriptionServiceImpl::MaybeRunInitializedCallbacks() {
 +  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-+  if (initialized_callbacks_.empty() || !IsInitialized()) {
-+    return;
-+  }
-+  for (base::OnceClosure& callback :
-+       std::exchange(initialized_callbacks_, {})) {
++  // A callback may enable or install a configuration that is still loading.
++  // The callbacks after it then wait for that configuration too.
++  while (!initialized_callbacks_.empty() && IsInitialized()) {
++    base::OnceClosure callback = std::move(initialized_callbacks_.front());
++    initialized_callbacks_.erase(initialized_callbacks_.begin());
++    // A callback may also destroy this service.
++    base::WeakPtr<SubscriptionServiceImpl> weak_this =
++        weak_ptr_factory_.GetWeakPtr();
 +    std::move(callback).Run();
++    if (!weak_this) {
++      return;
++    }
 +  }
 +}
 +
  void SubscriptionServiceImpl::OnEnabledStateChanged(
      FilteringConfiguration* config) {
    auto it = std::ranges::find_if(maintainers_, [&](const auto& entry) {
-@@ -329,6 +371,8 @@ void SubscriptionServiceImpl::OnEnabledStateChanged(
+@@ -329,6 +377,8 @@ void SubscriptionServiceImpl::OnEnabledStateChanged(
      // FilteringConfigurationMaintainer. This cancels all related operations and
      // frees all associated memory.
      it->second.reset();
@@ -355,7 +361,7 @@ diff --git a/components/adblock/core/subscription/subscription_service_impl.cc b
    }
  }
  
-@@ -341,10 +385,18 @@ void SubscriptionServiceImpl::OnSubscriptionUpdated(
+@@ -341,10 +391,18 @@ void SubscriptionServiceImpl::OnSubscriptionUpdated(
  
  std::unique_ptr<FilteringConfigurationMaintainer>
  SubscriptionServiceImpl::MakeMaintainer(FilteringConfiguration* configuration) {

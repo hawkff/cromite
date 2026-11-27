@@ -37,10 +37,10 @@ suit Cromite logic.
  components/adblock/content/browser/BUILD.gn   |   20 +-
  .../content/browser/adblock_blocking_page.cc  |  183 +
  .../content/browser/adblock_blocking_page.h   |   75 +
- .../browser/adblock_content_browser_client.h  |  241 +-
+ .../browser/adblock_content_browser_client.h  |  246 +-
  .../browser/adblock_internals_page_handler.cc |    9 +-
  .../browser/adblock_url_loader_factory.cc     |   73 +-
- .../adblock_web_ui_controller_factory.cc      |    1 +
+ .../adblock_web_ui_controller_factory.cc      |    8 +-
  .../browser/adblock_webcontents_observer.cc   |   63 +-
  .../browser/adblock_webcontents_observer.h    |    5 +-
  .../content/browser/element_hider_impl.cc     |   34 +-
@@ -73,7 +73,7 @@ suit Cromite logic.
  .../persistent_filtering_configuration.h      |    8 +-
  .../core/converter/flatbuffer_converter.cc    |    2 +-
  .../converter/parser/filter_classifier.cc     |    5 +-
- .../adblock/core/converter/parser/metadata.cc |   14 +-
+ .../adblock/core/converter/parser/metadata.cc |   36 +-
  .../core/converter/parser/url_filter.cc       |   20 +-
  .../converter/parser/url_filter_options.cc    |   34 +-
  .../serializer/filter_keyword_extractor.cc    |   13 +-
@@ -125,7 +125,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 120 files changed, 9147 insertions(+), 789 deletions(-)
+ 120 files changed, 9176 insertions(+), 794 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -2491,7 +2491,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
                                                site_for_cookies, user_agent,
                                                std::move(handshake_client),
                                                std::move(options));
-@@ -216,6 +267,97 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -216,6 +267,102 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
        adblock::AdblockInternalsUI>(map);
  }
  
@@ -2510,12 +2510,17 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
 +
 +  auto* browser_context = process->GetBrowserContext();
 +  if (IsFilteringNeeded(browser_context, initiator_origin.GetURL().GetAsReferrer())) {
++    // The ads site setting is read for the current profile above, but an
++    // off-the-record profile has no ad blocking services of its own and
++    // filters with those of its original profile.
++    auto* eyeo_browser_context =
++        GetBrowserContextForEyeoFactories(browser_context);
 +    auto* subscription_service =
 +        adblock::SubscriptionServiceFactory::GetForBrowserContext(
-+            browser_context);
++            eyeo_browser_context);
 +    auto* classification_runner =
 +        adblock::ResourceClassificationRunnerFactory::GetForBrowserContext(
-+            browser_context);
++            eyeo_browser_context);
 +
 +    classification_runner->CheckRequestFilterMatchForWebTransport(
 +        subscription_service->GetCurrentSnapshot(), url,
@@ -2589,7 +2594,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
  template <class ContentBrowserClientBase>
  void AdblockContentBrowserClient<ContentBrowserClientBase>::
      WillCreateURLLoaderFactory(
-@@ -256,29 +398,8 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -256,29 +403,8 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
    auto* eyeo_browser_context =
        GetBrowserContextForEyeoFactories(browser_context);
    bool use_adblock_proxy =
@@ -2621,7 +2626,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
  
    if (use_adblock_proxy) {
      auto [proxied_receiver, target_factory_remote] = factory_builder.Append();
-@@ -288,16 +409,18 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -288,16 +414,18 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
      AdblockContextData::StartProxying(
          eyeo_browser_context, initiator, std::move(proxied_receiver),
          std::move(target_factory_remote),
@@ -2641,7 +2646,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
          const net::SiteForCookies& site_for_cookies,
          const absl::optional<std::string>& user_agent,
          mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
-@@ -312,9 +435,9 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -312,9 +440,9 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
        result == adblock::FilterMatchResult::kBlockRule;
    if (!has_blocking_filter) {
      VLOG(1) << "[eyeo] Web socket allowed for " << url;
@@ -2654,7 +2659,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
                                                  std::move(handshake_client), std::move(options));
        return;
      }
-@@ -331,16 +454,42 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -331,16 +459,42 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
    VLOG(1) << "[eyeo] Web socket blocked for " << url;
  }
  
@@ -2910,13 +2915,28 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
 diff --git a/components/adblock/content/browser/adblock_web_ui_controller_factory.cc b/components/adblock/content/browser/adblock_web_ui_controller_factory.cc
 --- a/components/adblock/content/browser/adblock_web_ui_controller_factory.cc
 +++ b/components/adblock/content/browser/adblock_web_ui_controller_factory.cc
-@@ -20,6 +20,7 @@
+@@ -19,7 +19,9 @@
+ 
  #include "components/adblock/content/browser/adblock_internals_ui.h"
  #include "components/adblock/core/common/web_ui_constants.h"
++#include "content/public/browser/browser_context.h"
  #include "content/public/common/url_utils.h"
 +#include "url/gurl.h"
  
  namespace adblock {
+ 
+@@ -35,7 +37,11 @@ content::WebUI::TypeID AdblockWebUIControllerFactory::GetWebUIType(
+     return content::WebUI::kNoWebUI;
+   }
+ 
+-  if (url.host() == adblock::kChromeUIAdblockInternalsHost) {
++  // An off-the-record profile has no ad blocking services of its own, which
++  // the page reads, and its filter list switch must not change the lists of
++  // the original profile from there.
++  if (url.host() == adblock::kChromeUIAdblockInternalsHost &&
++      !(browser_context && browser_context->IsOffTheRecord())) {
+     return kAdblockInternalsID;
+   }
  
 diff --git a/components/adblock/content/browser/adblock_webcontents_observer.cc b/components/adblock/content/browser/adblock_webcontents_observer.cc
 --- a/components/adblock/content/browser/adblock_webcontents_observer.cc
@@ -4390,15 +4410,17 @@ diff --git a/components/adblock/core/converter/parser/filter_classifier.cc b/com
 diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/adblock/core/converter/parser/metadata.cc
 --- a/components/adblock/core/converter/parser/metadata.cc
 +++ b/components/adblock/core/converter/parser/metadata.cc
-@@ -19,6 +19,7 @@
+@@ -18,7 +18,9 @@
+ #include "components/adblock/core/converter/parser/metadata.h"
  
  #include <algorithm>
++#include <string_view>
  
 +#include "base/no_destructor.h"
  #include "base/logging.h"
  #include "base/strings/string_number_conversions.h"
  #include "base/strings/string_util.h"
-@@ -30,7 +31,7 @@ namespace adblock {
+@@ -30,7 +32,7 @@ namespace adblock {
  // comment line any upcoming comments will be skipped.
  // static
  absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
@@ -4407,7 +4429,36 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
  
    std::string homepage;
    std::string title;
-@@ -51,7 +52,7 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
+@@ -39,11 +41,24 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
+   base::TimeDelta expires = kDefaultExpirationInterval;
+ 
+   std::string line;
++  const auto start_of_stream = filter_stream.tellg();
+   std::getline(filter_stream, line);
+-  if (!IsValidAdblockHeader(line)) {
+-    VLOG(1) << "[eyeo] Invalid filter list. Should start with [Adblock Plus "
+-               "<x>.<y>].";
+-    return {};
++  // A byte order mark before the first line is not part of it.
++  constexpr std::string_view kUtf8ByteOrderMark = "\xEF\xBB\xBF";
++  const size_t mark_size = base::StartsWith(line, kUtf8ByteOrderMark)
++                               ? kUtf8ByteOrderMark.size()
++                               : 0;
++  line.erase(0, mark_size);
++  const std::string_view first_line =
++      base::TrimWhitespaceASCII(line, base::TRIM_ALL);
++  // Lists without a header are accepted. A first line that is a filter or a
++  // metadata comment is read again below; a blank line or another comment is
++  // skipped, as a header is.
++  if (!IsValidAdblockHeader(line) && !first_line.empty() &&
++      (!base::StartsWith(first_line, "!") ||
++       re2::RE2::FullMatch(first_line, *comment_re))) {
++    filter_stream.clear();
++    filter_stream.seekg(start_of_stream + std::streamoff(mark_size));
+   }
+ 
+   std::string key, value;
+@@ -51,7 +66,7 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
    auto position_in_stream = filter_stream.tellg();
    while (std::getline(filter_stream, line)) {
      base::TrimWhitespaceASCII(line, base::TRIM_ALL, &line);
@@ -4416,13 +4467,13 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
        break;
      }
  
-@@ -108,14 +109,15 @@ Metadata::~Metadata() = default;
+@@ -108,14 +123,15 @@ Metadata::~Metadata() = default;
  
  // static
  bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
 -  static re2::RE2 adblock_header_re("^\\[Adblock.*\\]");
-+  if ((true)) return true;
-+  static base::NoDestructor<re2::RE2> adblock_header_re("^\\[Adblock.*\\]");
++  // A header of any format, such as [Adblock Plus 2.0] or [AdGuard].
++  static base::NoDestructor<re2::RE2> adblock_header_re("^\\[.*\\]");
    std::string adblock_header_trimmed;
  
    base::TrimWhitespaceASCII(adblock_header, base::TRIM_ALL,
@@ -4434,7 +4485,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
      return false;
    }
    return true;
-@@ -126,11 +128,11 @@ bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
+@@ -126,11 +142,11 @@ bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
  // static
  base::TimeDelta Metadata::ParseExpirationTime(
      const std::string& expiration_value) {

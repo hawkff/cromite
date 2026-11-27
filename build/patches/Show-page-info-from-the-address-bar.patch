@@ -16,11 +16,140 @@ back button (ThreeDotMenuBackButton) lists it as well.
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 
 ---
- .../src/org/chromium/chrome/browser/util/BrowserUiUtils.java | 5 ++---
- .../Show-page-info-from-the-address-bar.inc                  | 1 +
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ .../omnibox/status/StatusMediator.java        | 10 +++++-
+ .../browser/omnibox/status/StatusView.java    | 31 ++++++++++++++++++-
+ .../omnibox/status/StatusViewBinder.java      |  7 +----
+ .../Show-page-info-from-the-address-bar.grdp  |  6 ++++
+ .../chrome/browser/util/BrowserUiUtils.java   |  5 ++-
+ .../Show-page-info-from-the-address-bar.inc   |  1 +
+ 6 files changed, 49 insertions(+), 11 deletions(-)
+ create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Show-page-info-from-the-address-bar.grdp
  create mode 100644 cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Show-page-info-from-the-address-bar.inc
 
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusMediator.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusMediator.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusMediator.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusMediator.java
+@@ -53,6 +53,7 @@ import org.chromium.chrome.browser.util.BrowserUiUtils;
+ import org.chromium.components.browser_ui.util.DrawableUtils;
+ import org.chromium.components.content_settings.CookieControlsBridge;
+ import org.chromium.components.content_settings.CookieControlsObserver;
++import org.chromium.components.embedder_support.util.UrlUtilities;
+ import org.chromium.components.metrics.OmniboxEventProtosIntDef.PageClassification;
+ import org.chromium.components.omnibox.AutocompleteInput;
+ import org.chromium.components.omnibox.AutocompleteInput.AutocompleteState;
+@@ -820,6 +821,8 @@ public class StatusMediator
+ 
+         mModel.set(
+                 StatusProperties.STATUS_ICON_RESOURCE, getStatusIconResourceForSearchEngineIcon());
++        // The search engine icon does nothing when tapped, so it has no security description.
++        mModel.set(StatusProperties.STATUS_ICON_DESCRIPTION_RES, Resources.ID_NULL);
+         setStatusClickListener(null);
+         updateStatusViewVisibility();
+         return true;
+@@ -935,7 +938,12 @@ public class StatusMediator
+         if (isPageInfoMovedAndConnectionNotSecure()) {
+             return 0;
+         }
+-        return (mSecurityIconRes != 0) ? mSecurityIconDescriptionRes : 0;
++        if (mSecurityIconRes == 0) return 0;
++        // Page info calls the browser's own pages secure.
++        if (UrlUtilities.isChromeScheme(mLocationBarDataProvider.getCurrentGurl())) {
++            return R.string.accessibility_security_btn_internal_page;
++        }
++        return mSecurityIconDescriptionRes;
+     }
+ 
+     private void onPreviewMatchUrlChanged(@Nullable GURL url) {
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusView.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusView.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusView.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusView.java
+@@ -10,6 +10,7 @@ import android.graphics.Rect;
+ import android.graphics.drawable.Drawable;
+ import android.graphics.drawable.RotateDrawable;
+ import android.util.AttributeSet;
++import android.view.Gravity;
+ import android.view.MotionEvent;
+ import android.view.TouchDelegate;
+ import android.view.View;
+@@ -80,6 +81,7 @@ public class StatusView extends LinearLayout {
+     private boolean mAnimatingStatusIconHide;
+     private boolean mIsAnimatingStatusIconChange;
+     private boolean mHoverEnabled;
++    private boolean mUseWideStatusIcon;
+ 
+     private @StringRes int mAccessibilityToast;
+     private @StringRes int mAccessibilityDoubleTapDescription;
+@@ -411,6 +413,32 @@ public class StatusView extends LinearLayout {
+      */
+     void setStatusClickListener(View.OnClickListener listener) {
+         setOnClickListener(listener);
++        // setOnClickListener() makes the view clickable even for a null listener.
++        setClickable(hasOnClickListeners());
++        updateMinimumWidth();
++    }
++
++    /** Specify whether the status view uses the wide minimum width. */
++    void setUseWideStatusIcon(boolean useWideStatusIcon) {
++        mUseWideStatusIcon = useWideStatusIcon;
++        updateMinimumWidth();
++    }
++
++    private void updateMinimumWidth() {
++        Resources res = getResources();
++        if (mUseWideStatusIcon) {
++            setMinimumWidth(res.getDimensionPixelSize(R.dimen.status_view_width_wide));
++            setGravity(Gravity.CENTER);
++            return;
++        }
++        // A tappable icon gets a full touch target. The extra width follows the icon, so the
++        // icon stays where it is.
++        setMinimumWidth(
++                res.getDimensionPixelSize(
++                        hasOnClickListeners()
++                                ? R.dimen.min_touch_target_size
++                                : R.dimen.status_view_width_narrow));
++        setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+     }
+ 
+     /** Configure accessibility descriptions. */
+@@ -514,7 +542,8 @@ public class StatusView extends LinearLayout {
+         mIconView.setContentDescription(description);
+         setImportantForAccessibility(importantForAccessibility);
+         setFocusable(descriptionRes != 0);
+-        setClickable(descriptionRes != 0);
++        // Only a view with a click action is clickable, whichever setter runs last.
++        setClickable(hasOnClickListeners());
+         setLongClickable(descriptionRes != 0);
+     }
+ 
+diff --git a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusViewBinder.java b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusViewBinder.java
+--- a/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusViewBinder.java
++++ b/chrome/browser/ui/android/omnibox/java/src/org/chromium/chrome/browser/omnibox/status/StatusViewBinder.java
+@@ -74,12 +74,7 @@ class StatusViewBinder implements ViewBinder<PropertyModel, StatusView, Property
+                                     .getDimensionPixelSize(R.dimen.location_bar_height);
+             view.setLayoutParams(params);
+         } else if (propertyKey == StatusProperties.USE_WIDE_STATUS_ICON) {
+-            view.setMinimumWidth(
+-                    view.getResources()
+-                            .getDimensionPixelSize(
+-                                    model.get(StatusProperties.USE_WIDE_STATUS_ICON)
+-                                            ? R.dimen.status_view_width_wide
+-                                            : R.dimen.status_view_width_narrow));
++            view.setUseWideStatusIcon(model.get(StatusProperties.USE_WIDE_STATUS_ICON));
+         } else if (propertyKey == StatusProperties.VERBOSE_STATUS_TEXT_COLOR) {
+             view.setVerboseStatusTextColor(model.get(StatusProperties.VERBOSE_STATUS_TEXT_COLOR));
+         } else if (propertyKey == StatusProperties.VERBOSE_STATUS_TEXT_STRING_RES) {
+diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Show-page-info-from-the-address-bar.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Show-page-info-from-the-address-bar.grdp
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Show-page-info-from-the-address-bar.grdp
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="utf-8"?>
++<grit-part>
++    <message name="IDS_ACCESSIBILITY_SECURITY_BTN_INTERNAL_PAGE" desc="Content description of the icon at the start of the address bar on the browser's own pages, such as the flags page. Tapping the icon opens page info, which says the same.">
++        You're viewing a secure Cromite page
++    </message>
++</grit-part>
 diff --git a/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java b/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java
 --- a/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java
 +++ b/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java
