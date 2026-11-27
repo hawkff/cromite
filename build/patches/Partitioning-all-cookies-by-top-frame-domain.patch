@@ -117,7 +117,7 @@ diff --git a/components/browser_ui/strings/android/site_settings.grdp b/componen
    </message>
     <message name="IDS_THIRD_PARTY_COOKIES_LINK_ROW_SUB_LABEL_ENABLED" desc="1 of 3 possible states for the Third-party cookies setting. This text appears beneath the 'Third-party cookies' button label.">
 -    Third-party cookies are allowed
-+    Third-party cookies are partitioned
++    Third-party cookies are kept separate for each site
    </message>
    <message name="IDS_THIRD_PARTY_COOKIES_LINK_ROW_SUB_LABEL_DISABLED" desc="3 of 3 possible states for the Third-party cookies setting. This text appears beneath the 'Third-party cookies' button label." >
      Third-party cookies are blocked
@@ -126,7 +126,7 @@ diff --git a/components/browser_ui/strings/android/site_settings.grdp b/componen
    </message>
    <message name="IDS_WEBSITE_SETTINGS_THIRD_PARTY_COOKIES_PAGE_ALLOW_RADIO_LABEL" desc="1 of 3 options the user has to configure cookies. See the cookies page for context: chrome://settings/cookies.">
 -    Allow third-party cookies
-+    Partitions all cookies by top frame url
++    Keep third-party cookies separate for each site
    </message>
    <message name="IDS_WEBSITE_SETTINGS_THIRD_PARTY_COOKIES_PAGE_BLOCK_RADIO_LABEL" desc="3 of 3 options the user has to configure cookies. See the cookies page for context: chrome://settings/cookies">
      Block third-party cookies
