@@ -28,7 +28,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../native_page/NativePageFactory.java        |  17 +-
  .../NativePageNavigationDelegateImpl.java     |   2 +-
  .../chrome/browser/ntp/NewTabPage.java        |   8 +-
- .../browser/ntp/NewTabPageCoordinator.java    |  47 ++-
+ .../browser/ntp/NewTabPageCoordinator.java    |  49 ++-
  .../ntp/SearchProviderInfoDelegate.java       |   2 +-
  .../ntp/search/SearchBoxViewBinder.java       |   1 +
  .../suggestions/SuggestionsConfig.java        |   2 +-
@@ -57,7 +57,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../Restore-Simplified-NTP-launch.inc         |  12 +
  .../Restore-Simplified-NTP-launch.inc         |   3 +
  .../Restore-Simplified-NTP-launch.inc         |   1 +
- 51 files changed, 700 insertions(+), 78 deletions(-)
+ 51 files changed, 701 insertions(+), 79 deletions(-)
  create mode 100644 chrome/android/java/res/drawable-hdpi/ic_most_visited_placeholder.png
  create mode 100644 chrome/android/java/res/drawable-mdpi/ic_most_visited_placeholder.png
  create mode 100644 chrome/android/java/res/drawable-xhdpi/ic_most_visited_placeholder.png
@@ -919,6 +919,15 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/ntp/NewTabPageC
          if (disable == mDisableUrlFocusChangeAnimations) return;
          if (disable) {
              // Force reset layout translation Y to prevent elements from staying stuck off-screen.
+@@ -1320,7 +1330,7 @@ public class NewTabPageCoordinator implements ModuleDelegateHost {
+         if (!mHasShownView) {
+             mHasShownView = true;
+             onInitializationProgressChanged();
+-            maybeTriggerCustomizationBottomSheet();
++            // No theme tip: theme customization is off by default and the tip only promotes it.
+             TraceEvent.instant("NewTabPageSearchAvailable");
+         }
+     }
 @@ -1739,6 +1749,9 @@ public class NewTabPageCoordinator implements ModuleDelegateHost {
  
      @SuppressWarnings("NullAway")
