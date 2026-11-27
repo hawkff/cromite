@@ -1,0 +1,843 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 22:40:43 +0000
+Subject: Add a "Site not working?" page to page info
+
+Page info gets a row, "Site not working?", below Permissions on http
+and https pages. It opens a page with the protections that most often
+stop a site from working, each with a switch for this site only:
+
+- ad blocking
+- third-party cookie blocking
+- safer JavaScript (JavaScript JIT off)
+- screen size protection (viewport)
+- keyboard size protection
+- time zone protection
+- pop-up blocking
+
+A protection is listed when it is on for this site or for all sites.
+Each line says in plain words what the protection does. A switch this
+page cannot change says why: ad blocking off in the ad blocking
+settings or allowed there for the site or a domain it belongs to, or a
+third-party cookie setting decided by a policy, an extension or an
+exception in Site settings.
+
+While all of them are on, the button "Relax protections for this site"
+turns off, for this site only, ad blocking, third-party cookie
+blocking, safer JavaScript and the screen size, keyboard size and time
+zone protections. While any of these is off for the site, the page
+says that turning them back on removes the site's own exceptions and
+uses the settings for all sites, and the button "Turn protections back
+on" does exactly that for all of them. Pop-up blocking keeps its own
+switch. Each switch sets or removes this site's exception directly.
+
+Page info reloads the page once when it closes after any change made
+in it, including a change on its cookie page, instead of each part
+reloading on its own. Its cookie row and cookie page show a change
+made on the new page right away.
+
+Only per-site settings are written: content setting exceptions for the
+site and its third-party cookie exception through the cookie controls.
+The ad blocker's own Allowed sites list is read, never written.
+Nothing is sent anywhere. The changes are ordinary site settings of
+the profile the page is open in.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ chrome/android/chrome_java_resources.gni      |   1 +
+ chrome/android/chrome_java_sources.gni        |   2 +
+ ...page_info_site_protections_preferences.xml |  13 +
+ .../ChromePageInfoControllerDelegate.java     |   8 +
+ .../PageInfoSiteProtectionsController.java    | 422 ++++++++++++++++++
+ .../PageInfoSiteProtectionsSettings.java      | 106 +++++
+ .../Add-site-protections-to-page-info.grdp    |  81 ++++
+ .../page_info/PageInfoController.java         |  19 +-
+ .../page_info/PageInfoCookiesController.java  |  20 +-
+ .../page_info/PageInfoMainController.java     |   9 +
+ 10 files changed, 678 insertions(+), 3 deletions(-)
+ create mode 100644 chrome/android/java/res/xml/page_info_site_protections_preferences.xml
+ create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java
+ create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java
+ create mode 100644 chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-site-protections-to-page-info.grdp
+
+diff --git a/chrome/android/chrome_java_resources.gni b/chrome/android/chrome_java_resources.gni
+--- a/chrome/android/chrome_java_resources.gni
++++ b/chrome/android/chrome_java_resources.gni
+@@ -669,6 +669,7 @@ chrome_java_resources = [
+   "java/res/xml/legal_information_preferences.xml",
+   "java/res/xml/main_preferences.xml",
+   "java/res/xml/on_startup_preferences.xml",
++  "java/res/xml/page_info_site_protections_preferences.xml",
+   "java/res/xml/personalize_google_services_preferences.xml",
+   "java/res/xml/incognito_preferences.xml",
+   "java/res/xml/privacy_preferences.xml", "java/res/xml/privacy_preferences_cromite.xml",
+diff --git a/chrome/android/chrome_java_sources.gni b/chrome/android/chrome_java_sources.gni
+--- a/chrome/android/chrome_java_sources.gni
++++ b/chrome/android/chrome_java_sources.gni
+@@ -962,6 +962,8 @@ chrome_java_sources = [
+   "java/src/org/chromium/chrome/browser/page_info/ChromePageInfoControllerDelegate.java",
+   "java/src/org/chromium/chrome/browser/page_info/PageInfoAboutThisSiteController.java",
+   "java/src/org/chromium/chrome/browser/page_info/PageInfoHistoryController.java",
++  "java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java",
++  "java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java",
+   "java/src/org/chromium/chrome/browser/page_info/SiteSettingsHelper.java",
+   "java/src/org/chromium/chrome/browser/paint_preview/StartupPaintPreviewHelper.java",
+   "java/src/org/chromium/chrome/browser/paint_preview/StartupPaintPreviewHelperSupplier.java",
+diff --git a/chrome/android/java/res/xml/page_info_site_protections_preferences.xml b/chrome/android/java/res/xml/page_info_site_protections_preferences.xml
+new file mode 100644
+--- /dev/null
++++ b/chrome/android/java/res/xml/page_info_site_protections_preferences.xml
+@@ -0,0 +1,13 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
++
++<!-- The protection switches are added below these two in code. -->
++<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <org.chromium.components.browser_ui.settings.TextMessagePreference
++        android:key="site_protections_intro" />
++
++    <org.chromium.components.browser_ui.settings.ButtonPreference
++        android:key="site_protections_button" />
++
++</PreferenceScreen>
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/page_info/ChromePageInfoControllerDelegate.java b/chrome/android/java/src/org/chromium/chrome/browser/page_info/ChromePageInfoControllerDelegate.java
+--- a/chrome/android/java/src/org/chromium/chrome/browser/page_info/ChromePageInfoControllerDelegate.java
++++ b/chrome/android/java/src/org/chromium/chrome/browser/page_info/ChromePageInfoControllerDelegate.java
+@@ -285,6 +285,14 @@ public class ChromePageInfoControllerDelegate extends PageInfoControllerDelegate
+             PageInfoMainController mainController, ViewGroup rowWrapper) {
+         Collection<PageInfoSubpageController> controllers = new ArrayList<>();
+ 
++        // Add the row for relaxing this site's protections, right below Permissions.
++        var siteProtectionsRow = new PageInfoRowView(rowWrapper.getContext(), null);
++        siteProtectionsRow.setId(PageInfoSiteProtectionsController.ROW_ID);
++        rowWrapper.addView(siteProtectionsRow);
++        controllers.add(
++                new PageInfoSiteProtectionsController(
++                        mainController, siteProtectionsRow, this, mProfile));
++
+         // Add history row.
+         final Tab tab = TabUtils.fromWebContents(mWebContents);
+         var historyRow = new PageInfoRowView(rowWrapper.getContext(), null);
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java b/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java
+new file mode 100644
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java
+@@ -0,0 +1,422 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++package org.chromium.chrome.browser.page_info;
++
++import android.content.res.Resources;
++import android.view.View;
++import android.view.ViewGroup;
++
++import org.chromium.base.task.PostTask;
++import org.chromium.base.task.TaskTraits;
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
++import org.chromium.chrome.R;
++import org.chromium.chrome.browser.profiles.Profile;
++import org.chromium.components.adblock.AdblockController;
++import org.chromium.components.browser_ui.site_settings.ContentSettingsResources;
++import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
++import org.chromium.components.content_settings.ContentSetting;
++import org.chromium.components.content_settings.ContentSettingsType;
++import org.chromium.components.content_settings.CookieControlsBridge;
++import org.chromium.components.content_settings.CookieControlsEnforcement;
++import org.chromium.components.content_settings.CookieControlsObserver;
++import org.chromium.components.content_settings.CookieControlsState;
++import org.chromium.components.embedder_support.util.UrlUtilities;
++import org.chromium.components.page_info.PageInfoControllerDelegate;
++import org.chromium.components.page_info.PageInfoMainController;
++import org.chromium.components.page_info.PageInfoPreferenceSubpageController;
++import org.chromium.components.page_info.PageInfoRowView;
++import org.chromium.url.GURL;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.Locale;
++
++/**
++ * Page info row "Site not working?" and its subpage: the protections that most often stop a site
++ * from working, each with a switch for this site. One button turns them off for this site; once
++ * any is off, the same button removes this site's own exceptions for them, so the settings for
++ * all sites apply again. Only per-site settings are written; global settings never change.
++ */
++@NullMarked
++public class PageInfoSiteProtectionsController extends PageInfoPreferenceSubpageController
++        implements CookieControlsObserver {
++    public static final int ROW_ID = View.generateViewId();
++
++    // Changed together by the button, in the order shown. Third-party cookies go with them.
++    private static final int[] RELAXED_TOGETHER = {
++        ContentSettingsType.ADS,
++        ContentSettingsType.JAVASCRIPT_JIT,
++        ContentSettingsType.VIEWPORT,
++        ContentSettingsType.PROTECTED_KEYBOARD_GEOMETRY,
++        ContentSettingsType.TIMEZONE_OVERRIDE,
++    };
++
++    private final PageInfoMainController mMainController;
++    private final PageInfoRowView mRowView;
++    private final Profile mProfile;
++    private final GURL mUrl;
++    private @Nullable PageInfoSiteProtectionsSettings mSubPage;
++    private @CookieControlsState int mCookieState = CookieControlsState.HIDDEN;
++    private @CookieControlsEnforcement int mCookieEnforcement =
++            CookieControlsEnforcement.NO_ENFORCEMENT;
++    // What the button on the subpage currently says; a tap does what it says.
++    private boolean mButtonTurnsProtectionsOn;
++
++    public PageInfoSiteProtectionsController(
++            PageInfoMainController mainController,
++            PageInfoRowView rowView,
++            PageInfoControllerDelegate delegate,
++            Profile profile) {
++        super(delegate);
++        mMainController = mainController;
++        mRowView = rowView;
++        mProfile = profile;
++        mUrl = mainController.getURL();
++        // Page info swaps the main view out for every subpage, so the row is attached again
++        // after the cookie page or any other subpage may have changed something.
++        mRowView.addOnAttachStateChangeListener(
++                new View.OnAttachStateChangeListener() {
++                    @Override
++                    public void onViewAttachedToWindow(View view) {
++                        refreshCookieState();
++                        updateRow();
++                    }
++
++                    @Override
++                    public void onViewDetachedFromWindow(View view) {}
++                });
++        updateRow();
++    }
++
++    private void updateRow() {
++        PageInfoRowView.ViewParams params = new PageInfoRowView.ViewParams();
++        params.visible =
++                getDelegate().isSiteSettingsAvailable() && UrlUtilities.isHttpOrHttps(mUrl);
++        Resources resources = mRowView.getContext().getResources();
++        params.title = resources.getString(R.string.page_info_site_protections_title);
++        params.subtitle =
++                resources.getString(
++                        isRelaxed()
++                                ? R.string.page_info_site_protections_row_relaxed
++                                : R.string.page_info_site_protections_row);
++        params.iconResId = R.drawable.page_info_shield_question;
++        params.clickCallback = () -> mMainController.launchSubpage(this);
++        mRowView.setParams(params);
++    }
++
++    /** Whether the protection of a content setting type is on with this value. */
++    private static boolean isProtecting(int type, @ContentSetting int value) {
++        // For these two, allowed means the protection is applied.
++        if (type == ContentSettingsType.VIEWPORT
++                || type == ContentSettingsType.PROTECTED_KEYBOARD_GEOMETRY) {
++            return value == ContentSetting.ALLOW;
++        }
++        return value != ContentSetting.ALLOW;
++    }
++
++    /** The value that applies the protection; for the time zone, a random one. */
++    private static @ContentSetting int protectingValue(int type) {
++        return isProtecting(type, ContentSetting.ALLOW)
++                ? ContentSetting.ALLOW
++                : ContentSetting.BLOCK;
++    }
++
++    private static @ContentSetting int relaxedValue(int type) {
++        return protectingValue(type) == ContentSetting.ALLOW
++                ? ContentSetting.BLOCK
++                : ContentSetting.ALLOW;
++    }
++
++    private @ContentSetting int getSetting(int type) {
++        return WebsitePreferenceBridge.getContentSetting(mProfile, type, mUrl, mUrl);
++    }
++
++    private boolean isProtectingForAllSites(int type) {
++        return isProtecting(type, WebsitePreferenceBridge.getDefaultContentSetting(mProfile, type));
++    }
++
++    private boolean isAdBlockingEnabled() {
++        try {
++            return AdblockController.getInstance(mProfile.getOriginalProfile()).isEnabled();
++        } catch (IllegalStateException e) {
++            return false;
++        }
++    }
++
++    /**
++     * Whether the ad blocker's own "Allowed sites" list exempts this site, matching the filter it
++     * makes for each entry: the domain itself and every subdomain.
++     */
++    private boolean isOnAdBlockingAllowList() {
++        String host = mUrl.getHost().toLowerCase(Locale.ROOT);
++        try {
++            for (String domain :
++                    AdblockController.getInstance(mProfile.getOriginalProfile())
++                            .getAllowedDomains()) {
++                String allowed = domain.trim().toLowerCase(Locale.ROOT);
++                if (allowed.isEmpty()) continue;
++                if (host.equals(allowed) || host.endsWith("." + allowed)) return true;
++            }
++        } catch (IllegalStateException e) {
++            return false;
++        }
++        return false;
++    }
++
++    private boolean isOn(int type) {
++        if (type == ContentSettingsType.ADS && !isChangeable(type)) return false;
++        return isProtecting(type, getSetting(type));
++    }
++
++    /** Listed when the protection is on for this site or for all sites. */
++    private boolean isListed(int type) {
++        return isOn(type) || isProtectingForAllSites(type);
++    }
++
++    /**
++     * Whether this site's switch can change the protection. Ad blocking turned off for all sites,
++     * or for this site in the ad blocker's own list, is changed only in the ad blocking settings,
++     * which this page never writes.
++     */
++    private boolean isChangeable(int type) {
++        return type != ContentSettingsType.ADS
++                || (isAdBlockingEnabled() && !isOnAdBlockingAllowList());
++    }
++
++    private boolean isCookieSwitchChangeable() {
++        return mCookieState != CookieControlsState.HIDDEN
++                && mCookieEnforcement == CookieControlsEnforcement.NO_ENFORCEMENT;
++    }
++
++    /** Whether any protection of the button's set is off for this site right now. */
++    private boolean isRelaxed() {
++        if (mCookieState == CookieControlsState.ALLOWED3PC && isCookieSwitchChangeable()) {
++            return true;
++        }
++        for (int type : RELAXED_TOGETHER) {
++            if (isListed(type) && isChangeable(type) && !isOn(type)) return true;
++        }
++        return false;
++    }
++
++    private void turnOff(int type) {
++        WebsitePreferenceBridge.setContentSettingDefaultScope(
++                mProfile, type, mUrl, mUrl, relaxedValue(type));
++    }
++
++    /**
++     * Removes this site's own exception, so the setting for all sites applies. If an exception
++     * covering more sites still leaves the protection off while the setting for all sites has it
++     * on, this site gets the value of the setting for all sites (a custom time zone or blocking
++     * all pop-ups stays as chosen there).
++     */
++    private void turnOn(int type) {
++        WebsitePreferenceBridge.setContentSettingDefaultScope(
++                mProfile, type, mUrl, mUrl, ContentSetting.DEFAULT);
++        if (!isOn(type) && isProtectingForAllSites(type)) {
++            WebsitePreferenceBridge.setContentSettingDefaultScope(
++                    mProfile,
++                    type,
++                    mUrl,
++                    mUrl,
++                    WebsitePreferenceBridge.getDefaultContentSetting(mProfile, type));
++        }
++    }
++
++    /** Reads the third-party cookie state; the bridge reports it while it is created. */
++    private void refreshCookieState() {
++        mCookieState = CookieControlsState.HIDDEN;
++        mCookieEnforcement = CookieControlsEnforcement.NO_ENFORCEMENT;
++        getDelegate().createCookieControlsBridge(this).destroy();
++    }
++
++    /**
++     * Changes this site's third-party cookie exception. The bridge is destroyed without its own
++     * reload on closing; page info reloads the page once when it closes.
++     */
++    private void setThirdPartyCookieBlocking(boolean block) {
++        if (!isCookieSwitchChangeable()) return;
++        CookieControlsBridge bridge = getDelegate().createCookieControlsBridge(this);
++        bridge.setThirdPartyCookieBlockingEnabledForSite(block);
++        bridge.destroy();
++        // Page info's own cookie row and page keep their state from their own bridge.
++        mMainController.refreshCookieControls();
++    }
++
++    @Override
++    public String getSubpageTitle() {
++        return mRowView.getContext().getString(R.string.page_info_site_protections_title);
++    }
++
++    @Override
++    public @Nullable View createViewForSubpage(ViewGroup parent) {
++        assert mSubPage == null;
++        if (!canCreateSubpageFragment()) return null;
++        mSubPage = new PageInfoSiteProtectionsSettings();
++        View view = addSubpageFragment(mSubPage);
++        refreshCookieState();
++        updateSubpage();
++        return view;
++    }
++
++    private void updateSubpage() {
++        if (mSubPage == null) return;
++        Resources resources = mRowView.getContext().getResources();
++        boolean relaxed = isRelaxed();
++        mButtonTurnsProtectionsOn = relaxed;
++        String host = mUrl.getHost();
++        mSubPage.setHeader(
++                relaxed
++                        ? resources.getString(
++                                R.string.page_info_site_protections_intro_relaxed, host)
++                        : resources.getString(R.string.page_info_site_protections_intro, host),
++                resources.getString(
++                        relaxed
++                                ? R.string.page_info_site_protections_restore
++                                : R.string.page_info_site_protections_relax),
++                this::onButtonClicked);
++
++        List<PageInfoSiteProtectionsSettings.Row> rows = new ArrayList<>();
++        for (int type : RELAXED_TOGETHER) {
++            if (isListed(type)) rows.add(createRow(type));
++            if (type == ContentSettingsType.ADS && mCookieState != CookieControlsState.HIDDEN) {
++                rows.add(
++                        new PageInfoSiteProtectionsSettings.Row(
++                                ContentSettingsResources.getIcon(ContentSettingsType.COOKIES),
++                                resources.getString(R.string.page_info_site_protections_cookies),
++                                resources.getString(getCookieSummary()),
++                                mCookieState == CookieControlsState.BLOCKED3PC,
++                                isCookieSwitchChangeable(),
++                                block -> {
++                                    setThirdPartyCookieBlocking(block);
++                                    onChanged();
++                                }));
++            }
++        }
++        if (isListed(ContentSettingsType.POPUPS)) rows.add(createRow(ContentSettingsType.POPUPS));
++        mSubPage.setRows(rows);
++    }
++
++    private int getCookieSummary() {
++        switch (mCookieEnforcement) {
++            case CookieControlsEnforcement.ENFORCED_BY_POLICY:
++                return R.string.page_info_site_protections_cookies_policy;
++            case CookieControlsEnforcement.ENFORCED_BY_EXTENSION:
++                return R.string.page_info_site_protections_cookies_extension;
++            case CookieControlsEnforcement.ENFORCED_BY_COOKIE_SETTING:
++                return R.string.page_info_site_protections_cookies_exception;
++            default:
++                return R.string.page_info_site_protections_cookies_summary;
++        }
++    }
++
++    private PageInfoSiteProtectionsSettings.Row createRow(int type) {
++        Resources resources = mRowView.getContext().getResources();
++        int titleRes;
++        int summaryRes;
++        switch (type) {
++            case ContentSettingsType.ADS:
++                titleRes = R.string.page_info_site_protections_ads;
++                if (!isAdBlockingEnabled()) {
++                    summaryRes = R.string.page_info_site_protections_ads_off_everywhere;
++                } else if (isOnAdBlockingAllowList()) {
++                    summaryRes = R.string.page_info_site_protections_ads_allowed_in_settings;
++                } else {
++                    summaryRes = R.string.page_info_site_protections_ads_summary;
++                }
++                break;
++            case ContentSettingsType.JAVASCRIPT_JIT:
++                titleRes = R.string.page_info_site_protections_jit;
++                summaryRes = R.string.page_info_site_protections_jit_summary;
++                break;
++            case ContentSettingsType.VIEWPORT:
++                titleRes = R.string.page_info_site_protections_viewport;
++                summaryRes = R.string.page_info_site_protections_viewport_summary;
++                break;
++            case ContentSettingsType.PROTECTED_KEYBOARD_GEOMETRY:
++                titleRes = R.string.page_info_site_protections_keyboard;
++                summaryRes = R.string.page_info_site_protections_keyboard_summary;
++                break;
++            case ContentSettingsType.TIMEZONE_OVERRIDE:
++                titleRes = R.string.page_info_site_protections_time_zone;
++                summaryRes = R.string.page_info_site_protections_time_zone_summary;
++                break;
++            default:
++                assert type == ContentSettingsType.POPUPS;
++                titleRes = R.string.page_info_site_protections_popups;
++                summaryRes = R.string.page_info_site_protections_popups_summary;
++        }
++        return new PageInfoSiteProtectionsSettings.Row(
++                ContentSettingsResources.getIcon(type),
++                resources.getString(titleRes),
++                resources.getString(summaryRes),
++                isOn(type),
++                isChangeable(type),
++                on -> {
++                    if (on) {
++                        turnOn(type);
++                    } else {
++                        turnOff(type);
++                    }
++                    onChanged();
++                });
++    }
++
++    /** After a switch: reload once when page info closes, and show the new state. */
++    private void onChanged() {
++        mMainController.reloadPageWhenClosed();
++        updateRow();
++        // Rebuilt after the switch has finished handling its own change. Not posted to the row:
++        // the row is detached while the subpage is shown, and a detached view runs nothing.
++        PostTask.postTask(TaskTraits.UI_USER_VISIBLE, this::updateSubpage);
++    }
++
++    /**
++     * Turns off this site's protections of the button's set, or, when any of them is off, removes
++     * this site's own exceptions for all of them. Then closes page info, which reloads the page.
++     */
++    private void onButtonClicked() {
++        boolean relax = !mButtonTurnsProtectionsOn;
++        for (int type : RELAXED_TOGETHER) {
++            if (!isChangeable(type)) continue;
++            if (!relax) {
++                turnOn(type);
++            } else if (isOn(type)) {
++                turnOff(type);
++            }
++        }
++        if (relax ? mCookieState == CookieControlsState.BLOCKED3PC
++                : mCookieState == CookieControlsState.ALLOWED3PC) {
++            setThirdPartyCookieBlocking(!relax);
++        }
++        mMainController.reloadPageWhenClosed();
++        mMainController.dismiss();
++    }
++
++    @Override
++    public void onStatusChanged(
++            @CookieControlsState int controlsState,
++            @CookieControlsEnforcement int enforcement,
++            long expiration) {
++        mCookieState = controlsState;
++        mCookieEnforcement = enforcement;
++    }
++
++    @Override
++    public void onSubpageRemoved() {
++        mSubPage = null;
++        removeSubpageFragment();
++    }
++
++    @Override
++    public void clearData() {}
++
++    @Override
++    public void updateRowIfNeeded() {
++        updateRow();
++    }
++
++    @Override
++    public void updateSubpageIfNeeded() {}
++}
+diff --git a/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java b/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java
+new file mode 100644
+--- /dev/null
++++ b/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++
++package org.chromium.chrome.browser.page_info;
++
++import static org.chromium.build.NullUtil.assertNonNull;
++
++import android.content.Context;
++import android.os.Bundle;
++
++import androidx.annotation.DrawableRes;
++import androidx.preference.Preference;
++
++import org.chromium.base.Callback;
++import org.chromium.build.annotations.NullMarked;
++import org.chromium.build.annotations.Nullable;
++import org.chromium.chrome.R;
++import org.chromium.components.browser_ui.settings.ButtonPreference;
++import org.chromium.components.browser_ui.settings.ChromeSwitchPreference;
++import org.chromium.components.browser_ui.settings.SettingsUtils;
++import org.chromium.components.browser_ui.settings.TextMessagePreference;
++import org.chromium.components.browser_ui.site_settings.BaseSiteSettingsFragment;
++
++import java.util.ArrayList;
++import java.util.List;
++
++/** Page info subpage with the protections of one site that most often stop it from working. */
++@NullMarked
++public class PageInfoSiteProtectionsSettings extends BaseSiteSettingsFragment {
++    private static final String INTRO_PREFERENCE = "site_protections_intro";
++    private static final String BUTTON_PREFERENCE = "site_protections_button";
++
++    /** One protection switch. */
++    static class Row {
++        final @DrawableRes int iconResId;
++        final String title;
++        final String summary;
++        final boolean on;
++        final boolean enabled;
++        final Callback<Boolean> onChanged;
++
++        Row(
++                @DrawableRes int iconResId,
++                String title,
++                String summary,
++                boolean on,
++                boolean enabled,
++                Callback<Boolean> onChanged) {
++            this.iconResId = iconResId;
++            this.title = title;
++            this.summary = summary;
++            this.on = on;
++            this.enabled = enabled;
++            this.onChanged = onChanged;
++        }
++    }
++
++    private final List<Preference> mRowPreferences = new ArrayList<>();
++
++    @Override
++    public void onCreatePreferences(@Nullable Bundle bundle, @Nullable String rootKey) {
++        // Remove this page if it is restored without its controller.
++        if (!hasSiteSettingsDelegate()) {
++            getParentFragmentManager().beginTransaction().remove(this).commit();
++            return;
++        }
++        SettingsUtils.addPreferencesFromResource(
++                this, R.xml.page_info_site_protections_preferences);
++    }
++
++    /** Sets the text above the switches and the button. */
++    void setHeader(String intro, String buttonText, Runnable onButtonClicked) {
++        TextMessagePreference introPreference = assertNonNull(findPreference(INTRO_PREFERENCE));
++        introPreference.setSummary(intro);
++        ButtonPreference button = assertNonNull(findPreference(BUTTON_PREFERENCE));
++        button.setTitle(buttonText);
++        button.setOnPreferenceClickListener(
++                preference -> {
++                    onButtonClicked.run();
++                    return true;
++                });
++    }
++
++    /** Replaces the protection switches. */
++    void setRows(List<Row> rows) {
++        for (Preference preference : mRowPreferences) {
++            getPreferenceScreen().removePreference(preference);
++        }
++        mRowPreferences.clear();
++        Context context = getPreferenceManager().getContext();
++        for (Row row : rows) {
++            ChromeSwitchPreference preference = new ChromeSwitchPreference(context);
++            preference.setIcon(SettingsUtils.getTintedIcon(context, row.iconResId));
++            preference.setTitle(row.title);
++            preference.setSummary(row.summary);
++            preference.setChecked(row.on);
++            preference.setEnabled(row.enabled);
++            preference.setOnPreferenceChangeListener(
++                    (p, newValue) -> {
++                        row.onChanged.onResult((Boolean) newValue);
++                        return true;
++                    });
++            getPreferenceScreen().addPreference(preference);
++            mRowPreferences.add(preference);
++        }
++    }
++}
+diff --git a/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-site-protections-to-page-info.grdp b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-site-protections-to-page-info.grdp
+new file mode 100644
+--- /dev/null
++++ b/chrome/browser/ui/android/strings/cromite_android_chrome_strings_grd/Add-site-protections-to-page-info.grdp
+@@ -0,0 +1,81 @@
++<?xml version="1.0" encoding="utf-8"?>
++<grit-part>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_TITLE" desc="Title of the page info row, and of the page it opens, that lists the protections that most often stop a site from working.">
++        Site not working?
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_ROW" desc="Second line of the 'Site not working?' row in page info while all of the site's protections are on.">
++        Relax protections for this site only
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_ROW_RELAXED" desc="Second line of the 'Site not working?' row in page info while some protections are off for the site.">
++        Some protections are off for this site
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_INTRO" desc="Text at the top of the 'Site not working?' page while all of the site's protections are on. SITE is the host name of the current site.">
++        If this site isn’t loading or working right, one of these protections may be the cause. Changes apply only to <ph name="SITE">%1$s<ex>example.com</ex></ph>.
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_INTRO_RELAXED" desc="Text at the top of the 'Site not working?' page while a protection of the button's set is off for the site. It says what the button 'Turn protections back on' will do. SITE is the host name of the current site.">
++        Some protections are off for <ph name="SITE">%1$s<ex>example.com</ex></ph>. Turning them back on removes this site’s own exceptions for them and uses your settings for all sites.
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_RELAX" desc="Button on the 'Site not working?' page. Turns off, for the current site only, the protections that most often stop sites from working, then reloads the page.">
++        Relax protections for this site
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_RESTORE" desc="Button on the 'Site not working?' page while a protection of the button's set is off for the site. Removes the site's own exceptions for those protections, so the settings for all sites apply, then reloads the page.">
++        Turn protections back on
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_ADS" desc="Title of the ad blocking switch on the 'Site not working?' page. On means ads are blocked on this site.">
++        Ad blocking
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_ADS_SUMMARY" desc="Summary of the ad blocking switch on the 'Site not working?' page.">
++        Blocks ads and many of the trackers that come with them
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_ADS_OFF_EVERYWHERE" desc="Summary of the ad blocking switch on the 'Site not working?' page when ad blocking is turned off in the ad blocking settings for all sites. The switch is then unavailable.">
++        Off for all sites in ad blocking settings
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_ADS_ALLOWED_IN_SETTINGS" desc="Summary of the ad blocking switch on the 'Site not working?' page when the site, or a domain it belongs to, is on the Allowed sites list in the ad blocking settings. The switch is then unavailable.">
++        Allowed for this site in ad blocking settings
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_COOKIES" desc="Title of the third-party cookies switch on the 'Site not working?' page. On means third-party cookies are blocked on this site.">
++        Third-party cookie blocking
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_COOKIES_SUMMARY" desc="Summary of the third-party cookies switch on the 'Site not working?' page.">
++        Keeps other companies on this site from following you to other sites
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_COOKIES_POLICY" desc="Summary of the third-party cookies switch on the 'Site not working?' page when a policy decides the setting. The switch is then unavailable.">
++        Set by a policy on this device
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_COOKIES_EXTENSION" desc="Summary of the third-party cookies switch on the 'Site not working?' page when an extension decides the setting. The switch is then unavailable.">
++        Set by an extension
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_COOKIES_EXCEPTION" desc="Summary of the third-party cookies switch on the 'Site not working?' page when an exception this page cannot change decides the setting, for example one made outside incognito or one that covers more sites. The switch is then unavailable.">
++        Set by an exception in Site settings
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_JIT" desc="Title of the switch on the 'Site not working?' page that keeps the JavaScript JIT compiler off for this site. On means the JIT is off.">
++        Safer JavaScript
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_JIT_SUMMARY" desc="Summary of the safer JavaScript switch on the 'Site not working?' page.">
++        Turns off a script speed-up that attacks often use (JavaScript JIT). Some games and video sites need the speed-up.
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_VIEWPORT" desc="Title of the viewport size protection switch on the 'Site not working?' page.">
++        Screen size protection
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_VIEWPORT_SUMMARY" desc="Summary of the screen size protection switch on the 'Site not working?' page.">
++        Sites see a slightly different screen size, so your phone is harder to recognize
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_KEYBOARD" desc="Title of the keyboard size protection switch on the 'Site not working?' page.">
++        Keyboard size protection
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_KEYBOARD_SUMMARY" desc="Summary of the keyboard size protection switch on the 'Site not working?' page.">
++        Sites can’t measure your on-screen keyboard
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_TIME_ZONE" desc="Title of the time zone switch on the 'Site not working?' page. On means sites see a custom or random time zone.">
++        Time zone protection
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_TIME_ZONE_SUMMARY" desc="Summary of the time zone protection switch on the 'Site not working?' page.">
++        Sites see a different time zone than yours
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_POPUPS" desc="Title of the pop-up blocking switch on the 'Site not working?' page. On means pop-ups are blocked on this site.">
++        Pop-up blocking
++    </message>
++    <message name="IDS_PAGE_INFO_SITE_PROTECTIONS_POPUPS_SUMMARY" desc="Summary of the pop-up blocking switch on the 'Site not working?' page.">
++        Blocks pop-ups and redirects that you didn’t tap
++    </message>
++</grit-part>
+diff --git a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java
+--- a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java
++++ b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoController.java
+@@ -122,6 +122,9 @@ public class PageInfoController
+     // chrome://settings page).
+     private final boolean mIsInternalPage;
+ 
++    // Set when a change made in page info needs the page reloaded when page info closes.
++    private boolean mReloadPageWhenClosed;
++
+     // The security level of the page (a valid ConnectionSecurityLevel).
+     private final @ConnectionSecurityLevel int mSecurityLevel;
+ 
+@@ -393,11 +396,15 @@ public class PageInfoController
+         mDialog.destroy();
+         mDialog = null;
+         if (mCookiesController != null) {
+-            mCookiesController.destroy();
++            mCookiesController.destroy(/* reloadIfChanged= */ !mReloadPageWhenClosed);
+         }
+         if (mConnectionSecurityController != null) {
+             mConnectionSecurityController.destroy();
+         }
++        // One reload for every change made in page info, including the cookie page's.
++        if (mReloadPageWhenClosed && !mWebContents.isDestroyed()) {
++            mWebContents.getNavigationController().reload(true);
++        }
+     }
+ 
+     /**
+@@ -715,6 +722,16 @@ public class PageInfoController
+         return mFullUrl;
+     }
+ 
++    @Override
++    public void reloadPageWhenClosed() {
++        mReloadPageWhenClosed = true;
++    }
++
++    @Override
++    public void refreshCookieControls() {
++        if (mCookiesController != null) mCookiesController.refreshStatus();
++    }
++
+     /** Dismiss the page info dialog. */
+     @Override
+     public void dismiss() {
+diff --git a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoCookiesController.java b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoCookiesController.java
+--- a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoCookiesController.java
++++ b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoCookiesController.java
+@@ -228,9 +228,25 @@ public class PageInfoCookiesController extends PageInfoPreferenceSubpageControll
+         mRwsInfoForTesting = rwsInfoForTesting;
+     }
+ 
+-    void destroy() {
++    /**
++     * Reads the cookie state again after another part of page info changed it through its own
++     * bridge; this bridge reports only its own changes. A new bridge reports the state while it
++     * is created. The old one is dropped without its reload on closing: the change that calls
++     * this also asks page info for its single reload when it closes.
++     */
++    void refreshStatus() {
+         if (mBridge == null) return;
+-        mBridge.onUiClosing();
++        mBridge.destroy();
++        mBridge = getDelegate().createCookieControlsBridge(this);
++    }
++
++    /**
++     * @param reloadIfChanged Whether to reload the page if the cookie setting was changed here.
++     *     False when page info reloads the page itself.
++     */
++    void destroy(boolean reloadIfChanged) {
++        if (mBridge == null) return;
++        if (reloadIfChanged) mBridge.onUiClosing();
+         mBridge.destroy();
+         mBridge = null;
+     }
+diff --git a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoMainController.java b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoMainController.java
+--- a/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoMainController.java
++++ b/components/page_info/android/java/src/org/chromium/components/page_info/PageInfoMainController.java
+@@ -56,6 +56,15 @@ public interface PageInfoMainController {
+     /** Dismiss the page info dialog. */
+     void dismiss();
+ 
++    /**
++     * Reloads the page once when page info closes, after every change made in it, in place of
++     * the reload the cookie controls would start on their own.
++     */
++    default void reloadPageWhenClosed() {}
++
++    /** Reads the third-party cookie state again after another part of page info changed it. */
++    default void refreshCookieControls() {}
++
+     /** Opens the Safe Browsing help center page. */
+     void openSafeBrowsingHelpCenter();
+ 
+--

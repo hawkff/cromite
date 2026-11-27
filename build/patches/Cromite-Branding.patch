@@ -66,7 +66,8 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  content/child/runtime_features.cc             |  18 +++-
  .../Cromite-Branding.inc                      |   2 +
  tools/grit/grit/grd_reader.py                 |  37 +++++++
- 62 files changed, 248 insertions(+), 156 deletions(-)
+ .../java/strings/android_ui_strings.grd       |   2 +-
+ 63 files changed, 249 insertions(+), 157 deletions(-)
  create mode 100644 cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Cromite-Branding.inc
 
 diff --git a/build/BUILD.gn b/build/BUILD.gn
@@ -15418,4 +15419,16 @@ diff --git a/tools/grit/grit/grd_reader.py b/tools/grit/grit/grd_reader.py
  
  class GrdPartContentHandler(xml.sax.handler.ContentHandler):
    def __init__(self, parent):
+diff --git a/ui/android/java/strings/android_ui_strings.grd b/ui/android/java/strings/android_ui_strings.grd
+--- a/ui/android/java/strings/android_ui_strings.grd
++++ b/ui/android/java/strings/android_ui_strings.grd
+@@ -212,7 +212,7 @@
+ 
+       <!-- Button Menu -->
+       <message name="IDS_ACCESSIBILITY_TOOLBAR_BTN_MENU" desc="Content description for the settings menu button.">
+-        Customize and control Google Chrome
++        More options
+       </message>
+       <message name="IDS_ACCESSIBILITY_LIST_MENU_BUTTON" desc="Content description for the button that shows option menu for a list item.">
+         <ph name="NAME_OF_LIST_ITEM">%1$s<ex>Movie Title</ex></ph> Options
 --

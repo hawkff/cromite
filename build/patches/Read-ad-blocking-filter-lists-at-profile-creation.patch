@@ -1,0 +1,57 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 22:40:40 +0000
+Subject: Read ad blocking filter lists at profile creation
+
+The ad blocking subscription service was created on first use, which is
+the first tab. Only then did it start reading the installed filter lists
+from disk on a worker thread. Requests are checked against the lists that
+are loaded at the time of the request, so the requests of a tab restored
+at startup could be made before the lists were read and were then not
+filtered.
+
+Create the service when the profile is initialized, so the lists are read
+while the rest of the browser starts.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../chrome_browser_main_extra_parts_profiles.cc        | 10 ++++++++++
+ .../chrome_browser_main_extra_parts_profiles.h         |  1 +
+ 2 files changed, 11 insertions(+)
+
+diff --git a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
+--- a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
++++ b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.cc
+@@ -216,6 +216,7 @@
+ #include "chrome/browser/private_verification_tokens/private_verification_tokens_service_factory.h"
+ #include "chrome/browser/profile_resetter/triggered_profile_resetter_factory.h"
+ #include "chrome/browser/profiles/batch_upload/batch_upload_service_factory.h"
++#include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/profiles/renderer_updater_factory.h"
+ #include "chrome/browser/push_messaging/push_messaging_service_factory.h"
+ #include "chrome/browser/reading_list/reading_list_model_factory.h"
+@@ -1612,3 +1613,12 @@ void ChromeBrowserMainExtraPartsProfiles::
+ void ChromeBrowserMainExtraPartsProfiles::PreProfileInit() {
+   EnsureBrowserContextKeyedServiceFactoriesBuilt();
+ }
++
++void ChromeBrowserMainExtraPartsProfiles::PostProfileInit(
++    Profile* profile,
++    bool is_initial_profile) {
++  // Requests are filtered only after the installed filter lists are read.
++  // Created on first use, the service would start reading them only when the
++  // first tab is created, and that tab's first requests do not wait for them.
++  adblock::SubscriptionServiceFactory::GetForBrowserContext(profile);
++}
+diff --git a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.h b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.h
+--- a/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.h
++++ b/chrome/browser/profiles/chrome_browser_main_extra_parts_profiles.h
+@@ -27,6 +27,7 @@ class ChromeBrowserMainExtraPartsProfiles : public ChromeBrowserMainExtraParts {
+ 
+   // Overridden from ChromeBrowserMainExtraParts:
+   void PreProfileInit() override;
++  void PostProfileInit(Profile* profile, bool is_initial_profile) override;
+ };
+ 
+ #endif  // CHROME_BROWSER_PROFILES_CHROME_BROWSER_MAIN_EXTRA_PARTS_PROFILES_H_
+--

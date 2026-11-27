@@ -1,0 +1,406 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 22:40:41 +0000
+Subject: Hold navigations until ad blocking filter lists are read
+
+Requests are checked against the filter lists that are loaded when the
+request starts. At startup the installed lists are read from disk on a
+worker thread, and a tab restored at startup, a link opened from another
+app or a custom tab could start loading before that read finished. Its
+page and the requests the page made were then not filtered.
+
+Defer HTTP and HTTPS navigations, in every profile including
+off-the-record ones, until every enabled filtering configuration has read
+its installed lists. The subscription service reports this through
+IsInitialized() and RunWhenInitialized(). Navigations that start later
+are not throttled. A navigation waits at most 5 seconds; after that it
+goes ahead and a warning is logged.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../adblock_chrome_content_browser_client.cc  | 116 ++++++++++++++++++
+ .../adblock_chrome_content_browser_client.h   |   4 +
+ .../filtering_configuration_maintainer.h      |   7 ++
+ ...filtering_configuration_maintainer_impl.cc |  18 +++
+ .../filtering_configuration_maintainer_impl.h |   5 +-
+ .../core/subscription/subscription_service.h  |   6 +
+ .../subscription/subscription_service_impl.cc |  54 +++++++-
+ .../subscription/subscription_service_impl.h  |   4 +
+ 8 files changed, 212 insertions(+), 2 deletions(-)
+
+diff --git a/chrome/browser/adblock/adblock_chrome_content_browser_client.cc b/chrome/browser/adblock/adblock_chrome_content_browser_client.cc
+--- a/chrome/browser/adblock/adblock_chrome_content_browser_client.cc
++++ b/chrome/browser/adblock/adblock_chrome_content_browser_client.cc
+@@ -17,7 +17,123 @@
+ 
+ #include "chrome/browser/adblock/adblock_chrome_content_browser_client.h"
+ 
++#include <memory>
++
++#include "base/functional/bind.h"
++#include "base/logging.h"
++#include "base/memory/weak_ptr.h"
++#include "base/time/time.h"
++#include "base/timer/timer.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "components/adblock/content/browser/factories/subscription_service_factory.h"
++#include "components/adblock/core/subscription/subscription_service.h"
++#include "content/public/browser/navigation_handle.h"
++#include "content/public/browser/navigation_throttle.h"
++#include "content/public/browser/navigation_throttle_registry.h"
++#include "content/public/browser/web_contents.h"
++
++namespace {
++
++// A navigation waits for the installed filter lists at most this long. Reading
++// them takes well under a second, so reaching the limit means the disk or the
++// worker thread is stalled.
++constexpr base::TimeDelta kFilterListsWaitLimit = base::Seconds(5);
++
++adblock::SubscriptionService* GetSubscriptionService(
++    content::NavigationHandle& handle) {
++  // Off-the-record profiles filter with the lists of their original profile.
++  return adblock::SubscriptionServiceFactory::GetForBrowserContext(
++      Profile::FromBrowserContext(handle.GetWebContents()->GetBrowserContext())
++          ->GetOriginalProfile());
++}
++
++// Defers an HTTP or HTTPS navigation until the installed ad blocking filter
++// lists have been read, because requests are checked only against the lists
++// loaded at the time of the request. After kFilterListsWaitLimit the
++// navigation goes ahead without them.
++class FilterListsReadyNavigationThrottle : public content::NavigationThrottle {
++ public:
++  explicit FilterListsReadyNavigationThrottle(
++      content::NavigationThrottleRegistry& registry)
++      : content::NavigationThrottle(registry) {}
++
++  // content::NavigationThrottle:
++  ThrottleCheckResult WillStartRequest() override { return MaybeDefer(); }
++  ThrottleCheckResult WillRedirectRequest() override { return MaybeDefer(); }
++  const char* GetNameForLogging() override {
++    return "FilterListsReadyNavigationThrottle";
++  }
++
++ private:
++  ThrottleCheckResult MaybeDefer() {
++    if (waited_) {
++      return PROCEED;
++    }
++    adblock::SubscriptionService* service =
++        GetSubscriptionService(*navigation_handle());
++    if (!service || service->IsInitialized()) {
++      return PROCEED;
++    }
++    waited_ = true;
++    waiting_ = true;
++    wait_start_ = base::TimeTicks::Now();
++    LOG(INFO) << "[eyeo] Navigation waits for the filter lists";
++    service->RunWhenInitialized(
++        base::BindOnce(&FilterListsReadyNavigationThrottle::StopWaiting,
++                       weak_ptr_factory_.GetWeakPtr(), /*lists_ready=*/true));
++    wait_limit_.Start(
++        FROM_HERE, kFilterListsWaitLimit,
++        base::BindOnce(&FilterListsReadyNavigationThrottle::StopWaiting,
++                       base::Unretained(this), /*lists_ready=*/false));
++    return DEFER;
++  }
++
++  void StopWaiting(bool lists_ready) {
++    if (!waiting_) {
++      return;
++    }
++    waiting_ = false;
++    wait_limit_.Stop();
++    if (lists_ready) {
++      LOG(INFO) << "[eyeo] Filter lists read, navigation resumes after "
++                << base::TimeTicks::Now() - wait_start_;
++    } else {
++      LOG(WARNING) << "[eyeo] Filter lists not read after "
++                   << kFilterListsWaitLimit
++                   << ", the navigation goes ahead without them";
++    }
++    // May delete this.
++    Resume();
++  }
++
++  // Set once this navigation has waited, so a redirect does not wait again.
++  bool waited_ = false;
++  // True while the navigation is deferred by this throttle.
++  bool waiting_ = false;
++  base::TimeTicks wait_start_;
++  base::OneShotTimer wait_limit_;
++  base::WeakPtrFactory<FilterListsReadyNavigationThrottle> weak_ptr_factory_{
++      this};
++};
++
++}  // namespace
++
++void AdblockChromeContentBrowserClient::CreateThrottlesForNavigation(
++    content::NavigationThrottleRegistry& registry) {
++  adblock::AdblockContentBrowserClient<
++      ChromeContentBrowserClient>::CreateThrottlesForNavigation(registry);
++  content::NavigationHandle& handle = registry.GetNavigationHandle();
++  if (!handle.GetURL().SchemeIsHTTPOrHTTPS()) {
++    return;
++  }
++  // Navigations that start after the lists were read need no throttle.
++  adblock::SubscriptionService* service = GetSubscriptionService(handle);
++  if (!service || service->IsInitialized()) {
++    return;
++  }
++  registry.AddThrottle(
++      std::make_unique<FilterListsReadyNavigationThrottle>(registry));
++}
+ 
+ content::BrowserContext*
+ AdblockChromeContentBrowserClient::GetBrowserContextForEyeoFactories(
+diff --git a/chrome/browser/adblock/adblock_chrome_content_browser_client.h b/chrome/browser/adblock/adblock_chrome_content_browser_client.h
+--- a/chrome/browser/adblock/adblock_chrome_content_browser_client.h
++++ b/chrome/browser/adblock/adblock_chrome_content_browser_client.h
+@@ -25,6 +25,10 @@
+ 
+ class AdblockChromeContentBrowserClient
+     : public adblock::AdblockContentBrowserClient<ChromeContentBrowserClient> {
++ public:
++  void CreateThrottlesForNavigation(
++      content::NavigationThrottleRegistry& registry) override;
++
+  private:
+   content::BrowserContext* GetBrowserContextForEyeoFactories(
+       content::BrowserContext* current_browser_context) override;
+diff --git a/components/adblock/core/subscription/filtering_configuration_maintainer.h b/components/adblock/core/subscription/filtering_configuration_maintainer.h
+--- a/components/adblock/core/subscription/filtering_configuration_maintainer.h
++++ b/components/adblock/core/subscription/filtering_configuration_maintainer.h
+@@ -21,6 +21,7 @@
+ #include <memory>
+ #include <vector>
+ 
++#include "base/functional/callback_forward.h"
+ #include "base/memory/scoped_refptr.h"
+ #include "components/adblock/core/subscription/subscription.h"
+ #include "components/adblock/core/subscription/subscription_collection.h"
+@@ -52,6 +53,12 @@ class FilteringConfigurationMaintainer {
+ 
+   // Removes all subscriptions with InstalationState::AutoInstalled
+   virtual void RemoveAutoInstalledSubscriptions() = 0;
++
++  // Whether the installed filter lists have been read from disk.
++  virtual bool IsInitialized() const = 0;
++  // Runs `callback` once the installed filter lists have been read from disk,
++  // or at once if they already have been.
++  virtual void RunWhenInitialized(base::OnceClosure callback) = 0;
+ };
+ 
+ }  // namespace adblock
+diff --git a/components/adblock/core/subscription/filtering_configuration_maintainer_impl.cc b/components/adblock/core/subscription/filtering_configuration_maintainer_impl.cc
+--- a/components/adblock/core/subscription/filtering_configuration_maintainer_impl.cc
++++ b/components/adblock/core/subscription/filtering_configuration_maintainer_impl.cc
+@@ -17,6 +17,8 @@
+ 
+ #include "components/adblock/core/subscription/filtering_configuration_maintainer_impl.h"
+ 
++#include <utility>
++
+ #include "base/functional/bind.h"
+ #include "base/logging.h"
+ #include "base/strings/string_util.h"
+@@ -157,6 +159,16 @@ bool FilteringConfigurationMaintainerImpl::IsInitialized() const {
+   return status_ == StorageStatus::Initialized;
+ }
+ 
++void FilteringConfigurationMaintainerImpl::RunWhenInitialized(
++    base::OnceClosure callback) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (IsInitialized()) {
++    std::move(callback).Run();
++    return;
++  }
++  initialized_callbacks_.push_back(std::move(callback));
++}
++
+ void FilteringConfigurationMaintainerImpl::InstallMissingSubscriptions() {
+   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+   DCHECK(IsInitialized());
+@@ -251,6 +263,12 @@ void FilteringConfigurationMaintainerImpl::StorageInitialized(
+   TRACE_EVENT_ASYNC_END1(
+       "eyeo", "FilteringConfigurationMaintainerImpl::InitializeStorage",
+       TRACE_ID_LOCAL(this), "name", configuration_->GetName());
++  // The lists and custom filters are in place now, so a snapshot taken by a
++  // callback already filters with them.
++  for (base::OnceClosure& callback :
++       std::exchange(initialized_callbacks_, {})) {
++    std::move(callback).Run();
++  }
+ }
+ 
+ void FilteringConfigurationMaintainerImpl::RemoveDuplicateSubscriptions() {
+diff --git a/components/adblock/core/subscription/filtering_configuration_maintainer_impl.h b/components/adblock/core/subscription/filtering_configuration_maintainer_impl.h
+--- a/components/adblock/core/subscription/filtering_configuration_maintainer_impl.h
++++ b/components/adblock/core/subscription/filtering_configuration_maintainer_impl.h
+@@ -64,6 +64,9 @@ class FilteringConfigurationMaintainerImpl
+   void StartUpdate() final;
+   raw_ptr<SubscriptionPersistentMetadata> GetMetadata() final;
+ 
++  bool IsInitialized() const final;
++  void RunWhenInitialized(base::OnceClosure callback) final;
++
+   // FilteringConfiguration::Observer:
+   void OnFilterListsChanged(FilteringConfiguration* config) final;
+   void OnAllowedDomainsChanged(FilteringConfiguration* config) final;
+@@ -77,7 +80,6 @@ class FilteringConfigurationMaintainerImpl
+     Uninitialized,
+   };
+   class OngoingInstallation;
+-  bool IsInitialized() const;
+   void InstallMissingSubscriptions();
+   void RemoveUnneededSubscriptions();
+   void StorageInitialized(
+@@ -117,6 +119,7 @@ class FilteringConfigurationMaintainerImpl
+   std::set<scoped_refptr<OngoingInstallation>> ongoing_installations_;
+   std::vector<scoped_refptr<InstalledSubscription>> current_state_;
+   scoped_refptr<InstalledSubscription> custom_filters_;
++  std::vector<base::OnceClosure> initialized_callbacks_;
+   base::WeakPtrFactory<FilteringConfigurationMaintainerImpl> weak_ptr_factory_{
+       this};
+ };
+diff --git a/components/adblock/core/subscription/subscription_service.h b/components/adblock/core/subscription/subscription_service.h
+--- a/components/adblock/core/subscription/subscription_service.h
++++ b/components/adblock/core/subscription/subscription_service.h
+@@ -96,6 +96,12 @@ class SubscriptionService : public KeyedService {
+ 
+   virtual void AddObserver(SubscriptionObserver*) = 0;
+   virtual void RemoveObserver(SubscriptionObserver*) = 0;
++
++  // Whether every enabled FilteringConfiguration has read its installed filter
++  // lists from disk. Until then GetCurrentSnapshot() lacks them.
++  virtual bool IsInitialized() const = 0;
++  // Runs `callback` once IsInitialized() is true, or at once if it already is.
++  virtual void RunWhenInitialized(base::OnceClosure callback) = 0;
+ };
+ 
+ }  // namespace adblock
+diff --git a/components/adblock/core/subscription/subscription_service_impl.cc b/components/adblock/core/subscription/subscription_service_impl.cc
+--- a/components/adblock/core/subscription/subscription_service_impl.cc
++++ b/components/adblock/core/subscription/subscription_service_impl.cc
+@@ -21,6 +21,7 @@
+ #include <iterator>
+ #include <memory>
+ #include <set>
++#include <utility>
+ 
+ #include "base/functional/bind.h"
+ #include "base/logging.h"
+@@ -174,6 +175,8 @@ void SubscriptionServiceImpl::UninstallFilteringConfiguration(
+   for (auto& observer : observers_) {
+     observer.OnFilteringConfigurationUninstalled(configuration_name);
+   }
++  // The removed configuration may have been the last one still loading.
++  MaybeRunInitializedCallbacks();
+ }
+ 
+ void SubscriptionServiceImpl::StartUpdate() {
+@@ -310,6 +313,45 @@ void SubscriptionServiceImpl::RemoveObserver(SubscriptionObserver* o) {
+   observers_.RemoveObserver(o);
+ }
+ 
++bool SubscriptionServiceImpl::IsInitialized() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  // Disabled configurations have no maintainer and filter nothing.
++  return std::ranges::all_of(maintainers_, [](const auto& entry) {
++    return !entry.second || entry.second->IsInitialized();
++  });
++}
++
++void SubscriptionServiceImpl::RunWhenInitialized(base::OnceClosure callback) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (IsInitialized()) {
++    std::move(callback).Run();
++    return;
++  }
++  const bool first_waiter = initialized_callbacks_.empty();
++  initialized_callbacks_.push_back(std::move(callback));
++  if (!first_waiter) {
++    return;
++  }
++  for (auto& entry : maintainers_) {
++    if (entry.second && !entry.second->IsInitialized()) {
++      entry.second->RunWhenInitialized(
++          base::BindOnce(&SubscriptionServiceImpl::MaybeRunInitializedCallbacks,
++                         weak_ptr_factory_.GetWeakPtr()));
++    }
++  }
++}
++
++void SubscriptionServiceImpl::MaybeRunInitializedCallbacks() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (initialized_callbacks_.empty() || !IsInitialized()) {
++    return;
++  }
++  for (base::OnceClosure& callback :
++       std::exchange(initialized_callbacks_, {})) {
++    std::move(callback).Run();
++  }
++}
++
+ void SubscriptionServiceImpl::OnEnabledStateChanged(
+     FilteringConfiguration* config) {
+   auto it = std::ranges::find_if(maintainers_, [&](const auto& entry) {
+@@ -329,6 +371,8 @@ void SubscriptionServiceImpl::OnEnabledStateChanged(
+     // FilteringConfigurationMaintainer. This cancels all related operations and
+     // frees all associated memory.
+     it->second.reset();
++    // The disabled configuration may have been the last one still loading.
++    MaybeRunInitializedCallbacks();
+   }
+ }
+ 
+@@ -341,10 +385,18 @@ void SubscriptionServiceImpl::OnSubscriptionUpdated(
+ 
+ std::unique_ptr<FilteringConfigurationMaintainer>
+ SubscriptionServiceImpl::MakeMaintainer(FilteringConfiguration* configuration) {
+-  return maintainer_factory_.Run(
++  auto maintainer = maintainer_factory_.Run(
+       configuration,
+       base::BindRepeating(&SubscriptionServiceImpl::OnSubscriptionUpdated,
+                           weak_ptr_factory_.GetWeakPtr()));
++  // Callers of RunWhenInitialized() also wait for configurations enabled while
++  // they wait.
++  if (maintainer && !initialized_callbacks_.empty()) {
++    maintainer->RunWhenInitialized(
++        base::BindOnce(&SubscriptionServiceImpl::MaybeRunInitializedCallbacks,
++                       weak_ptr_factory_.GetWeakPtr()));
++  }
++  return maintainer;
+ }
+ 
+ }  // namespace adblock
+diff --git a/components/adblock/core/subscription/subscription_service_impl.h b/components/adblock/core/subscription/subscription_service_impl.h
+--- a/components/adblock/core/subscription/subscription_service_impl.h
++++ b/components/adblock/core/subscription/subscription_service_impl.h
+@@ -85,6 +85,8 @@ class SubscriptionServiceImpl final : public SubscriptionService,
+   bool IsAutoInstallEnabled() const final;
+   void AddObserver(SubscriptionObserver*) final;
+   void RemoveObserver(SubscriptionObserver*) final;
++  bool IsInitialized() const final;
++  void RunWhenInitialized(base::OnceClosure callback) final;
+ 
+   // FilteringConfiguration::Observer:
+   void OnEnabledStateChanged(FilteringConfiguration* config) final;
+@@ -93,6 +95,7 @@ class SubscriptionServiceImpl final : public SubscriptionService,
+   void OnSubscriptionUpdated(const GURL& subscription_url);
+   std::unique_ptr<FilteringConfigurationMaintainer> MakeMaintainer(
+       FilteringConfiguration* configuration);
++  void MaybeRunInitializedCallbacks();
+ 
+   SEQUENCE_CHECKER(sequence_checker_);
+   const raw_ptr<PrefService> pref_service_;
+@@ -103,6 +106,7 @@ class SubscriptionServiceImpl final : public SubscriptionService,
+                std::unique_ptr<FilteringConfigurationMaintainer>>;
+   MaintainersCollection maintainers_;
+   base::ObserverList<SubscriptionObserver> observers_;
++  std::vector<base::OnceClosure> initialized_callbacks_;
+   base::WeakPtrFactory<SubscriptionServiceImpl> weak_ptr_factory_{this};
+ };
+ 
+--

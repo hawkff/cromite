@@ -1,0 +1,52 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Thu, 26 Nov 2026 22:40:44 +0000
+Subject: Show page info from the address bar
+
+Chromium 158 moves page info into the app menu ("Site controls") on
+phones (AndroidPageInfoAsAppMenuItem, on by default). With it, secure
+pages show no icon at the start of the address bar, and the icon shown
+on other pages, including the browser's own pages, does nothing when
+tapped.
+
+Keep page info on the address bar: the status icon shows the page's
+security state again and opens page info when tapped, as before the
+move. Site controls stays in the app menu, where the menu with the
+back button (ThreeDotMenuBackButton) lists it as well.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../src/org/chromium/chrome/browser/util/BrowserUiUtils.java | 5 ++---
+ .../Show-page-info-from-the-address-bar.inc                  | 1 +
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+ create mode 100644 cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Show-page-info-from-the-address-bar.inc
+
+diff --git a/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java b/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java
+--- a/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java
++++ b/chrome/browser/util/android/java/src/org/chromium/chrome/browser/util/BrowserUiUtils.java
+@@ -20,7 +20,6 @@ import org.chromium.base.metrics.RecordUserAction;
+ import org.chromium.build.annotations.NullMarked;
+ import org.chromium.build.annotations.Nullable;
+ import org.chromium.chrome.browser.flags.ChromeFeatureList;
+-import org.chromium.ui.base.DeviceFormFactor;
+ import org.chromium.ui.mojom.WindowOpenDisposition;
+ 
+ /** Deals with multiple parts of browser UI code calls. */
+@@ -162,8 +161,8 @@ public class BrowserUiUtils {
+      * @return Whether the page info item should be moved to the app menu.
+      */
+     public static boolean isPageInfoMovedToAppMenu(Context context) {
+-        return ChromeFeatureList.sAndroidPageInfoAsAppMenuItem.isEnabled()
+-                && !DeviceFormFactor.isNonMultiDisplayContextOnTablet(context);
++        // The address bar keeps its security icon, which opens page info.
++        return false;
+     }
+ 
+     /**
+diff --git a/cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Show-page-info-from-the-address-bar.inc b/cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Show-page-info-from-the-address-bar.inc
+new file mode 100644
+--- /dev/null
++++ b/cromite_flags/chrome/browser/flags/android/chrome_feature_list_cc/Show-page-info-from-the-address-bar.inc
+@@ -0,0 +1 @@
++SET_CROMITE_FEATURE_DISABLED(kAndroidPageInfoAsAppMenuItem);
+--

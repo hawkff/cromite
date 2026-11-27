@@ -10,14 +10,15 @@ suit Cromite logic.
  .../adblock_chrome_content_browser_client.cc  |    6 +
  .../adblock_chrome_content_browser_client.h   |    4 +
  chrome/browser/adblock/android/BUILD.gn       |    5 +-
- .../adblock/android/adblock_strings.grd       |   67 +-
- .../java/res/layout/adblock_custom_item.xml   |   14 +-
+ .../adblock/android/adblock_strings.grd       |   96 +-
+ .../java/res/layout/adblock_custom_item.xml   |   25 +-
+ .../layout/adblock_custom_item_settings.xml   |   16 +-
  .../layout/adblock_filter_lists_list_item.xml |   10 +
  ...ences.xml => eyeo_adblock_preferences.xml} |   30 +-
- .../AdblockAllowedDomainsFragment.java        |    7 +-
- .../AdblockCustomFilterListsFragment.java     |   37 +-
- .../AdblockCustomFiltersFragment.java         |    7 +-
- .../settings/AdblockCustomItemFragment.java   |   27 +-
+ .../AdblockAllowedDomainsFragment.java        |   23 +-
+ .../AdblockCustomFilterListsFragment.java     |   60 +-
+ .../AdblockCustomFiltersFragment.java         |   23 +-
+ .../settings/AdblockCustomItemFragment.java   |   44 +-
  .../settings/AdblockFilterListsAdapter.java   |   32 +-
  .../settings/AdblockFilterListsFragment.java  |    8 +-
  .../settings/AdblockSettingsFragment.java     |  202 +-
@@ -90,7 +91,7 @@ suit Cromite logic.
  .../adblock/core/sitekey_storage_impl.cc      |   17 +-
  .../core/subscription/conversion_executors.h  |    1 +
  .../filtering_configuration_maintainer.h      |    4 +
- ...filtering_configuration_maintainer_impl.cc |   36 +-
+ ...filtering_configuration_maintainer_impl.cc |   42 +-
  .../filtering_configuration_maintainer_impl.h |    4 +-
  .../preloaded_subscription_provider_impl.cc   |    4 +-
  ...recommended_subscription_installer_impl.cc |    1 +
@@ -124,7 +125,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 119 files changed, 9077 insertions(+), 725 deletions(-)
+ 120 files changed, 9147 insertions(+), 789 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -298,7 +299,7 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
 +        Block ads that get around filters
 +      </message>
 +      <message name="IDS_ADBLOCK_SETTINGS_PRIVILEGED_FILTERS_ENABLED_SUMMARY" desc="">
-+        Runs small scripts on pages to remove ads that get around ordinary filters. This switch turns on the lists "ABP filters" and "Cromite experimental filters", the only lists allowed to run these scripts (anti-circumvention filters and snippets).
++        Turns on two built-in lists that run small scripts on pages to remove ads that ordinary filters miss
 +      </message>
 +      <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_FILTER_LISTS_TITLE_COUNT" desc="Title of MultiSelectListPreference to choose filter lists">
 +        Filter lists (<ph name="COUNT">%s</ph> selected)
@@ -322,7 +323,7 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
        </message>
        <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_AA_ENABLED_TITLE" desc="Title of SwitchPreference to enable/disable Acceptable Ads">
          Acceptable Ads
-@@ -210,34 +255,34 @@
+@@ -210,34 +255,61 @@
          Allow auto adjustments of filter lists collection, based on your geolocation, to provide the best ad-filtering experience.
        </message>
        <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_DOMAINS_TITLE" desc="Title of Preference to configure allowed domains">
@@ -349,7 +350,8 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
 +        Add a filter list by its address
        </message>
        <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_ADD_CUSTOM_FILTER_LIST" desc="Hint shown in a EditView for adding custom filter list URL">
-         https://example.org/myFilterList.txt
+-        https://example.org/myFilterList.txt
++        Enter a filter list address
        </message>
        <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_CUSTOM_FILTERS_TITLE" desc="Title of the Preference and fragment for adding custom filters">
 -        Custom Filters
@@ -362,6 +364,33 @@ diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser
        <message name="IDS_FRAGMENT_ADBLOCK_MORE_OPTIONS_CUSTOM_FILTERS_HINT" desc="Hint shown in a EditView for adding custom filter">
 -        Enter filter
 +        Enter a filter rule
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_ITEM_REMOVE" desc="Accessibility label of the button that removes one item (a site, a filter list address or a filter rule) from a list in the ad blocking settings. ITEM is the item as shown in the list.">
++        Remove <ph name="ITEM">%1$s<ex>example.com</ex></ph>
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_ALLOWED_DOMAINS_ADD" desc="Accessibility label of the button that adds the typed site to the list of sites where ads are not blocked.">
++        Add site
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_ALLOWED_DOMAINS_EMPTY" desc="Shown on the Allowed sites page while no site has been added.">
++        No sites added. Ads are not blocked on sites you add here.
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_FILTER_LISTS_ADD" desc="Accessibility label of the button that adds the typed filter list address.">
++        Add filter list
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_FILTER_LISTS_EMPTY" desc="Shown on the Custom filter lists page while no list has been added.">
++        No filter lists added
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_FILTER_LISTS_HTTPS_ONLY" desc="Short message shown when the typed filter list address does not start with https://.">
++        Enter an address that starts with https://
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_FILTER_LISTS_INVALID" desc="Short message shown when the typed filter list address cannot be read as a web address.">
++        This address isn’t valid
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_FILTERS_ADD" desc="Accessibility label of the button that adds the typed filter rule.">
++        Add filter
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_CUSTOM_FILTERS_EMPTY" desc="Shown on the Custom filters page while no filter rule has been added.">
++        No filters added
        </message>
      </messages>
    </release>
@@ -395,6 +424,62 @@ diff --git a/chrome/browser/adblock/android/java/res/layout/adblock_custom_item.
  
      <!-- Remove button
           UseCompoundDrawables added to parent element to suppress warning
+@@ -40,11 +50,12 @@
+          not whole element.
+     -->
+     <ImageView
+-        android:contentDescription="@null"
+         android:id="@+id/fragment_adblock_custom_item_remove"
+-        android:layout_width="wrap_content"
+-        android:layout_height="wrap_content"
+-        android:src="@drawable/fragment_adblock_custom_item_remove"
+-        android:paddingStart="16dp" />
++        android:layout_width="48dp"
++        android:layout_height="48dp"
++        android:layout_marginStart="8dp"
++        android:scaleType="center"
++        android:background="?attr/selectableItemBackgroundBorderless"
++        android:src="@drawable/fragment_adblock_custom_item_remove" />
+ 
+ </LinearLayout>
+diff --git a/chrome/browser/adblock/android/java/res/layout/adblock_custom_item_settings.xml b/chrome/browser/adblock/android/java/res/layout/adblock_custom_item_settings.xml
+--- a/chrome/browser/adblock/android/java/res/layout/adblock_custom_item_settings.xml
++++ b/chrome/browser/adblock/android/java/res/layout/adblock_custom_item_settings.xml
+@@ -36,25 +36,27 @@
+             android:hint="@strings/fragment_adblock_settings_add_domain"
+             android:textAppearance="?android:attr/textAppearanceMedium" />
+ 
+-        <!-- Add button -->
++        <!-- Add button, labeled in code -->
+         <ImageView
+-            android:contentDescription="@null"
+             android:id="@+id/fragment_adblock_custom_item_add_button"
+-            android:layout_width="wrap_content"
+-            android:layout_height="wrap_content"
++            android:layout_width="48dp"
++            android:layout_height="48dp"
++            android:layout_marginStart="4dp"
+             android:layout_gravity="center_vertical"
+-            android:src="@drawable/fragment_adblock_custom_item_add"
+-            android:paddingStart="8dp" />
++            android:scaleType="center"
++            android:background="?attr/selectableItemBackgroundBorderless"
++            android:src="@drawable/fragment_adblock_custom_item_add" />
+ 
+     </LinearLayout>
+ 
++    <!-- Shown by the list while it has no items -->
+     <TextView
+         android:id="@+id/fragment_adblock_custom_item_text"
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:paddingTop="32dp"
+         android:paddingBottom="32dp"
+-        android:textAppearance="?android:attr/textAppearanceMedium"/>
++        android:textAppearance="@style/TextAppearance.TextMedium.Secondary"/>
+ 
+     <!-- ListView -->
+     <ListView
 diff --git a/chrome/browser/adblock/android/java/res/layout/adblock_filter_lists_list_item.xml b/chrome/browser/adblock/android/java/res/layout/adblock_filter_lists_list_item.xml
 --- a/chrome/browser/adblock/android/java/res/layout/adblock_filter_lists_list_item.xml
 +++ b/chrome/browser/adblock/android/java/res/layout/adblock_filter_lists_list_item.xml
@@ -499,6 +584,38 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      @Override
      protected List<String> getItems() {
          return AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+@@ -41,8 +46,8 @@ public class AdblockAllowedDomainsFragment extends AdblockCustomItemFragment {
+     }
+ 
+     @Override
+-    protected String getCustomItemTextViewText() {
+-        return getString(R.string.fragment_adblock_settings_allowed_domains_title);
++    protected String getCustomItemEmptyText() {
++        return getString(R.string.fragment_adblock_allowed_domains_empty);
+     }
+ 
+     @Override
+@@ -50,19 +55,9 @@ public class AdblockAllowedDomainsFragment extends AdblockCustomItemFragment {
+         return getString(R.string.fragment_adblock_settings_add_domain);
+     }
+ 
+-    @Override
+-    protected String getCustomItemTextViewContentDescription() {
+-        return new String("Add allowed domain text field");
+-    }
+-
+     @Override
+     protected String getCustomItemAddButtonContentDescription() {
+-        return new String("Allowed domain add button");
+-    }
+-
+-    @Override
+-    protected String getCustomItemRemoveButtonContentDescription() {
+-        return new String("Allowed domain remove button");
++        return getString(R.string.fragment_adblock_allowed_domains_add);
+     }
+ 
+     @Override
 diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
 --- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
 +++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
@@ -518,7 +635,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      private static final String TAG = AdblockCustomFilterListsFragment.class.getSimpleName();
  
      public AdblockCustomFilterListsFragment() {}
-@@ -44,29 +45,19 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment
+@@ -44,61 +45,44 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment
      }
  
      @Override
@@ -543,23 +660,73 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
 -            }
 -            customStrings.add(subscription.url().toString());
 -        }
+-
+-        return customStrings;
 +    protected List<Subscription> getItems() {
 +        return AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
 +            .getCustomSubscriptions();
-+    }
-+
-+    @Override
+     }
+ 
+     @Override
+-    protected String getCustomItemTextViewText() {
+-        return getString(R.string.fragment_adblock_settings_filter_lists_title);
 +    protected String getItemText(Subscription item) {
 +        return item.url().toString();
-+    }
+     }
  
--        return customStrings;
-+    @Override
+     @Override
+-    protected String getCustomItemEditTextHint() {
+-        return getString(R.string.fragment_adblock_more_options_add_custom_filter_list);
 +    protected String getItemStatus(Subscription item) {
 +        return AdblockFilterListsAdapter.getStatusText(getContext(), item);
      }
  
      @Override
+-    protected String getCustomItemTextViewContentDescription() {
+-        return new String("Add custom filter list text field");
++    protected String getCustomItemEmptyText() {
++        return getString(R.string.fragment_adblock_custom_filter_lists_empty);
+     }
+ 
+     @Override
+-    protected String getCustomItemAddButtonContentDescription() {
+-        return new String("Add custom filter list add button");
++    protected String getCustomItemEditTextHint() {
++        return getString(R.string.fragment_adblock_more_options_add_custom_filter_list);
+     }
+ 
+     @Override
+-    protected String getCustomItemRemoveButtonContentDescription() {
+-        return new String("Add custom filter list remove button");
++    protected String getCustomItemAddButtonContentDescription() {
++        return getString(R.string.fragment_adblock_custom_filter_lists_add);
+     }
+ 
+     @Override
+     protected void addItemImpl(String url) {
+         if (!URLUtil.isHttpsUrl(url)) {
+             Toast toast =
+-                    Toast.makeText(getActivity(), "Url must be https format", Toast.LENGTH_SHORT);
++                    Toast.makeText(
++                            getActivity(),
++                            R.string.fragment_adblock_custom_filter_lists_https_only,
++                            Toast.LENGTH_SHORT);
+             toast.setGravity(Gravity.CENTER_VERTICAL | Gravity.CENTER_HORIZONTAL, 0, 0);
+             toast.show();
+             Log.e(TAG, "Invalid url: " + url);
+@@ -108,7 +92,11 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment
+             AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+                     .installSubscription(new URL(URLUtil.guessUrl(url)));
+         } catch (MalformedURLException ex) {
+-            Toast.makeText(getActivity(), "Error parsing url", Toast.LENGTH_SHORT).show();
++            Toast.makeText(
++                            getActivity(),
++                            R.string.fragment_adblock_custom_filter_lists_invalid,
++                            Toast.LENGTH_SHORT)
++                    .show();
+             Log.e(TAG, "Error parsing url: " + url);
+         }
+     }
 diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java
 --- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java
 +++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java
@@ -579,6 +746,38 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      @Override
      public void onActivityCreated(Bundle savedInstanceState) {
          super.onActivityCreated(savedInstanceState);
+@@ -42,8 +47,8 @@ public class AdblockCustomFiltersFragment extends AdblockCustomItemFragment {
+     }
+ 
+     @Override
+-    protected String getCustomItemTextViewText() {
+-        return getString(R.string.fragment_adblock_more_options_custom_filters_title);
++    protected String getCustomItemEmptyText() {
++        return getString(R.string.fragment_adblock_custom_filters_empty);
+     }
+ 
+     @Override
+@@ -51,19 +56,9 @@ public class AdblockCustomFiltersFragment extends AdblockCustomItemFragment {
+         return getString(R.string.fragment_adblock_more_options_custom_filters_hint);
+     }
+ 
+-    @Override
+-    protected String getCustomItemTextViewContentDescription() {
+-        return "Add custom filter text field";
+-    }
+-
+     @Override
+     protected String getCustomItemAddButtonContentDescription() {
+-        return "Custom filter add button";
+-    }
+-
+-    @Override
+-    protected String getCustomItemRemoveButtonContentDescription() {
+-        return "Custom filter remove button";
++        return getString(R.string.fragment_adblock_custom_filters_add);
+     }
+ 
+     @Override
 diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
 --- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
 +++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
@@ -595,7 +794,7 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      private EditText mItem;
      private ImageView mAddButton;
      private ListView mListView;
-@@ -41,6 +42,11 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
+@@ -41,15 +42,20 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
  
      public AdblockCustomItemFragment() {}
  
@@ -607,16 +806,37 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
      @Override
      public View onCreateView(
              LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-@@ -75,7 +81,7 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
+         View rootView = inflater.inflate(R.layout.adblock_custom_item_settings, container, false);
+-        TextView textView = rootView.findViewById(R.id.fragment_adblock_custom_item_text);
+-        textView.setText(getCustomItemTextViewText());
+-        textView.setContentDescription(getCustomItemTextViewContentDescription());
++        TextView emptyView = rootView.findViewById(R.id.fragment_adblock_custom_item_text);
++        emptyView.setText(getCustomItemEmptyText());
+ 
+         bindControls(rootView);
++        mListView.setEmptyView(emptyView);
+ 
+         return rootView;
+     }
+@@ -75,28 +81,25 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
  
      protected abstract void removeItemImpl(String item);
  
 -    protected abstract List<String> getItems();
+-
+-    protected abstract String getCustomItemTextViewText();
 +    protected abstract List<T> getItems();
  
-     protected abstract String getCustomItemTextViewText();
+-    protected abstract String getCustomItemTextViewContentDescription();
++    /** Text shown in place of the list while it has no items. */
++    protected abstract String getCustomItemEmptyText();
  
-@@ -90,10 +96,12 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
+     protected abstract String getCustomItemAddButtonContentDescription();
+ 
+-    protected abstract String getCustomItemRemoveButtonContentDescription();
+-
+     protected abstract String getCustomItemEditTextHint();
+ 
      // Holder for listview items
      private class Holder {
          TextView mItem;
@@ -627,9 +847,12 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
              mItem = rootView.findViewById(R.id.fragment_adblock_custom_item_title);
 +            mStatus = rootView.findViewById(R.id.fragment_adblock_custom_item_status);
              mRemoveButton = rootView.findViewById(R.id.fragment_adblock_custom_item_remove);
-             mRemoveButton.setContentDescription(
-                     AdblockCustomItemFragment.this.getCustomItemRemoveButtonContentDescription());
-@@ -134,16 +142,25 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
+-            mRemoveButton.setContentDescription(
+-                    AdblockCustomItemFragment.this.getCustomItemRemoveButtonContentDescription());
+         }
+     }
+ 
+@@ -134,16 +137,27 @@ public abstract class AdblockCustomItemFragment extends PreferenceFragmentCompat
                  convertView.setTag(new Holder(convertView));
              }
  
@@ -644,6 +867,8 @@ diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser
              holder.mRemoveButton.setOnClickListener(removeItemClickListener);
 -            holder.mRemoveButton.setTag(item.toString());
 +            holder.mRemoveButton.setTag(getItemText(item));
++            holder.mRemoveButton.setContentDescription(
++                    getString(R.string.fragment_adblock_custom_item_remove, getItemText(item)));
  
              return convertView;
          }
@@ -11859,7 +12084,20 @@ diff --git a/components/adblock/core/subscription/filtering_configuration_mainta
    }
  }
  
-@@ -405,15 +418,6 @@ void FilteringConfigurationMaintainerImpl::SubscriptionAddedToStorage(
+@@ -374,8 +387,10 @@ void FilteringConfigurationMaintainerImpl::SubscriptionAddedToStorage(
+   if (ongoing_installations_.find(ongoing_installation) ==
+       ongoing_installations_.end()) {
+     // Installation was canceled. We must now remove the subscription from
+-    // storage. Do not add it to |current_state|.
+-    storage_->RemoveSubscription(subscription);
++    // storage, unless storing it failed. Do not add it to |current_state|.
++    if (subscription) {
++      storage_->RemoveSubscription(subscription);
++    }
+     UpdatePreloadedSubscriptionProvider();
+     return;
+   }
+@@ -405,15 +420,6 @@ void FilteringConfigurationMaintainerImpl::SubscriptionAddedToStorage(
    subscription_updated_callback_.Run(subscription->GetSourceUrl());
  }
  
@@ -11875,7 +12113,7 @@ diff --git a/components/adblock/core/subscription/filtering_configuration_mainta
  void FilteringConfigurationMaintainerImpl::OnHeadRequestDone(
      const std::string version) {
    if (version.empty()) {
-@@ -426,20 +430,20 @@ void FilteringConfigurationMaintainerImpl::OnHeadRequestDone(
+@@ -426,20 +432,20 @@ void FilteringConfigurationMaintainerImpl::OnHeadRequestDone(
  
  void FilteringConfigurationMaintainerImpl::UninstallSubscription(
      const GURL& subscription_url) {
@@ -11900,7 +12138,7 @@ diff --git a/components/adblock/core/subscription/filtering_configuration_mainta
  }
  
  bool FilteringConfigurationMaintainerImpl::UninstallSubscriptionInternal(
-@@ -473,6 +477,8 @@ void FilteringConfigurationMaintainerImpl::SetCustomFilters() {
+@@ -473,6 +479,8 @@ void FilteringConfigurationMaintainerImpl::SetCustomFilters() {
    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
  
    std::vector<std::string> filters = configuration_->GetCustomFilters();

@@ -344,5 +344,9 @@ Match-the-start-screen-to-the-browser-theme.patch
 Show-settings-section-headers-in-the-primary-color.patch
 Shorten-the-address-bar-hint-to-fit.patch
 Disable-the-toolbar-sign-in-button.patch
+Read-ad-blocking-filter-lists-at-profile-creation.patch
+Hold-navigations-until-ad-blocking-filter-lists-are-read.patch
+Add-a-site-not-working-page-to-page-info.patch
+Show-page-info-from-the-address-bar.patch
 
 # extension patches
