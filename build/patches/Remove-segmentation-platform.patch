@@ -7,25 +7,90 @@ Also fixes a crash on startup.
 Original License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
 ---
- .../org/chromium/chrome/browser/flags/ChromeFeatureList.java  | 3 ++-
- .../chrome_browser_main_extra_parts_segmentation_platform.cc  | 4 ++++
- components/segmentation_platform/public/features.cc           | 4 ++++
- 3 files changed, 10 insertions(+), 1 deletion(-)
+ .../browser/flags/ChromeFeatureList.java      |  4 +++-
+ ...NtpCustomizationConfigManagerUnitTest.java | 20 +++++++++++++++----
+ .../NtpCustomizationMediatorUnitTest.java     |  1 +
+ ..._main_extra_parts_segmentation_platform.cc |  4 ++++
+ .../segmentation_platform/public/features.cc  |  4 ++++
+ 5 files changed, 28 insertions(+), 5 deletions(-)
 
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 --- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 +++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
-@@ -1338,8 +1338,9 @@ public abstract class ChromeFeatureList {
+@@ -1338,8 +1338,10 @@ public abstract class ChromeFeatureList {
                      /* defaultValueInTests= */ true);
      public static final CachedFlag sNewTabPageCustomizationThemeSync =
              newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC, /* defaultValue= */ false);
-+    // Off like the native feature: a first run reads this before the native value is cached.
++    // Off like the native feature, also in development builds, which otherwise take
++    // defaultValueInTests: a first run reads this before the native value is cached.
      public static final CachedFlag sNewTabPageCustomizationV2 =
 -            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_V2, true);
-+            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_V2, false, /* defaultValueInTests= */ true);
++            newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_V2, false);
      public static final CachedFlag sNotificationTrampoline =
              newCachedFlag(NOTIFICATION_TRAMPOLINE, false);
      public static final CachedFlag sNotificationTrampolineNoNewTask =
+diff --git a/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationConfigManagerUnitTest.java b/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationConfigManagerUnitTest.java
+--- a/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationConfigManagerUnitTest.java
++++ b/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationConfigManagerUnitTest.java
+@@ -1120,7 +1120,10 @@ public class NtpCustomizationConfigManagerUnitTest {
+     }
+ 
+     @Test
+-    @EnableFeatures(ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC)
++    @EnableFeatures({
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_V2,
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC
++    })
+     public void testMaybeSaveUserSelectedBackgroundTypeToSharedPreference() {
+         NtpCustomizationConfigManager manager = createConfigManagerWithListener();
+         CustomBackgroundInfo info = createTestCustomBackgroundInfo();
+@@ -1134,7 +1137,10 @@ public class NtpCustomizationConfigManagerUnitTest {
+     }
+ 
+     @Test
+-    @EnableFeatures(ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC)
++    @EnableFeatures({
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_V2,
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC
++    })
+     public void testMaybeApplyBackgroundUpdateFromDeviceSync_withThemeMismatch() {
+         NtpCustomizationConfigManager manager = createConfigManagerWithListener();
+         CustomBackgroundInfo info = createTestCustomBackgroundInfo();
+@@ -1165,7 +1171,10 @@ public class NtpCustomizationConfigManagerUnitTest {
+     }
+ 
+     @Test
+-    @EnableFeatures(ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC)
++    @EnableFeatures({
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_V2,
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC
++    })
+     public void testMaybeApplyBackgroundUpdateFromDeviceSync_colorOnlyChange_reapplies() {
+         NtpCustomizationConfigManager manager = createConfigManagerWithListener();
+         CustomBackgroundInfo info = createTestCustomBackgroundInfo();
+@@ -1461,7 +1470,10 @@ public class NtpCustomizationConfigManagerUnitTest {
+     }
+ 
+     @Test
+-    @EnableFeatures(ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC)
++    @EnableFeatures({
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_V2,
++        ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC
++    })
+     public void testOnSyncedChromeColorChanged_sameColorBeforeInitialized_isIgnored() {
+         // The persisted Chrome color is replayed on startup before it is initialized. It is
+         // compared with SharedPreferences, so nothing is replaced and the Activity isn't recreated.
+diff --git a/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationMediatorUnitTest.java b/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationMediatorUnitTest.java
+--- a/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationMediatorUnitTest.java
++++ b/chrome/browser/ntp_customization/junit/src/org/chromium/chrome/browser/ntp_customization/NtpCustomizationMediatorUnitTest.java
+@@ -477,6 +477,7 @@ public class NtpCustomizationMediatorUnitTest {
+     }
+ 
+     @Test
++    @Features.EnableFeatures(ChromeFeatureList.NEW_TAB_PAGE_CUSTOMIZATION_V2)
+     public void testBuildListContentWhenProfileIsNotReady() {
+         List<Integer> listContent = mMediator.buildListContent(mContext);
+         assertEquals(List.of(MVT, NTP_CARDS, THEME), listContent);
 diff --git a/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc b/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc
 --- a/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc
 +++ b/chrome/browser/segmentation_platform/chrome_browser_main_extra_parts_segmentation_platform.cc

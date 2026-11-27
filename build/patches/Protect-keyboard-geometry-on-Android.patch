@@ -2163,7 +2163,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/tab/TabWebConte
 diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 --- a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
 +++ b/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/flags/ChromeFeatureList.java
-@@ -1770,7 +1770,7 @@ public abstract class ChromeFeatureList {
+@@ -1771,7 +1771,7 @@ public abstract class ChromeFeatureList {
      public static final MutableFlagWithSafeDefault sBookmarksBarNTP =
              newMutableFlagWithSafeDefault(BOOKMARKS_BAR_NTP, false);
      public static final MutableFlagWithSafeDefault sBrowserControlsEarlyResize =

@@ -14,27 +14,29 @@ feature is already never shown.
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 
 ---
- .../src/org/chromium/components/signin/SigninFeatureMap.java   | 3 ++-
- components/signin/public/base/signin_switches.cc               | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ .../org/chromium/components/signin/SigninFeatureMap.java   | 7 +++----
+ components/signin/public/base/signin_switches.cc           | 1 +
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java b/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java
 --- a/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java
 +++ b/components/signin/public/android/java/src/org/chromium/components/signin/SigninFeatureMap.java
-@@ -34,11 +34,12 @@ public final class SigninFeatureMap extends FeatureMap {
+@@ -34,12 +34,11 @@ public final class SigninFeatureMap extends FeatureMap {
                      SigninFeatures.PROFILE_DISC_ON_ALL_PAGES,
                      /* defaultValue= */ true,
                      /* defaultValueInTests= */ true);
-+    // Off like the native feature: a first run reads this before the native value is cached.
++    // Off like the native feature, also in development builds, which otherwise take
++    // defaultValueInTests: a first run reads this before the native value is cached.
      public static final CachedFlag sSigninLevelUpButton =
              new CachedFlag(
-                     sInstance,
-                     SigninFeatures.SIGNIN_LEVEL_UP_BUTTON,
+-                    sInstance,
+-                    SigninFeatures.SIGNIN_LEVEL_UP_BUTTON,
 -                    /* defaultValue= */ true,
-+                    /* defaultValue= */ false,
-                     /* defaultValueInTests= */ true);
+-                    /* defaultValueInTests= */ true);
++                    sInstance, SigninFeatures.SIGNIN_LEVEL_UP_BUTTON, /* defaultValue= */ false);
      public static final CachedFlag sSupportForcedSigninPolicy =
              new CachedFlag(
+                     sInstance,
 diff --git a/components/signin/public/base/signin_switches.cc b/components/signin/public/base/signin_switches.cc
 --- a/components/signin/public/base/signin_switches.cc
 +++ b/components/signin/public/base/signin_switches.cc

@@ -207,8 +207,8 @@ diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/f
 +            newCachedFlag(SHOW_ALWAYS_CONTEXT_MENU_ON_LINKS, false);
      public static final CachedFlag sNewTabPageCustomizationThemeSync =
              newCachedFlag(NEW_TAB_PAGE_CUSTOMIZATION_THEME_SYNC, /* defaultValue= */ false);
-     // Off like the native feature: a first run reads this before the native value is cached.
-@@ -1663,6 +1667,7 @@ public abstract class ChromeFeatureList {
+     // Off like the native feature, also in development builds, which otherwise take
+@@ -1664,6 +1668,7 @@ public abstract class ChromeFeatureList {
                      sSettingsInTabDesktop,
                      sSettingsInTabUrlNav,
                      sSettingsSearchCollapsibleSearchBox,

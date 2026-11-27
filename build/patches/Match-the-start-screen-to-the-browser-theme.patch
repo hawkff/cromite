@@ -4,48 +4,49 @@ Subject: Match the start screen to the browser theme
 
 Since Android 12 the system shows a start screen whenever the browser
 starts without a running activity. It is drawn from the theme in the
-manifest, so it follows the system's dark mode, not the browser's own
-theme setting, and it does not follow the browser's AMOLED black
-setting.
+manifest, which follows the system's dark mode: light by day and dark
+gray at night. With AMOLED black on, the browser is black at night, so
+that start screen does not match it.
 
-On Android 13 and later, set the theme of the next start screen from the
-browser's theme setting: light for Light, dark gray for Dark, black for
-Dark with AMOLED black, and light by day and black at night for System
-default with AMOLED black. System default without AMOLED black resets to
-the theme in the manifest. The themes show no icon, like the tabbed
-browser theme.
+On Android 13 and later, while AMOLED black is on, set the theme of the
+next start screen to one that is light by day and black at night and
+shows no icon, like the tabbed browser theme. With AMOLED black off,
+reset it to the theme in the manifest.
 
-Android looks the theme up by name, so the names are kept in release
-builds. The theme is set right after the theme setting or the AMOLED
-black switch is written, and once per process in deferred startup, after
-the first frame. Within a process it is set again only when it changes.
-Android keeps one start screen theme per app, so custom tabs and web
-apps started from the home screen use it too. Android 12 has no such
-setting and is unchanged.
+The start screen keeps following the system's dark mode, not the
+browser's Light or Dark setting. Android keeps one start screen theme
+per app, so custom tabs and web apps started from the home screen use
+it too, and custom tabs follow the system's dark mode unless the app
+that opens them asks for a color scheme. A start screen taken from the
+browser's setting would show a light screen before a dark custom tab,
+or the reverse.
+
+Android looks the theme up by name, so the name is kept in release
+builds. The theme is set right after the AMOLED black switch is
+written, and once per process in deferred startup, after the first
+frame. Within a process it is set again only when it changes. Android
+12 has no such setting and is unchanged.
 
 License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
 
 ---
- chrome/android/aapt2.config                   |  4 ++
- .../chrome/browser/app/ChromeActivity.java    |  9 ++++
+ chrome/android/aapt2.config                   |  1 +
+ .../chrome/browser/app/ChromeActivity.java    |  9 +++++
  chrome/browser/ui/android/night_mode/BUILD.gn |  1 +
- .../GlobalNightModeStateController.java       |  8 ++++
- .../browser/night_mode/NightModeUtils.java    | 41 +++++++++++++++++++
+ .../GlobalNightModeStateController.java       |  7 ++++
+ .../browser/night_mode/NightModeUtils.java    | 33 +++++++++++++++++++
  .../android/java/res/values-night/colors.xml  |  1 +
- .../theme/android/java/res/values/colors.xml  |  2 +
- .../android/templates/res/values/themes.xml   | 20 +++++++++
- 8 files changed, 86 insertions(+)
+ .../theme/android/java/res/values/colors.xml  |  2 ++
+ .../android/templates/res/values/themes.xml   |  8 +++++
+ 8 files changed, 62 insertions(+)
 
 diff --git a/chrome/android/aapt2.config b/chrome/android/aapt2.config
 --- a/chrome/android/aapt2.config
 +++ b/chrome/android/aapt2.config
-@@ -24,3 +24,7 @@ drawable/topic_taxonomy_1_id_332#no_collapse
+@@ -24,3 +24,4 @@ drawable/topic_taxonomy_1_id_332#no_collapse
  drawable/topic_taxonomy_1_id_57#no_collapse
  drawable/topic_taxonomy_1_id_86#no_collapse
  dimen/automotive_ui_scale_factor#no_collapse
-+style/Theme.BrowserUI.StartScreen.Light#no_collapse
-+style/Theme.BrowserUI.StartScreen.Dark#no_collapse
-+style/Theme.BrowserUI.StartScreen.Black#no_collapse
 +style/Theme.BrowserUI.StartScreen.DayBlack#no_collapse
 diff --git a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java b/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
 --- a/chrome/android/java/src/org/chromium/chrome/browser/app/ChromeActivity.java
@@ -103,13 +104,12 @@ diff --git a/chrome/browser/ui/android/night_mode/java/src/org/chromium/chrome/b
  
  /** Maintains and provides the night mode state for the entire application. */
  @JNINamespace("night_mode")
-@@ -52,6 +54,12 @@ class GlobalNightModeStateController
+@@ -52,6 +54,11 @@ class GlobalNightModeStateController
          mPreferenceListener =
                  (prefs, key) -> {
                      if (TextUtils.equals(key, UI_THEME_SETTING)) updateNightMode();
-+                    // Every writer of these two values, the settings page and native code alike.
-+                    if (TextUtils.equals(key, UI_THEME_SETTING)
-+                            || TextUtils.equals(key, ChromeColors.PREF_AMOLED_BLACK)) {
++                    // The start screen theme depends on the AMOLED black switch only.
++                    if (TextUtils.equals(key, ChromeColors.PREF_AMOLED_BLACK)) {
 +                        Activity activity = ApplicationStatus.getLastTrackedFocusedActivity();
 +                        if (activity != null) NightModeUtils.updateStartScreenTheme(activity);
 +                    }
@@ -147,33 +147,25 @@ diff --git a/chrome/browser/ui/android/night_mode/java/src/org/chromium/chrome/b
      private static @Nullable Boolean sNightModeSupportedForTest;
  
      /**
-@@ -130,6 +139,38 @@ public class NightModeUtils {
+@@ -130,6 +139,30 @@ public class NightModeUtils {
          ChromeSharedPreferences.getInstance().writeInt(UI_THEME_SETTING, theme);
      }
  
 +    /**
-+     * Sets the theme of the start screen that Android 13 and later show on the next cold start, so
-+     * that its color matches the first frame of the browser. Android keeps one such theme for the
-+     * whole app, so custom tabs and web apps started from the home screen get it too.
++     * Sets the theme of the start screen that Android 13 and later show when the browser starts
++     * without a running activity. With AMOLED black on, it is light by day and black at night;
++     * otherwise it is the theme in the manifest. Both follow the system's dark mode, not the
++     * browser's theme setting: Android keeps one such theme for the whole app, and custom tabs
++     * follow the system's dark mode as well.
 +     *
 +     * @param activity Any running activity of the browser.
 +     */
 +    public static void updateStartScreenTheme(Activity activity) {
 +        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
-+        boolean amoledBlack = ChromeColors.isAmoledBlackEnabled();
 +        @StyleRes int theme =
-+                switch (getThemeSetting()) {
-+                    case ThemeType.LIGHT -> R.style.Theme_BrowserUI_StartScreen_Light;
-+                    case ThemeType.DARK ->
-+                            amoledBlack
-+                                    ? R.style.Theme_BrowserUI_StartScreen_Black
-+                                    : R.style.Theme_BrowserUI_StartScreen_Dark;
-+                    // Without AMOLED black, the theme in the manifest follows the system already.
-+                    default ->
-+                            amoledBlack
-+                                    ? R.style.Theme_BrowserUI_StartScreen_DayBlack
-+                                    : Resources.ID_NULL;
-+                };
++                ChromeColors.isAmoledBlackEnabled()
++                        ? R.style.Theme_BrowserUI_StartScreen_DayBlack
++                        : Resources.ID_NULL;
 +        // Android stores the theme by name. Each call goes to the system's package service, so
 +        // call it once per process and then only when the theme changes.
 +        String name =
@@ -208,27 +200,15 @@ diff --git a/components/browser_ui/theme/android/java/res/values/colors.xml b/co
 diff --git a/components/browser_ui/theme/android/templates/res/values/themes.xml b/components/browser_ui/theme/android/templates/res/values/themes.xml
 --- a/components/browser_ui/theme/android/templates/res/values/themes.xml
 +++ b/components/browser_ui/theme/android/templates/res/values/themes.xml
-@@ -351,6 +351,26 @@ Note: This is a jinja2 template, processed at build time into the final resource
+@@ -351,6 +351,14 @@ Note: This is a jinja2 template, processed at build time into the final resource
          <item name="android:windowOptOutEdgeToEdgeEnforcement" tools:targetApi="35">false</item>
      </style>
  
-+    <!-- Start screen themes, set from the browser's theme setting on Android 13 and later.
-+         Android looks them up by name at launch, so release builds keep their names. Like the
-+         tabbed browser theme, they show no icon. -->
-+    <style name="Theme.BrowserUI.StartScreen" parent="Theme.BrowserUI.DayNight">
++    <!-- Start screen theme while AMOLED black is on, set on Android 13 and later. It follows the
++         system: light by day, black at night. Android looks it up by name at launch, so release
++         builds keep its name. Like the tabbed browser theme, it shows no icon. -->
++    <style name="Theme.BrowserUI.StartScreen.DayBlack" parent="Theme.BrowserUI.DayNight">
 +        <item name="android:windowSplashScreenAnimatedIcon" tools:targetApi="31">@android:color/transparent</item>
-+    </style>
-+    <style name="Theme.BrowserUI.StartScreen.Light">
-+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/system_neutral1_10</item>
-+    </style>
-+    <style name="Theme.BrowserUI.StartScreen.Dark">
-+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/system_neutral1_900</item>
-+    </style>
-+    <style name="Theme.BrowserUI.StartScreen.Black">
-+        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@android:color/black</item>
-+    </style>
-+    <!-- Follows the system: light by day, black at night. -->
-+    <style name="Theme.BrowserUI.StartScreen.DayBlack">
 +        <item name="android:windowSplashScreenBackground" tools:targetApi="31">@color/splash_screen_amoled_bg</item>
 +    </style>
 +

@@ -25,7 +25,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/browser/component_updater/BUILD.gn     |  4 ++--
  chrome/browser/extensions/api/BUILD.gn        |  2 +-
  .../api/glic_private/glic_private_api.cc      |  2 +-
- .../browser/flags/ChromeFeatureList.java      |  3 ++-
+ .../browser/flags/ChromeFeatureList.java      |  5 ++--
  chrome/browser/glic/public/glic_enabling.cc   | 23 +++++++++----------
  .../optimization_guide_keyed_service.cc       | 13 +----------
  chrome/browser/profiles/BUILD.gn              |  2 +-
@@ -42,7 +42,7 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/utility/services.cc                    |  2 +-
  .../autofill/core/common/autofill_prefs.cc    |  2 +-
  components/browser_sync/BUILD.gn              |  2 +-
- 35 files changed, 73 insertions(+), 121 deletions(-)
+ 35 files changed, 74 insertions(+), 122 deletions(-)
 
 diff --git a/chrome/android/java/res/xml/main_preferences.xml b/chrome/android/java/res/xml/main_preferences.xml
 --- a/chrome/android/java/res/xml/main_preferences.xml
@@ -457,10 +457,11 @@ diff --git a/chrome/browser/flags/android/java/src/org/chromium/chrome/browser/f
                      GESTURE_USER_EDUCATION_BACK_SWIPE,
                      /* defaultValue= */ false,
                      /* defaultValueInTests= */ true);
-+    // Off like the native feature: a first run reads this before the native value is cached.
-     public static final CachedFlag sGlic =
+-    public static final CachedFlag sGlic =
 -            newCachedFlag(GLIC, true, /* defaultValueInTests= */ true);
-+            newCachedFlag(GLIC, false, /* defaultValueInTests= */ true);
++    // Off like the native feature, also in development builds, which otherwise take
++    // defaultValueInTests: a first run reads this before the native value is cached.
++    public static final CachedFlag sGlic = newCachedFlag(GLIC, false);
      public static final CachedFlag sGlicAndroidTablet = newCachedFlag(GLIC_ANDROID_TABLET, false);
      public static final CachedFlag sGlicBackgroundActuation =
              newCachedFlag(
