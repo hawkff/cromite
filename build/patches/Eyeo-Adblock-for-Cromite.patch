@@ -37,9 +37,9 @@ suit Cromite logic.
  components/adblock/content/browser/BUILD.gn   |   20 +-
  .../content/browser/adblock_blocking_page.cc  |  183 +
  .../content/browser/adblock_blocking_page.h   |   75 +
- .../browser/adblock_content_browser_client.h  |  246 +-
+ .../browser/adblock_content_browser_client.h  |  252 +-
  .../browser/adblock_internals_page_handler.cc |    9 +-
- .../browser/adblock_url_loader_factory.cc     |   73 +-
+ .../browser/adblock_url_loader_factory.cc     |  140 +-
  .../adblock_web_ui_controller_factory.cc      |    8 +-
  .../browser/adblock_webcontents_observer.cc   |   63 +-
  .../browser/adblock_webcontents_observer.h    |    5 +-
@@ -73,7 +73,7 @@ suit Cromite logic.
  .../persistent_filtering_configuration.h      |    8 +-
  .../core/converter/flatbuffer_converter.cc    |    2 +-
  .../converter/parser/filter_classifier.cc     |    5 +-
- .../adblock/core/converter/parser/metadata.cc |   36 +-
+ .../adblock/core/converter/parser/metadata.cc |   68 +-
  .../core/converter/parser/url_filter.cc       |   20 +-
  .../converter/parser/url_filter_options.cc    |   34 +-
  .../serializer/filter_keyword_extractor.cc    |   13 +-
@@ -100,7 +100,7 @@ suit Cromite logic.
  .../subscription_collection_impl.cc           |    7 +-
  .../core/subscription/subscription_config.cc  |   88 +-
  .../core/subscription/subscription_config.h   |    6 +-
- .../subscription_downloader_impl.cc           |   19 +-
+ .../subscription_downloader_impl.cc           |   34 +-
  .../subscription_persistent_metadata.h        |    1 +
  .../subscription_persistent_metadata_impl.cc  |   11 +-
  .../subscription_persistent_metadata_impl.h   |    1 +
@@ -125,7 +125,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 120 files changed, 9176 insertions(+), 794 deletions(-)
+ 120 files changed, 9291 insertions(+), 799 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -2594,17 +2594,23 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
  template <class ContentBrowserClientBase>
  void AdblockContentBrowserClient<ContentBrowserClientBase>::
      WillCreateURLLoaderFactory(
-@@ -256,29 +403,8 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -255,30 +402,21 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+ #endif
    auto* eyeo_browser_context =
        GetBrowserContextForEyeoFactories(browser_context);
-   bool use_adblock_proxy =
--      (type == content::ContentBrowserClient::URLLoaderFactoryType::
+-  bool use_adblock_proxy =
++  // Service worker and shared worker factories have no frame: their ads site
++  // setting is the one of the worker's own origin.
++  const bool is_worker_factory =
++      !frame &&
+       (type == content::ContentBrowserClient::URLLoaderFactoryType::
 -                   kDocumentSubResource ||
 -       type ==
 -           content::ContentBrowserClient::URLLoaderFactoryType::kNavigation ||
--       type == content::ContentBrowserClient::URLLoaderFactoryType::
--                   kServiceWorkerSubResource ||
--       type == content::ContentBrowserClient::URLLoaderFactoryType::
++                   kServiceWorkerScript ||
+        type == content::ContentBrowserClient::URLLoaderFactoryType::
+                    kServiceWorkerSubResource ||
+        type == content::ContentBrowserClient::URLLoaderFactoryType::
 -                   kServiceWorkerScript) &&
 -      IsFilteringNeeded(eyeo_browser_context);
 -
@@ -2621,12 +2627,16 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
 -    use_adblock_proxy |= use_test_loader;
 -  }
 -#endif
++                   kWorkerSubResource);
++  bool use_adblock_proxy =
 +      type != content::ContentBrowserClient::URLLoaderFactoryType::kDownload &&
-+      IsFilteringNeeded(frame, request_initiator.GetURL());
++      (is_worker_factory
++           ? IsFilteringNeeded(browser_context, request_initiator.GetURL())
++           : IsFilteringNeeded(frame, request_initiator.GetURL()));
  
    if (use_adblock_proxy) {
      auto [proxied_receiver, target_factory_remote] = factory_builder.Append();
-@@ -288,16 +414,18 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -288,16 +426,18 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
      AdblockContextData::StartProxying(
          eyeo_browser_context, initiator, std::move(proxied_receiver),
          std::move(target_factory_remote),
@@ -2646,7 +2656,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
          const net::SiteForCookies& site_for_cookies,
          const absl::optional<std::string>& user_agent,
          mojo::PendingRemote<network::mojom::WebSocketHandshakeClient>
-@@ -312,9 +440,9 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -312,9 +452,9 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
        result == adblock::FilterMatchResult::kBlockRule;
    if (!has_blocking_filter) {
      VLOG(1) << "[eyeo] Web socket allowed for " << url;
@@ -2659,7 +2669,7 @@ diff --git a/components/adblock/content/browser/adblock_content_browser_client.h
                                                  std::move(handshake_client), std::move(options));
        return;
      }
-@@ -331,16 +459,42 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
+@@ -331,16 +471,42 @@ void AdblockContentBrowserClient<ContentBrowserClientBase>::
    VLOG(1) << "[eyeo] Web socket blocked for " << url;
  }
  
@@ -2760,8 +2770,12 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
  }
  
  }  // namespace
-@@ -217,8 +217,13 @@ class AdblockURLLoaderFactory::InProgressRequest
+@@ -215,10 +215,17 @@ class AdblockURLLoaderFactory::InProgressRequest
+       FilterMatchResult result,
+       network::mojom::ParsedHeadersPtr parsed_headers);
    void OnRequestError(int error_code);
++  void CompleteWithStatus(const network::URLLoaderCompletionStatus& status);
++  void OnNetworkClientDisconnected(base::OnceClosure on_closed);
    void CheckFilterMatch(CheckFilterMatchCallback callback);
    void ProcessResponseHeaders(
 +      const std::vector<std::string>& dns_aliases,
@@ -2774,7 +2788,7 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
    void CheckRewriteFilterMatch(CheckRewriteFilterMatchCallback callback);
    void OnRequestUrlClassified(CheckFilterMatchCallback callback,
                                FilterMatchResult result);
-@@ -243,6 +248,7 @@ class AdblockURLLoaderFactory::InProgressRequest
+@@ -243,6 +250,7 @@ class AdblockURLLoaderFactory::InProgressRequest
    GURL request_url_;
    int request_id_;
    bool is_document_request_;
@@ -2782,15 +2796,60 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
    ContentType adblock_resource_type_;
    const raw_ptr<AdblockURLLoaderFactory> factory_;
    // There are the mojo pipe endpoints between this proxy and the renderer.
-@@ -272,6 +278,7 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
+@@ -257,6 +265,9 @@ class AdblockURLLoaderFactory::InProgressRequest
+   // |target_loader_|.
+   mojo::Remote<network::mojom::URLLoader> target_loader_;
+   mojo::Receiver<network::mojom::URLLoaderClient> client_receiver_{this};
++  // Set by the first terminal status sent to |target_client_|; every later
++  // step of this request is then dropped.
++  bool completed_ = false;
+   base::WeakPtrFactory<AdblockURLLoaderFactory::InProgressRequest>
+       weak_factory_{this};
+ };
+@@ -271,7 +282,11 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
+     const net::MutableNetworkTrafficAnnotationTag& traffic_annotation)
      : request_url_(request.url),
        request_id_(request_id),
-       is_document_request_(IsDocumentRequest(request)),
+-      is_document_request_(IsDocumentRequest(request)),
++      // Only a frame loads a document. A worker's request that looks like one
++      // is filtered as an ordinary request, without the frame-only steps.
++      is_document_request_(IsDocumentRequest(request) &&
++                           factory->request_initiator_.IsFrame()),
 +      is_popup_(false),
        adblock_resource_type_(ToAdblockResourceType(request)),
        factory_(factory),
        target_client_(std::move(client)),
-@@ -352,7 +359,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveResponse(
+@@ -300,7 +315,9 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
+       2, base::BindOnce(&InProgressRequest::OnBindingsClosed,
+                         weak_factory_.GetWeakPtr()));
+   loader_receiver_.set_disconnect_handler(closure);
+-  client_receiver_.set_disconnect_handler(closure);
++  client_receiver_.set_disconnect_handler(
++      base::BindOnce(&InProgressRequest::OnNetworkClientDisconnected,
++                     weak_factory_.GetWeakPtr(), base::OnceClosure(closure)));
+   target_client_.set_disconnect_handler(base::BindOnce(
+       &InProgressRequest::OnClientDisconnected, weak_factory_.GetWeakPtr()));
+ }
+@@ -308,7 +325,7 @@ AdblockURLLoaderFactory::InProgressRequest::InProgressRequest(
+ void AdblockURLLoaderFactory::InProgressRequest::FollowRedirect(
+     network::HttpRequestHeadersUpdateParams headers_update_params,
+     const absl::optional<GURL>& new_url) {
+-  if (target_loader_.is_bound()) {
++  if (!completed_ && target_loader_.is_bound()) {
+     target_loader_->FollowRedirect(std::move(headers_update_params), new_url);
+   }
+ }
+@@ -330,6 +347,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveResponse(
+     network::mojom::URLResponseHeadPtr head,
+     mojo::ScopedDataPipeConsumerHandle body,
+     absl::optional<mojo_base::BigBuffer> cached_metadata) {
++  if (completed_) {
++    return;
++  }
+   bool needs_early_exit = false;
+   if (ShouldIgnoreRequest(request_url_)) {
+     VLOG(1) << "[eyeo] Unsupported scheme, allowing to load.";
+@@ -352,7 +372,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveResponse(
    VLOG(1) << "[eyeo] Sending headers for processing: " << request_url_;
    client_receiver_.Pause();
    const scoped_refptr<net::HttpResponseHeaders>& headers = head->headers;
@@ -2800,7 +2859,46 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
        headers, base::BindOnce(&InProgressRequest::OnProcessHeadersResult,
                                weak_factory_.GetWeakPtr(), std::move(head),
                                std::move(body), std::move(cached_metadata)));
-@@ -399,6 +408,7 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
+@@ -364,6 +386,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnProcessHeadersResult(
+     absl::optional<mojo_base::BigBuffer> cached_metadata,
+     FilterMatchResult result,
+     network::mojom::ParsedHeadersPtr parsed_headers) {
++  if (completed_) {
++    return;
++  }
+   if (result == FilterMatchResult::kBlockRule) {
+     OnRequestError(net::ERR_BLOCKED_BY_ADMINISTRATOR);
+     return;
+@@ -383,10 +408,27 @@ void AdblockURLLoaderFactory::InProgressRequest::OnProcessHeadersResult(
+ 
+ void AdblockURLLoaderFactory::InProgressRequest::OnRequestError(
+     int error_code) {
+-  target_client_->OnComplete(network::URLLoaderCompletionStatus(error_code));
++  CompleteWithStatus(network::URLLoaderCompletionStatus(error_code));
+   factory_->RemoveRequest(this);
+ }
+ 
++void AdblockURLLoaderFactory::InProgressRequest::CompleteWithStatus(
++    const network::URLLoaderCompletionStatus& status) {
++  if (completed_) {
++    return;
++  }
++  completed_ = true;
++  target_client_->OnComplete(status);
++}
++
++void AdblockURLLoaderFactory::InProgressRequest::OnNetworkClientDisconnected(
++    base::OnceClosure on_closed) {
++  // The network side went away without a status, for example because the
++  // network service stopped: the load must not wait forever.
++  CompleteWithStatus(network::URLLoaderCompletionStatus(net::ERR_FAILED));
++  std::move(on_closed).Run();
++}
++
+ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
+     CheckFilterMatchCallback callback) {
+   const RequestInitiator& initiator = factory_->request_initiator_;
+@@ -399,6 +441,7 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
    auto subscription_service = factory_->config_.subscription_service;
    if (is_document_request_) {
      if (IsPopup(initiator)) {
@@ -2808,7 +2906,7 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
        auto* host = initiator.GetRenderFrameHost();
        factory_->config_.resource_classifier->CheckPopupFilterMatch(
            subscription_service->GetCurrentSnapshot(), request_url_, *host,
-@@ -409,13 +419,12 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
+@@ -409,13 +452,12 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
                base::BindOnce(&AdblockURLLoaderFactory::InProgressRequest::
                                   PostFilterMatchCallbackToUI,
                               weak_factory_.GetWeakPtr(), std::move(callback))));
@@ -2826,7 +2924,7 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
          adblock_resource_type_, initiator,
          base::BindOnce(
              &AdblockURLLoaderFactory::InProgressRequest::OnRequestUrlClassified,
-@@ -423,10 +432,10 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
+@@ -423,10 +465,10 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckFilterMatch(
              base::BindOnce(&AdblockURLLoaderFactory::InProgressRequest::
                                 PostFilterMatchCallbackToUI,
                             weak_factory_.GetWeakPtr(), std::move(callback))));
@@ -2838,7 +2936,7 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
      const scoped_refptr<net::HttpResponseHeaders>& headers,
      ProcessResponseHeadersCallback callback) {
    if (IsRequestInitiatorDestroyed()) {
-@@ -435,6 +444,37 @@ void AdblockURLLoaderFactory::InProgressRequest::ProcessResponseHeaders(
+@@ -435,6 +477,37 @@ void AdblockURLLoaderFactory::InProgressRequest::ProcessResponseHeaders(
      return;
    }
  
@@ -2876,7 +2974,61 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
    auto subscription_service = factory_->config_.subscription_service;
    factory_->config_.resource_classifier->CheckResponseFilterMatch(
        subscription_service->GetCurrentSnapshot(), request_url_,
-@@ -613,6 +653,7 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
+@@ -467,6 +540,10 @@ void AdblockURLLoaderFactory::InProgressRequest::CheckRewriteFilterMatch(
+ void AdblockURLLoaderFactory::InProgressRequest::OnRequestUrlClassified(
+     CheckFilterMatchCallback callback,
+     FilterMatchResult result) {
++  // No blocking action (closing a pop-up, hiding an element) after the status.
++  if (completed_) {
++    return;
++  }
+   if (result == FilterMatchResult::kBlockRule && IsRequestInitiatedByFrame()) {
+     ApplyPostBlockingBehavior();
+   }
+@@ -541,6 +618,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnReceiveRedirect(
+       << "[eyeo] AdblockURLLoaderFactory::InProgressRequest::OnReceiveRedirect "
+          "from "
+       << request_url_ << " to " << redirect_info.new_url;
++  if (completed_) {
++    return;
++  }
+   request_url_ = redirect_info.new_url;
+   if (ShouldIgnoreRequest(request_url_)) {
+     VLOG(1) << "[eyeo] Unsupported scheme, allowing to load.";
+@@ -556,10 +636,9 @@ void AdblockURLLoaderFactory::InProgressRequest::OnRedirectFilterMatchResult(
+     const net::RedirectInfo& redirect_info,
+     network::mojom::URLResponseHeadPtr head,
+     FilterMatchResult result) {
+-  if (!factory_->target_factory_.is_bound()) {
+-    DLOG(WARNING) << "[eyeo] "
+-                     "AdblockURLLoaderFactory::InProgressRequest::"
+-                     "OnRedirectFilterMatchResult: target_factory_ not bound";
++  // The redirect is handled by the existing loader, not the factory; its own
++  // pipe loss goes through OnNetworkClientDisconnected().
++  if (completed_) {
+     return;
+   }
+   if (result == FilterMatchResult::kBlockRule) {
+@@ -587,7 +666,7 @@ void AdblockURLLoaderFactory::InProgressRequest::OnTransferSizeUpdated(
+ 
+ void AdblockURLLoaderFactory::InProgressRequest::OnComplete(
+     const network::URLLoaderCompletionStatus& status) {
+-  target_client_->OnComplete(status);
++  CompleteWithStatus(status);
+ }
+ 
+ void AdblockURLLoaderFactory::InProgressRequest::OnBindingsClosed() {
+@@ -605,6 +684,9 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
+     mojo::PendingReceiver<network::mojom::URLLoader> target_loader,
+     mojo::PendingRemote<network::mojom::URLLoaderClient> proxy_client,
+     const absl::optional<GURL>& rewrite) {
++  if (completed_) {
++    return;
++  }
+   if (rewrite) {
+     constexpr int kInternalRedirectStatusCode = net::HTTP_TEMPORARY_REDIRECT;
+     net::RedirectInfo redirect_info = net::RedirectInfo::ComputeRedirectInfo(
+@@ -613,6 +695,7 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
              ? net::RedirectInfo::FirstPartyURLPolicy::UPDATE_URL_ON_REDIRECT
              : net::RedirectInfo::FirstPartyURLPolicy::NEVER_CHANGE_URL,
          request.referrer_policy, request.referrer.spec(),
@@ -2884,7 +3036,17 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
          kInternalRedirectStatusCode, rewrite.value(),
          absl::nullopt /* referrer_policy_header */,
          false /* insecure_scheme_was_upgraded */, false /* copy_fragment */,
-@@ -655,6 +696,10 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
+@@ -641,6 +724,9 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
+     DLOG(WARNING)
+         << "[eyeo] AdblockURLLoaderFactory::InProgressRequest::Start: "
+            "target_factory_ not bound";
++    // Start may run in the constructor, so the request is not removed here;
++    // the closed pipes remove it.
++    CompleteWithStatus(network::URLLoaderCompletionStatus(net::ERR_FAILED));
+     return;
+   }
+ 
+@@ -655,6 +741,10 @@ void AdblockURLLoaderFactory::InProgressRequest::Start(
    VLOG(1) << "[eyeo] Checking filter match for: " << request.url << " ("
            << request.resource_type << ")";
  
@@ -2895,7 +3057,22 @@ diff --git a/components/adblock/content/browser/adblock_url_loader_factory.cc b/
    CheckFilterMatch(base::BindOnce(
        &InProgressRequest::OnRequestFilterMatchResult,
        weak_factory_.GetWeakPtr(), std::move(target_loader), options, request,
-@@ -723,10 +768,12 @@ void AdblockURLLoaderFactory::InProgressRequest::ApplyPostBlockingBehavior()
+@@ -668,10 +758,14 @@ void AdblockURLLoaderFactory::InProgressRequest::OnRequestFilterMatchResult(
+     ::mojo::PendingRemote<network::mojom::URLLoaderClient> proxy_client,
+     const net::MutableNetworkTrafficAnnotationTag& traffic_annotation,
+     FilterMatchResult result) {
++  if (completed_) {
++    return;
++  }
+   if (!factory_->target_factory_.is_bound()) {
+     DLOG(WARNING) << "[eyeo] "
+                      "AdblockURLLoaderFactory::InProgressRequest::"
+                      "OnRequestFilterMatchResult: target_factory_ not bound";
++    OnRequestError(net::ERR_FAILED);
+     return;
+   }
+   if (result == FilterMatchResult::kBlockRule) {
+@@ -723,10 +817,12 @@ void AdblockURLLoaderFactory::InProgressRequest::ApplyPostBlockingBehavior()
    // some cleanup to preserve good user experience.
    if (frame) {
      if (is_document_request_) {
@@ -4420,7 +4597,22 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
  #include "base/logging.h"
  #include "base/strings/string_number_conversions.h"
  #include "base/strings/string_util.h"
-@@ -30,7 +32,7 @@ namespace adblock {
+@@ -26,11 +28,22 @@
+ 
+ namespace adblock {
+ 
++namespace {
++
++// A line that starts an HTML document. Filters may start with "<".
++bool IsWebPageStart(std::string_view line) {
++  return base::StartsWith(line, "<!doctype html",
++                          base::CompareCase::INSENSITIVE_ASCII) ||
++         base::StartsWith(line, "<html", base::CompareCase::INSENSITIVE_ASCII);
++}
++
++}  // namespace
++
+ // Parses the stream line by line until it finds comments. After the first non
  // comment line any upcoming comments will be skipped.
  // static
  absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
@@ -4429,7 +4621,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
  
    std::string homepage;
    std::string title;
-@@ -39,11 +41,24 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
+@@ -39,19 +52,55 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
    base::TimeDelta expires = kDefaultExpirationInterval;
  
    std::string line;
@@ -4438,7 +4630,6 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
 -  if (!IsValidAdblockHeader(line)) {
 -    VLOG(1) << "[eyeo] Invalid filter list. Should start with [Adblock Plus "
 -               "<x>.<y>].";
--    return {};
 +  // A byte order mark before the first line is not part of it.
 +  constexpr std::string_view kUtf8ByteOrderMark = "\xEF\xBB\xBF";
 +  const size_t mark_size = base::StartsWith(line, kUtf8ByteOrderMark)
@@ -4447,6 +4638,29 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
 +  line.erase(0, mark_size);
 +  const std::string_view first_line =
 +      base::TrimWhitespaceASCII(line, base::TRIM_ALL);
++  // A web page sent with status 200, for example by a captive portal, is not
++  // a filter list. Rejecting it keeps the installed list.
++  if (first_line.empty()) {
++    const auto after_first_line = filter_stream.tellg();
++    std::string next_line;
++    while (std::getline(filter_stream, next_line)) {
++      const std::string_view text =
++          base::TrimWhitespaceASCII(next_line, base::TRIM_ALL);
++      if (text.empty()) {
++        continue;
++      }
++      if (IsWebPageStart(text)) {
++        VLOG(1) << "[eyeo] Invalid filter list: it is a web page.";
++        return {};
++      }
++      break;
++    }
++    filter_stream.clear();
++    filter_stream.seekg(after_first_line);
++  } else if (IsWebPageStart(first_line)) {
++    VLOG(1) << "[eyeo] Invalid filter list: it is a web page.";
+     return {};
+   }
 +  // Lists without a header are accepted. A first line that is a filter or a
 +  // metadata comment is read again below; a blank line or another comment is
 +  // skipped, as a header is.
@@ -4455,10 +4669,10 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
 +       re2::RE2::FullMatch(first_line, *comment_re))) {
 +    filter_stream.clear();
 +    filter_stream.seekg(start_of_stream + std::streamoff(mark_size));
-   }
++  }
  
    std::string key, value;
-@@ -51,7 +66,7 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
+   // Process stream until the line is a comment
    auto position_in_stream = filter_stream.tellg();
    while (std::getline(filter_stream, line)) {
      base::TrimWhitespaceASCII(line, base::TRIM_ALL, &line);
@@ -4467,7 +4681,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
        break;
      }
  
-@@ -108,14 +123,15 @@ Metadata::~Metadata() = default;
+@@ -108,14 +157,15 @@ Metadata::~Metadata() = default;
  
  // static
  bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
@@ -4485,7 +4699,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
      return false;
    }
    return true;
-@@ -126,11 +142,11 @@ bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
+@@ -126,11 +176,11 @@ bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
  // static
  base::TimeDelta Metadata::ParseExpirationTime(
      const std::string& expiration_value) {
@@ -12565,7 +12779,22 @@ diff --git a/components/adblock/core/subscription/subscription_config.h b/compon
 diff --git a/components/adblock/core/subscription/subscription_downloader_impl.cc b/components/adblock/core/subscription/subscription_downloader_impl.cc
 --- a/components/adblock/core/subscription/subscription_downloader_impl.cc
 +++ b/components/adblock/core/subscription/subscription_downloader_impl.cc
-@@ -53,6 +53,7 @@ std::string BuildSubscriptionQueryParams(
+@@ -23,12 +23,14 @@
+ #include <vector>
+ 
+ #include "base/files/file_path.h"
++#include "base/files/file_util.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback.h"
+ #include "base/strings/escape.h"
+ #include "base/strings/safe_sprintf.h"
+ #include "base/strings/strcat.h"
+ #include "base/strings/string_number_conversions.h"
++#include "base/task/thread_pool.h"
+ #include "base/time/time.h"
+ #include "base/trace_event/trace_event.h"
+ #include "components/adblock/core/common/flatbuffer_data.h"
+@@ -53,6 +55,7 @@ std::string BuildSubscriptionQueryParams(
      const GURL& subscription_url,
      const SubscriptionPersistentMetadata* persistent_metadata,
      const bool is_disabled) {
@@ -12573,7 +12802,7 @@ diff --git a/components/adblock/core/subscription/subscription_downloader_impl.c
    return base::StrCat(
        {"lastVersion=",
         base::EscapeQueryParamValue(
-@@ -117,6 +118,8 @@ void SubscriptionDownloaderImpl::StartDownload(
+@@ -117,6 +120,8 @@ void SubscriptionDownloaderImpl::StartDownload(
  }
  
  void SubscriptionDownloaderImpl::CancelDownload(const GURL& subscription_url) {
@@ -12582,7 +12811,7 @@ diff --git a/components/adblock/core/subscription/subscription_downloader_impl.c
    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
    ongoing_downloads_.erase(subscription_url);
  }
-@@ -144,10 +147,6 @@ void SubscriptionDownloaderImpl::DoHeadRequest(
+@@ -144,10 +149,6 @@ void SubscriptionDownloaderImpl::DoHeadRequest(
  
  bool SubscriptionDownloaderImpl::IsUrlAllowed(
      const GURL& subscription_url) const {
@@ -12593,7 +12822,7 @@ diff --git a/components/adblock/core/subscription/subscription_downloader_impl.c
    if (!subscription_url.SchemeIs("https") &&
        !subscription_url.SchemeIs("data")) {
      return false;
-@@ -187,7 +186,7 @@ void SubscriptionDownloaderImpl::OnDownloadFinished(
+@@ -187,7 +188,7 @@ void SubscriptionDownloaderImpl::OnDownloadFinished(
  
    if (downloaded_file.empty()) {
      persistent_metadata_->IncrementDownloadErrorCount(subscription_url);
@@ -12602,7 +12831,27 @@ diff --git a/components/adblock/core/subscription/subscription_downloader_impl.c
                    << subscription_url << ", will abort";
      std::move(std::get<DownloadCompletedCallback>(download_it->second))
          .Run(nullptr);
-@@ -203,8 +202,10 @@ void SubscriptionDownloaderImpl::OnDownloadFinished(
+@@ -195,6 +196,19 @@ void SubscriptionDownloaderImpl::OnDownloadFinished(
+     return;
+   }
+ 
++  // A web page sent with status 200, for example by a captive portal, is not
++  // a filter list. Aborting keeps the installed list; the next update check
++  // tries again.
++  std::string mime_type;
++  if (headers && headers->GetMimeType(&mime_type) &&
++      mime_type == "text/html") {
++    base::ThreadPool::PostTask(FROM_HERE, {base::MayBlock()},
++                               base::GetDeleteFileCallback(downloaded_file));
++    persistent_metadata_->IncrementDownloadErrorCount(subscription_url);
++    AbortWithWarning(download_it, "The download is a web page.");
++    return;
++  }
++
+   VLOG(1) << "[eyeo] Finished downloading " << subscription_url
+           << ", starting conversion";
+ 
+@@ -203,8 +217,10 @@ void SubscriptionDownloaderImpl::OnDownloadFinished(
        TRACE_ID_LOCAL(GenerateTraceId(subscription_url)), "url",
        subscription_url.spec());
  
@@ -12614,7 +12863,7 @@ diff --git a/components/adblock/core/subscription/subscription_downloader_impl.c
        base::BindOnce(&SubscriptionDownloaderImpl::OnConversionFinished,
                       weak_ptr_factory_.GetWeakPtr(), subscription_url));
  }
-@@ -218,14 +219,14 @@ void SubscriptionDownloaderImpl::OnConversionFinished(
+@@ -218,14 +234,14 @@ void SubscriptionDownloaderImpl::OnConversionFinished(
        TRACE_ID_LOCAL(GenerateTraceId(subscription_url)));
    const auto download_it = ongoing_downloads_.find(subscription_url);
    if (download_it == ongoing_downloads_.end()) {
@@ -12631,7 +12880,7 @@ diff --git a/components/adblock/core/subscription/subscription_downloader_impl.c
              << " successfully";
      std::move(std::get<DownloadCompletedCallback>(download_it->second))
          .Run(std::move(
-@@ -269,7 +270,7 @@ void SubscriptionDownloaderImpl::AbortWithWarning(
+@@ -269,7 +285,7 @@ void SubscriptionDownloaderImpl::AbortWithWarning(
    if (ongoing_download_it == ongoing_downloads_.end()) {
      return;
    }
