@@ -18,7 +18,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../res/xml/referer_policy_preferences.xml    | 31 ++++++
  .../privacy/settings/PrivacySettings.java     |  6 ++
  .../RadioButtonGroupRefererSettings.java      | 89 +++++++++++++++++
- .../settings/RefererSettingsFragment.java     | 98 +++++++++++++++++++
+ .../settings/RefererSettingsFragment.java     | 99 +++++++++++++++++++
  .../net/system_network_context_manager.cc     |  4 +
  chrome/browser/renderer_preferences_util.cc   |  1 +
  .../strings/android_chrome_strings.grd        | 24 +++++
@@ -30,7 +30,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../renderer_host/navigation_request.cc       |  9 ++
  .../network/public/cpp/resource_request.h     |  2 +-
  .../renderer_preferences.h                    |  1 +
- 19 files changed, 354 insertions(+), 1 deletion(-)
+ 19 files changed, 355 insertions(+), 1 deletion(-)
  create mode 100644 chrome/android/java/res/layout/radio_button_group_referer_policy_preference.xml
  create mode 100644 chrome/android/java/res/xml/referer_policy_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/RadioButtonGroupRefererSettings.java
@@ -291,7 +291,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/privacy/setting
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/privacy/settings/RefererSettingsFragment.java
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,99 @@
 +/*
 +    This file is part of Bromite.
 +
@@ -344,10 +344,11 @@ new file mode 100644
 +        ObservableSuppliers.createMonotonic();
 +
 +    public static String getRefererSummaryString(Context context) {
-+        int policy = UserPrefs.get(ProfileManager.getLastUsedRegularProfile())
-+                              .getInteger(Pref.REFERRERS_POLICY);
++        PrefService prefs = UserPrefs.get(ProfileManager.getLastUsedRegularProfile());
++        int policy = prefs.getInteger(Pref.REFERRERS_POLICY);
 +
-+        if (policy == 0) {
++        // Same choice as RadioButtonGroupRefererSettings.init() selects.
++        if (!prefs.getBoolean(Pref.ENABLE_REFERRERS) || policy == 0) {
 +            return context.getString(R.string.disable_referer_policy_title);
 +        }
 +        if (policy == 1) {

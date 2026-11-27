@@ -26,7 +26,7 @@ Require: bromite-build-utils.patch
  ...tomTriStateSiteSettingsPreferenceImpl.java |  24 +
  .../ContentSettingsResources.java             |  34 +-
  .../site_settings/SingleCategorySettings.java |  64 ++-
- .../site_settings/SingleWebsiteSettings.java  |  60 ++-
+ .../site_settings/SingleWebsiteSettings.java  |  61 ++-
  .../site_settings/SiteSettings.java           |  44 +-
  .../site_settings/SiteSettingsCategory.java   |  28 +-
  .../site_settings/SiteSettingsDelegate.java   |   2 +
@@ -64,7 +64,7 @@ Require: bromite-build-utils.patch
  .../platform/web_content_settings_client.h    |  13 +
  .../execution_context/execution_context.cc    |  16 +
  .../execution_context/execution_context.h     |   5 +
- 53 files changed, 1460 insertions(+), 74 deletions(-)
+ 53 files changed, 1454 insertions(+), 81 deletions(-)
  create mode 100644 components/browser_ui/settings/android/java/res/layout/preference_spinner_single_widget.xml
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSetting.java
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSettingImpl.java
@@ -1478,7 +1478,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
          setUpPreferenceCommon(preference, value, permission);
          preference.setOnPreferenceChangeListener(this);
  
-@@ -1485,24 +1504,33 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
+@@ -1485,24 +1504,20 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
                  oneTimePreference.setBackgroundColor(mHighlightColor);
              }
          } else {
@@ -1487,6 +1487,15 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 -            switchPreference.setChecked(value == enabledValue);
 -
 -            if (!isEmbargoed) {
+-                String a11ySummary =
+-                        getString(
+-                                ContentSettingsResources.getCategorySummary(
+-                                        contentType,
+-                                        enabledValue,
+-                                        isOneTime,
+-                                        mHasApproximateLocationGrant,
+-                                        isOnlyPreciseLocationBlockedInOs));
+-                switchPreference.setSummaryOverrideForScreenReader(a11ySummary);
 +            Preference switchPreference = preference;
 +            if (preference instanceof ChromeSwitchPreference) {
 +                ((ChromeSwitchPreference) switchPreference).setChecked(
@@ -1494,23 +1503,8 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
 +            } else {
 +                BromiteCustomContentSettingImpl.setWebSitePreferenceValue(
 +                        contentType, preference, value);
-+            }
-+            // A custom content setting row shows the text of its current state, so a
-+            // screen reader reads that text instead of the allowed state's text.
-+            if (preference instanceof ChromeSwitchPreference && !isEmbargoed && cs == null) {
-                 String a11ySummary =
-                         getString(
-                                 ContentSettingsResources.getCategorySummary(
-                                         contentType,
--                                        enabledValue,
-+                                        getEnabledValue(contentType),
-                                         isOneTime,
-                                         mHasApproximateLocationGrant,
-                                         isOnlyPreciseLocationBlockedInOs));
--                switchPreference.setSummaryOverrideForScreenReader(a11ySummary);
-+                ((ChromeSwitchPreference) switchPreference)
-+                        .setSummaryOverrideForScreenReader(a11ySummary);
              }
++            // Screen readers use each row's visible summary.
  
 -            if (contentType == mHighlightedPermission) {
 -                switchPreference.setBackgroundColor(getContext().getColor(mHighlightColor));
@@ -1521,7 +1515,7 @@ diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/c
              }
          }
          if (preference instanceof ChromeSwitchPreference && isSessionPermission(contentType)) {
-@@ -1847,7 +1875,13 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
+@@ -1847,7 +1862,13 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
          if (newValue instanceof Boolean) {
              permission = (Boolean) newValue ? getEnabledValue(type) : ContentSetting.BLOCK;
          } else {

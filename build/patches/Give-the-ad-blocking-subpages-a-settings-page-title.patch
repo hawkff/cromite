@@ -1,0 +1,172 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 08:11:50 +0000
+Subject: Give the ad blocking subpages a settings page title
+
+The Filter lists, Custom filters, Custom filter lists and Allowed sites
+pages set the window title themselves. Settings did not know about it,
+so after Back the Ad blocking page still showed the title of the page
+that was closed.
+
+The pages now provide their title the way settings pages do, and
+settings shows the right title when a page opens and after Back.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ .../AdblockAllowedDomainsFragment.java        |  6 ++---
+ .../AdblockCustomFilterListsFragment.java     |  6 ++---
+ .../AdblockCustomFiltersFragment.java         |  8 ++-----
+ .../settings/AdblockCustomItemFragment.java   | 22 ++++++++++++++++---
+ .../settings/AdblockFilterListsFragment.java  | 16 +++++++++++---
+ 5 files changed, 38 insertions(+), 20 deletions(-)
+
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java
+@@ -17,7 +17,6 @@
+ 
+ package org.chromium.chrome.browser.adblock.settings;
+ 
+-import android.os.Bundle;
+ import android.widget.Toast;
+ 
+ import org.chromium.chrome.browser.adblock.R;
+@@ -47,9 +46,8 @@ public class AdblockAllowedDomainsFragment
+     public AdblockAllowedDomainsFragment() {}
+ 
+     @Override
+-    public void onActivityCreated(Bundle savedInstanceState) {
+-        super.onActivityCreated(savedInstanceState);
+-        getActivity().setTitle(R.string.fragment_adblock_settings_allowed_domains_title);
++    protected int getPageTitleId() {
++        return R.string.fragment_adblock_settings_allowed_domains_title;
+     }
+ 
+     @Override
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
+@@ -17,7 +17,6 @@
+ 
+ package org.chromium.chrome.browser.adblock.settings;
+ 
+-import android.os.Bundle;
+ import android.util.Log;
+ import android.view.Gravity;
+ import android.webkit.URLUtil;
+@@ -39,9 +38,8 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment<
+     public AdblockCustomFilterListsFragment() {}
+ 
+     @Override
+-    public void onActivityCreated(Bundle savedInstanceState) {
+-        super.onActivityCreated(savedInstanceState);
+-        getActivity().setTitle(R.string.fragment_adblock_more_options_custom_filter_lists_title);
++    protected int getPageTitleId() {
++        return R.string.fragment_adblock_more_options_custom_filter_lists_title;
+     }
+ 
+     @Override
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFiltersFragment.java
+@@ -17,8 +17,6 @@
+ 
+ package org.chromium.chrome.browser.adblock.settings;
+ 
+-import android.os.Bundle;
+-
+ import org.chromium.chrome.browser.adblock.R;
+ import org.chromium.chrome.browser.profiles.ProfileManager;
+ import org.chromium.components.adblock.AdblockController;
+@@ -34,10 +32,8 @@ public class AdblockCustomFiltersFragment extends AdblockCustomItemFragment<Stri
+     }
+ 
+     @Override
+-    public void onActivityCreated(Bundle savedInstanceState) {
+-        super.onActivityCreated(savedInstanceState);
+-        getActivity()
+-                .setTitle(getString(R.string.fragment_adblock_more_options_custom_filters_title));
++    protected int getPageTitleId() {
++        return R.string.fragment_adblock_more_options_custom_filters_title;
+     }
+ 
+     @Override
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
+@@ -29,12 +29,18 @@ import android.widget.TextView;
+ 
+ import androidx.preference.PreferenceFragmentCompat;
+ 
++import org.chromium.base.supplier.MonotonicObservableSupplier;
++import org.chromium.base.supplier.ObservableSuppliers;
++import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
+ import org.chromium.chrome.browser.adblock.R;
+-import org.chromium.components.browser_ui.settings.SettingsFragment;
++import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
+ 
+ import java.util.List;
+ 
+-public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCompat implements SettingsFragment {
++public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCompat
++        implements EmbeddableSettingsPage {
++    private final SettableMonotonicObservableSupplier<String> mPageTitle =
++            ObservableSuppliers.createMonotonic();
+     private EditText mItem;
+     private ImageView mAddButton;
+     private ListView mListView;
+@@ -61,7 +67,17 @@ public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCom
+     }
+ 
+     @Override
+-    public void onCreatePreferences(Bundle bundle, String key) {}
++    public void onCreatePreferences(Bundle bundle, String key) {
++        mPageTitle.set(getString(getPageTitleId()));
++    }
++
++    // The settings window shows this title and puts the previous page's title back on Back.
++    @Override
++    public MonotonicObservableSupplier<String> getPageTitle() {
++        return mPageTitle;
++    }
++
++    protected abstract int getPageTitleId();
+ 
+     @Override
+     public void onResume() {
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockFilterListsFragment.java
+@@ -23,18 +23,28 @@ import android.widget.ListView;
+ 
+ import androidx.fragment.app.ListFragment;
+ 
++import org.chromium.base.supplier.MonotonicObservableSupplier;
++import org.chromium.base.supplier.ObservableSuppliers;
++import org.chromium.base.supplier.SettableMonotonicObservableSupplier;
+ import org.chromium.chrome.browser.adblock.R;
+ import org.chromium.chrome.browser.profiles.ProfileManager;
+ import org.chromium.components.adblock.AdblockController;
+-import org.chromium.components.browser_ui.settings.SettingsFragment;
++import org.chromium.components.browser_ui.settings.EmbeddableSettingsPage;
+ 
+-public class AdblockFilterListsFragment extends ListFragment implements SettingsFragment {
++public class AdblockFilterListsFragment extends ListFragment implements EmbeddableSettingsPage {
++    private final SettableMonotonicObservableSupplier<String> mPageTitle =
++            ObservableSuppliers.createMonotonic();
+     private AdblockFilterListsAdapter mFilterListsAdapter;
+ 
++    @Override
++    public MonotonicObservableSupplier<String> getPageTitle() {
++        return mPageTitle;
++    }
++
+     @Override
+     public void onCreate(Bundle savedInstanceState) {
+         super.onCreate(savedInstanceState);
+-        getActivity().setTitle(R.string.fragment_adblock_settings_filter_lists_title);
++        mPageTitle.set(getString(R.string.fragment_adblock_settings_filter_lists_title));
+         mFilterListsAdapter =
+                 new AdblockFilterListsAdapter(
+                         getActivity(),
+--

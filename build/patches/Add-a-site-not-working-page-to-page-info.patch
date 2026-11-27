@@ -48,13 +48,13 @@ License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
  chrome/android/chrome_java_sources.gni        |   2 +
  ...page_info_site_protections_preferences.xml |  13 +
  .../ChromePageInfoControllerDelegate.java     |   8 +
- .../PageInfoSiteProtectionsController.java    | 422 ++++++++++++++++++
- .../PageInfoSiteProtectionsSettings.java      | 106 +++++
+ .../PageInfoSiteProtectionsController.java    | 421 ++++++++++++++++++
+ .../PageInfoSiteProtectionsSettings.java      | 125 ++++++
  .../Add-site-protections-to-page-info.grdp    |  81 ++++
  .../page_info/PageInfoController.java         |  19 +-
  .../page_info/PageInfoCookiesController.java  |  20 +-
  .../page_info/PageInfoMainController.java     |   9 +
- 10 files changed, 678 insertions(+), 3 deletions(-)
+ 10 files changed, 696 insertions(+), 3 deletions(-)
  create mode 100644 chrome/android/java/res/xml/page_info_site_protections_preferences.xml
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java
  create mode 100644 chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java
@@ -123,7 +123,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageI
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsController.java
-@@ -0,0 +1,422 @@
+@@ -0,0 +1,421 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +
 +package org.chromium.chrome.browser.page_info;
@@ -139,7 +139,6 @@ new file mode 100644
 +import org.chromium.chrome.R;
 +import org.chromium.chrome.browser.profiles.Profile;
 +import org.chromium.components.adblock.AdblockController;
-+import org.chromium.components.browser_ui.site_settings.ContentSettingsResources;
 +import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
 +import org.chromium.components.content_settings.ContentSetting;
 +import org.chromium.components.content_settings.ContentSettingsType;
@@ -409,7 +408,7 @@ new file mode 100644
 +            if (type == ContentSettingsType.ADS && mCookieState != CookieControlsState.HIDDEN) {
 +                rows.add(
 +                        new PageInfoSiteProtectionsSettings.Row(
-+                                ContentSettingsResources.getIcon(ContentSettingsType.COOKIES),
++                                ContentSettingsType.COOKIES,
 +                                resources.getString(R.string.page_info_site_protections_cookies),
 +                                resources.getString(getCookieSummary()),
 +                                mCookieState == CookieControlsState.BLOCKED3PC,
@@ -474,7 +473,7 @@ new file mode 100644
 +                summaryRes = R.string.page_info_site_protections_popups_summary;
 +        }
 +        return new PageInfoSiteProtectionsSettings.Row(
-+                ContentSettingsResources.getIcon(type),
++                type,
 +                resources.getString(titleRes),
 +                resources.getString(summaryRes),
 +                isOn(type),
@@ -493,7 +492,7 @@ new file mode 100644
 +    private void onChanged() {
 +        mMainController.reloadPageWhenClosed();
 +        updateRow();
-+        // Rebuilt after the switch has finished handling its own change. Not posted to the row:
++        // Updated after the switch has finished handling its own change. Not posted to the row:
 +        // the row is detached while the subpage is shown, and a detached view runs nothing.
 +        PostTask.postTask(TaskTraits.UI_USER_VISIBLE, this::updateSubpage);
 +    }
@@ -550,7 +549,7 @@ diff --git a/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageI
 new file mode 100644
 --- /dev/null
 +++ b/chrome/android/java/src/org/chromium/chrome/browser/page_info/PageInfoSiteProtectionsSettings.java
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,125 @@
 +// SPDX-License-Identifier: GPL-2.0-or-later
 +
 +package org.chromium.chrome.browser.page_info;
@@ -560,7 +559,6 @@ new file mode 100644
 +import android.content.Context;
 +import android.os.Bundle;
 +
-+import androidx.annotation.DrawableRes;
 +import androidx.preference.Preference;
 +
 +import org.chromium.base.Callback;
@@ -572,9 +570,12 @@ new file mode 100644
 +import org.chromium.components.browser_ui.settings.SettingsUtils;
 +import org.chromium.components.browser_ui.settings.TextMessagePreference;
 +import org.chromium.components.browser_ui.site_settings.BaseSiteSettingsFragment;
++import org.chromium.components.browser_ui.site_settings.ContentSettingsResources;
 +
 +import java.util.ArrayList;
++import java.util.HashMap;
 +import java.util.List;
++import java.util.Map;
 +
 +/** Page info subpage with the protections of one site that most often stop it from working. */
 +@NullMarked
@@ -582,9 +583,9 @@ new file mode 100644
 +    private static final String INTRO_PREFERENCE = "site_protections_intro";
 +    private static final String BUTTON_PREFERENCE = "site_protections_button";
 +
-+    /** One protection switch. */
++    /** One protection switch, known by its content settings type (COOKIES for third parties). */
 +    static class Row {
-+        final @DrawableRes int iconResId;
++        final int type;
 +        final String title;
 +        final String summary;
 +        final boolean on;
@@ -592,13 +593,13 @@ new file mode 100644
 +        final Callback<Boolean> onChanged;
 +
 +        Row(
-+                @DrawableRes int iconResId,
++                int type,
 +                String title,
 +                String summary,
 +                boolean on,
 +                boolean enabled,
 +                Callback<Boolean> onChanged) {
-+            this.iconResId = iconResId;
++            this.type = type;
 +            this.title = title;
 +            this.summary = summary;
 +            this.on = on;
@@ -607,7 +608,7 @@ new file mode 100644
 +        }
 +    }
 +
-+    private final List<Preference> mRowPreferences = new ArrayList<>();
++    private final Map<Integer, ChromeSwitchPreference> mRowPreferences = new HashMap<>();
 +
 +    @Override
 +    public void onCreatePreferences(@Nullable Bundle bundle, @Nullable String rootKey) {
@@ -633,17 +634,29 @@ new file mode 100644
 +                });
 +    }
 +
-+    /** Replaces the protection switches. */
++    /**
++     * Shows the protection switches in this order. A switch already shown is updated in place, so
++     * keyboard and TalkBack focus stay on it; only switches that appear or go are added or removed.
++     */
 +    void setRows(List<Row> rows) {
-+        for (Preference preference : mRowPreferences) {
-+            getPreferenceScreen().removePreference(preference);
-+        }
++        Map<Integer, ChromeSwitchPreference> shown = new HashMap<>(mRowPreferences);
 +        mRowPreferences.clear();
++        List<Preference> added = new ArrayList<>();
 +        Context context = getPreferenceManager().getContext();
++        // Below the intro and the button. Every order is set before any switch is added.
++        Preference button = assertNonNull(findPreference(BUTTON_PREFERENCE));
++        int order = button.getOrder();
 +        for (Row row : rows) {
-+            ChromeSwitchPreference preference = new ChromeSwitchPreference(context);
-+            preference.setIcon(SettingsUtils.getTintedIcon(context, row.iconResId));
-+            preference.setTitle(row.title);
++            ChromeSwitchPreference preference = shown.remove(row.type);
++            if (preference == null) {
++                preference = new ChromeSwitchPreference(context);
++                preference.setIcon(
++                        SettingsUtils.getTintedIcon(
++                                context, ContentSettingsResources.getIcon(row.type)));
++                preference.setTitle(row.title);
++                added.add(preference);
++            }
++            preference.setOrder(++order);
 +            preference.setSummary(row.summary);
 +            preference.setChecked(row.on);
 +            preference.setEnabled(row.enabled);
@@ -652,8 +665,13 @@ new file mode 100644
 +                        row.onChanged.onResult((Boolean) newValue);
 +                        return true;
 +                    });
++            mRowPreferences.put(row.type, preference);
++        }
++        for (Preference preference : shown.values()) {
++            getPreferenceScreen().removePreference(preference);
++        }
++        for (Preference preference : added) {
 +            getPreferenceScreen().addPreference(preference);
-+            mRowPreferences.add(preference);
 +        }
 +    }
 +}

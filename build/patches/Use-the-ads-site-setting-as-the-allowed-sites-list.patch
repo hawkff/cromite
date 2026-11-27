@@ -1,0 +1,656 @@
+From: hawkff <109485367+hawkff@users.noreply.github.com>
+Date: Fri, 27 Nov 2026 08:11:48 +0000
+Subject: Use the ads site setting for new allowed sites
+
+Sites where ads are not blocked can be added in two places: Allowed
+sites in the ad blocking settings, which kept its own list, and the
+per-site ads setting in Site settings and page info, which the ad
+blocker also honors. A site added on the Allowed sites page now goes to
+the ads site setting, so a site allowed in any place shows in Site
+settings and on the Allowed sites page alike.
+
+The Allowed sites page lists the sites allowed in the ads site setting,
+each with its exact address pattern, and the sites added there by an
+earlier version. The earlier ones are marked "From an earlier version",
+work exactly as before and stay until they are removed. Nothing is
+moved or changed on its own. Each row removes only itself. While a
+policy sets ads for all sites, nothing can be added there.
+
+A typed site is accepted only if it names a site: a name with a dot,
+"localhost", or an IP address. It is allowed with its subdomains, an IP
+address exactly.
+
+The setting is named "Ads" in Site settings and page info instead of
+"Intrusive ads", with the states "Allowed" and "Blocked". While ads are
+blocked by default and no site has its own block, the Ads page in Site
+settings only lists sites: the ad blocking settings hold the switch for
+all sites. Otherwise the page keeps its setting for all sites, which
+now says that sites with their own setting keep it.
+
+License: GPL-2.0-or-later - https://spdx.org/licenses/GPL-2.0-or-later.html
+
+---
+ chrome/browser/adblock/android/BUILD.gn       |   3 +
+ .../adblock/android/adblock_strings.grd       |   8 +-
+ .../AdblockAllowedDomainsFragment.java        | 110 ++++++++++++++++--
+ .../AdblockCustomFilterListsFragment.java     |  10 +-
+ .../settings/AdblockCustomItemFragment.java   |  28 ++++-
+ components/adblock/android/BUILD.gn           |   2 +
+ .../adblock/android/adblock_controller_jni.cc |  84 +++++++++++++
+ .../components/adblock/AdblockController.java |  12 ++
+ .../adblock/FilteringConfiguration.java       |   6 +
+ .../ContentSettingsResources.java             |   4 +-
+ .../site_settings/SingleCategorySettings.java |  33 +++++-
+ .../site_settings/SingleWebsiteSettings.java  |  12 +-
+ .../strings/android/site_settings.grdp        |  10 +-
+ .../strings/bromite_content_settings/ads.grdp |   9 ++
+ components/site_settings_strings.grdp         |   4 +-
+ 15 files changed, 298 insertions(+), 37 deletions(-)
+ create mode 100644 components/browser_ui/strings/bromite_content_settings/ads.grdp
+
+diff --git a/chrome/browser/adblock/android/BUILD.gn b/chrome/browser/adblock/android/BUILD.gn
+--- a/chrome/browser/adblock/android/BUILD.gn
++++ b/chrome/browser/adblock/android/BUILD.gn
+@@ -39,6 +39,9 @@ android_library("adblock_ui_java") {
+     "//chrome/browser/ui/messages/android:java",
+     "//components/adblock/android:adblock_controller_java",
+     "//components/browser_ui/settings/android:java",
++    "//components/browser_ui/site_settings/android:java",
++    "//components/browser_ui/strings/android:browser_ui_strings_grd",
++    "//components/content_settings/android:content_settings_enums_java",
+     "//components/prefs/android:java",
+     "//components/user_prefs/android:java",
+     "//content/public/android:content_full_java",
+diff --git a/chrome/browser/adblock/android/adblock_strings.grd b/chrome/browser/adblock/android/adblock_strings.grd
+--- a/chrome/browser/adblock/android/adblock_strings.grd
++++ b/chrome/browser/adblock/android/adblock_strings.grd
+@@ -258,7 +258,7 @@
+         Allowed sites
+       </message>
+       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ALLOWED_DOMAINS_SUMMARY" desc="Summary of Preference to configure allowed domains">
+-        Ads are not blocked on sites you add here
++        Ads are not blocked on these sites. Sites added here are also listed in Site settings under Ads.
+       </message>
+       <message name="IDS_FRAGMENT_ADBLOCK_SETTINGS_ADD_DOMAIN" desc="Hint of EditText for typing domain in allowed domains fragment">
+         Enter a site address
+@@ -290,6 +290,12 @@
+       <message name="IDS_FRAGMENT_ADBLOCK_ALLOWED_DOMAINS_ADD" desc="Accessibility label of the button that adds the typed site to the list of sites where ads are not blocked.">
+         Add site
+       </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_ALLOWED_DOMAINS_FROM_EARLIER_VERSION" desc="Second line of a row on the Allowed sites page for a site that was added in an earlier version of the browser, which keeps working until it is removed. It is not listed in Site settings.">
++        From an earlier version
++      </message>
++      <message name="IDS_FRAGMENT_ADBLOCK_ALLOWED_DOMAINS_EARLIER_ITEM" desc="How the remove button of a row on the Allowed sites page names a site that was added in an earlier version of the browser, so that it differs from a row with the same site in Site settings. ITEM is the site as shown in the row.">
++        <ph name="ITEM">%1$s<ex>example.com</ex></ph>, from an earlier version
++      </message>
+       <message name="IDS_FRAGMENT_ADBLOCK_ALLOWED_DOMAINS_EMPTY" desc="Shown on the Allowed sites page while no site has been added.">
+         No sites added. Ads are not blocked on sites you add here.
+       </message>
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockAllowedDomainsFragment.java
+@@ -18,14 +18,32 @@
+ package org.chromium.chrome.browser.adblock.settings;
+ 
+ import android.os.Bundle;
++import android.widget.Toast;
+ 
+ import org.chromium.chrome.browser.adblock.R;
++import org.chromium.chrome.browser.profiles.Profile;
+ import org.chromium.chrome.browser.profiles.ProfileManager;
+ import org.chromium.components.adblock.AdblockController;
++import org.chromium.components.browser_ui.site_settings.ContentSettingException;
++import org.chromium.components.browser_ui.site_settings.WebsiteAddress;
++import org.chromium.components.browser_ui.site_settings.WebsitePreferenceBridge;
++import org.chromium.components.content_settings.ContentSetting;
++import org.chromium.components.content_settings.ContentSettingsType;
++import org.chromium.components.content_settings.ProviderType;
+ 
++import java.util.ArrayList;
+ import java.util.List;
+ 
+-public class AdblockAllowedDomainsFragment extends AdblockCustomItemFragment<String> {
++/**
++ * The sites where ads are not blocked: the user's exceptions of the ads site setting, the list of
++ * Site settings > Ads, and the domains the ad blocker kept from an earlier version, which work as
++ * before until they are removed.
++ */
++public class AdblockAllowedDomainsFragment
++        extends AdblockCustomItemFragment<AdblockAllowedDomainsFragment.AllowedSite> {
++    /** A row: an ads site setting pattern, or a domain of the ad blocker's own earlier list. */
++    record AllowedSite(String key, boolean isFromEarlierVersion) {}
++
+     public AdblockAllowedDomainsFragment() {}
+ 
+     @Override
+@@ -35,14 +53,56 @@ public class AdblockAllowedDomainsFragment extends AdblockCustomItemFragment<Str
+     }
+ 
+     @Override
+-    protected String getItemText(String item) {
+-        return item;
++    protected String getItemText(AllowedSite site) {
++        return site.isFromEarlierVersion()
++                ? site.key()
++                : WebsiteAddress.create(site.key()).getTitle();
+     }
+ 
++    /** The stored pattern tells apart rows with the same title, such as a domain and an origin. */
+     @Override
+-    protected List<String> getItems() {
+-        return AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+-                .getAllowedDomains();
++    protected String getItemStatus(AllowedSite site) {
++        return site.isFromEarlierVersion()
++                ? getString(R.string.fragment_adblock_allowed_domains_from_earlier_version)
++                : site.key();
++    }
++
++    @Override
++    protected String getItemRemoveName(AllowedSite site) {
++        return site.isFromEarlierVersion()
++                ? getString(R.string.fragment_adblock_allowed_domains_earlier_item, site.key())
++                : site.key();
++    }
++
++    /** With the ads setting for all sites set by policy, sites added here would have no effect. */
++    @Override
++    protected String getAddDisabledReason() {
++        boolean managed =
++                WebsitePreferenceBridge.isContentSettingManaged(
++                        getProfile(), ContentSettingsType.ADS);
++        return managed ? getString(R.string.managed_by_your_organization) : null;
++    }
++
++    @Override
++    protected List<AllowedSite> getItems() {
++        List<AllowedSite> sites = new ArrayList<>();
++        for (ContentSettingException exception :
++                new WebsitePreferenceBridge()
++                        .getContentSettingsExceptions(getProfile(), ContentSettingsType.ADS)) {
++            // Exceptions set by policy cannot be removed here.
++            if (exception.getContentSetting() == ContentSetting.ALLOW
++                    && exception.getSource() == ProviderType.PREF_PROVIDER) {
++                sites.add(new AllowedSite(exception.getPrimaryPattern(), false));
++            }
++        }
++        try {
++            for (String domain : AdblockController.getInstance(getProfile()).getAllowedDomains()) {
++                sites.add(new AllowedSite(domain, true));
++            }
++        } catch (IllegalStateException e) {
++            // No ad blocking configuration, so no earlier list.
++        }
++        return sites;
+     }
+ 
+     @Override
+@@ -60,15 +120,41 @@ public class AdblockAllowedDomainsFragment extends AdblockCustomItemFragment<Str
+         return getString(R.string.fragment_adblock_allowed_domains_add);
+     }
+ 
++    /** Allows the typed site and its subdomains in the ads site setting. */
+     @Override
+-    protected void addItemImpl(String domain) {
+-        AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+-                .addAllowedDomain(domain);
++    protected void addItemImpl(String site) {
++        String pattern = AdblockController.toAllowedSitePattern(site);
++        if (pattern == null) {
++            Toast.makeText(
++                            getActivity(),
++                            R.string.fragment_adblock_custom_filter_lists_invalid,
++                            Toast.LENGTH_SHORT)
++                    .show();
++            return;
++        }
++        WebsitePreferenceBridge.setContentSettingCustomScope(
++                getProfile(),
++                ContentSettingsType.ADS,
++                pattern,
++                WebsitePreferenceBridge.SITE_WILDCARD,
++                ContentSetting.ALLOW);
+     }
+ 
+     @Override
+-    protected void removeItemImpl(String domain) {
+-        AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+-                .removeAllowedDomain(domain);
++    protected void removeItemImpl(AllowedSite site) {
++        if (site.isFromEarlierVersion()) {
++            AdblockController.getInstance(getProfile()).removeAllowedDomain(site.key());
++            return;
++        }
++        WebsitePreferenceBridge.setContentSettingCustomScope(
++                getProfile(),
++                ContentSettingsType.ADS,
++                site.key(),
++                WebsitePreferenceBridge.SITE_WILDCARD,
++                ContentSetting.DEFAULT);
++    }
++
++    private static Profile getProfile() {
++        return ProfileManager.getLastUsedRegularProfile();
+     }
+ }
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomFilterListsFragment.java
+@@ -102,12 +102,8 @@ public class AdblockCustomFilterListsFragment extends AdblockCustomItemFragment<
+     }
+ 
+     @Override
+-    protected void removeItemImpl(String url) {
+-        try {
+-            AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
+-                    .uninstallSubscription(new URL(URLUtil.guessUrl(url)));
+-        } catch (MalformedURLException ex) {
+-            Log.e(TAG, "Error parsing url: " + url);
+-        }
++    protected void removeItemImpl(Subscription item) {
++        AdblockController.getInstance(ProfileManager.getLastUsedRegularProfile())
++                .uninstallSubscription(item.url());
+     }
+ }
+diff --git a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
+--- a/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
++++ b/chrome/browser/adblock/android/java/src/org/chromium/chrome/browser/adblock/settings/AdblockCustomItemFragment.java
+@@ -75,11 +75,27 @@ public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCom
+         mAddButton = rootView.findViewById(R.id.fragment_adblock_custom_item_add_button);
+         mAddButton.setContentDescription(getCustomItemAddButtonContentDescription());
+         mListView = rootView.findViewById(R.id.fragment_adblock_custom_item_listview);
++        String addDisabledReason = getAddDisabledReason();
++        if (addDisabledReason != null) {
++            mItem.setHint(addDisabledReason);
++            mItem.setEnabled(false);
++            mAddButton.setEnabled(false);
++        }
++    }
++
++    /** Why nothing can be added on this page, shown in place of the hint; null if it can. */
++    protected String getAddDisabledReason() {
++        return null;
++    }
++
++    /** The item as the remove button names it; it must tell apart items with the same text. */
++    protected String getItemRemoveName(T item) {
++        return getItemText(item);
+     }
+ 
+     protected abstract void addItemImpl(String item);
+ 
+-    protected abstract void removeItemImpl(String item);
++    protected abstract void removeItemImpl(T item);
+ 
+     protected abstract List<T> getItems();
+ 
+@@ -107,7 +123,8 @@ public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCom
+             new View.OnClickListener() {
+                 @Override
+                 public void onClick(View v) {
+-                    String item = (String) v.getTag();
++                    @SuppressWarnings("unchecked")
++                    T item = (T) v.getTag();
+                     removeItemImpl(item);
+                     mAdapter.notifyDataSetChanged();
+                 }
+@@ -144,9 +161,12 @@ public abstract class AdblockCustomItemFragment<T> extends PreferenceFragmentCom
+             holder.mItem.setText(getItemText(item));
+             holder.mStatus.setText(getItemStatus(item));
+             holder.mRemoveButton.setOnClickListener(removeItemClickListener);
+-            holder.mRemoveButton.setTag(getItemText(item));
++            // The row itself, so that only this item is removed even if two show the same text.
++            holder.mRemoveButton.setTag(item);
+             holder.mRemoveButton.setContentDescription(
+-                    getString(R.string.fragment_adblock_custom_item_remove, getItemText(item)));
++                    getString(
++                            R.string.fragment_adblock_custom_item_remove,
++                            getItemRemoveName(item)));
+ 
+             return convertView;
+         }
+diff --git a/components/adblock/android/BUILD.gn b/components/adblock/android/BUILD.gn
+--- a/components/adblock/android/BUILD.gn
++++ b/components/adblock/android/BUILD.gn
+@@ -26,8 +26,10 @@ source_set("java_bindings") {
+   deps = [
+     ":jni_headers",
+     "//base",
++    "//components/content_settings/core/common",
+     "//components/keyed_service/content:content",
+     "//components/user_prefs:user_prefs",
++    "//url",
+   ]
+ 
+   public_deps = [
+diff --git a/components/adblock/android/adblock_controller_jni.cc b/components/adblock/android/adblock_controller_jni.cc
+--- a/components/adblock/android/adblock_controller_jni.cc
++++ b/components/adblock/android/adblock_controller_jni.cc
+@@ -17,6 +17,7 @@
+ 
+ #include <algorithm>
+ #include <iterator>
++#include <string>
+ #include <vector>
+ 
+ #include "base/android/jni_android.h"
+@@ -25,14 +26,18 @@
+ #include "base/android/jni_weak_ref.h"
+ #include "base/i18n/icubridge/date_time_formatter.h"
+ #include "base/i18n/icubridge/icu_bridge.h"
++#include "base/check_op.h"
++#include "base/strings/string_util.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/logging.h"
+ #include "components/adblock/android/jni_headers/AdblockController_jni.h"
+ #include "components/adblock/content/browser/factories/subscription_service_factory.h"
+ #include "components/adblock/core/common/adblock_constants.h"
+ #include "components/adblock/core/subscription/subscription_config.h"
++#include "components/content_settings/core/common/content_settings_pattern.h"
+ #include "content/public/browser/android/browser_context_handle.h"
+ #include "content/public/browser/browser_thread.h"
++#include "url/gurl.h"
+ 
+ using base::android::CheckException;
+ using base::android::ConvertUTF8ToJavaString;
+@@ -139,6 +144,69 @@ std::vector<ScopedJavaLocalRef<jobject>> CSubscriptionsToJObjects(
+   return jobjects;
+ }
+ 
++// The ads site setting pattern for a site typed on the Allowed sites page: the
++// site and its subdomains, or exactly the address for an IP address. Empty for
++// text that names no site.
++std::string AllowedSitePattern(const std::string& site) {
++  GURL url(site);
++  if (!url.is_valid() || !url.has_host()) {
++    url = GURL("http://" + site);
++  }
++  if (!url.is_valid() || !url.SchemeIsHTTPOrHTTPS() || !url.has_host()) {
++    return std::string();
++  }
++  const std::string host(url.host());
++  const bool is_ip_address = url.HostIsIPAddress();
++  const ContentSettingsPattern pattern = ContentSettingsPattern::FromString(
++      is_ip_address ? host : "[*.]" + host);
++  if (!pattern.IsValid() || pattern.MatchesAllHosts()) {
++    return std::string();
++  }
++  if (!is_ip_address) {
++    // The host as saved, after the pattern dropped trailing dots. Like the ad
++    // blocker's own domain option, a name needs a dot or must be "localhost",
++    // so that no top-level domain can be allowed as a whole.
++    const std::string& saved_host = pattern.GetHost();
++    if (saved_host != "localhost" &&
++        (saved_host.find('.') == std::string::npos ||
++         saved_host.starts_with('.') ||
++         saved_host.find("..") != std::string::npos ||
++         !base::ContainsOnlyChars(saved_host,
++                                  "abcdefghijklmnopqrstuvwxyz0123456789-."))) {
++      return std::string();
++    }
++  }
++  return pattern.ToString();
++}
++
++#if DCHECK_IS_ON()
++// Typed text and the pattern it must give; an empty pattern means rejected.
++void CheckAllowedSitePatterns() {
++  static constexpr struct {
++    const char* site;
++    const char* pattern;
++  } kCases[] = {
++      {"com", ""},
++      {"com.", ""},
++      {"example.com", "[*.]example.com"},
++      {"example.com.", "[*.]example.com"},
++      {"https://Example.com/path", "[*.]example.com"},
++      {"localhost", "[*.]localhost"},
++      {"127.1", "127.0.0.1"},
++      {"[::1]", "[::1]"},
++      {"*", ""},
++      {"*.example.com", ""},
++      {"example..com", ""},
++      {"xn--80ak6aa92e.com", "[*.]xn--80ak6aa92e.com"},
++      {"xn--p1ai", ""},
++  };
++  for (const auto& test_case : kCases) {
++    DCHECK_EQ(AllowedSitePattern(test_case.site), test_case.pattern)
++        << test_case.site;
++  }
++}
++#endif  // DCHECK_IS_ON()
++
+ }  // namespace
+ 
+ static void
+@@ -246,4 +314,20 @@ JNI_AdblockController_GetRecommendedSubscriptions(JNIEnv* env) {
+   return ToJavaArrayOfObjects(env, CSubscriptionsToJObjects(env, list));
+ }
+ 
++static base::android::ScopedJavaLocalRef<jstring>
++JNI_AdblockController_ToAllowedSitePattern(
++    JNIEnv* env,
++    const base::android::JavaRef<jstring>& jsite) {
++#if DCHECK_IS_ON()
++  static const bool checked = (CheckAllowedSitePatterns(), true);
++  DCHECK(checked);
++#endif
++  const std::string pattern =
++      AllowedSitePattern(base::android::ConvertJavaStringToUTF8(env, jsite));
++  if (pattern.empty()) {
++    return ScopedJavaLocalRef<jstring>();
++  }
++  return ConvertUTF8ToJavaString(env, pattern);
++}
++
+ DEFINE_JNI(AdblockController)
+diff --git a/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java b/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java
+--- a/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java
++++ b/components/adblock/android/java/src/org/chromium/components/adblock/AdblockController.java
+@@ -321,6 +321,16 @@ public class AdblockController {
+         mFilteringConfiguration.removeSubscriptionUpdateObserver(observer);
+     }
+ 
++    /**
++     * Returns the ads site setting pattern for a site typed by the user: the site and its
++     * subdomains, or exactly the address for an IP address. Returns null if the text names no
++     * site.
++     */
++    @UiThread
++    public static String toAllowedSitePattern(final String site) {
++        return AdblockControllerJni.get().toAllowedSitePattern(site);
++    }
++
+     @NativeMethods
+     public interface Natives {
+         void startUpdate(BrowserContextHandle contextHandle);
+@@ -331,5 +341,7 @@ public class AdblockController {
+         String getLastUpdateTime(BrowserContextHandle contextHandle);
+ 
+         Object[] getRecommendedSubscriptions();
++
++        String toAllowedSitePattern(String site);
+     }
+ }
+diff --git a/components/adblock/android/java/src/org/chromium/components/adblock/FilteringConfiguration.java b/components/adblock/android/java/src/org/chromium/components/adblock/FilteringConfiguration.java
+--- a/components/adblock/android/java/src/org/chromium/components/adblock/FilteringConfiguration.java
++++ b/components/adblock/android/java/src/org/chromium/components/adblock/FilteringConfiguration.java
+@@ -199,6 +199,12 @@ public final class FilteringConfiguration {
+     @UiThread
+     public void removeAllowedDomain(final String domain) throws IllegalStateException {
+         ValidateConfiguration();
++        // An entry is removed exactly as getAllowedDomains() returns it, which may not survive
++        // the parsing below; other text names the site to remove, as before.
++        if (getAllowedDomains().contains(domain)) {
++            FilteringConfigurationJni.get().removeAllowedDomain(mNativeController, domain);
++            return;
++        }
+         String sanitizedDomain = sanitizeSite(domain);
+         if (sanitizedDomain == null) return;
+         FilteringConfigurationJni.get().removeAllowedDomain(mNativeController, sanitizedDomain);
+diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/ContentSettingsResources.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/ContentSettingsResources.java
+--- a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/ContentSettingsResources.java
++++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/ContentSettingsResources.java
+@@ -176,8 +176,8 @@ public class ContentSettingsResources {
+                         R.string.site_settings_page_intrusive_blocked_sub_label,
+                         R.string.site_settings_page_intrusive_ads_a11y,
+                         R.drawable.ad_off_24px,
+-                        R.string.site_settings_page_intrusive_allowed_sub_label,
+-                        R.string.site_settings_page_intrusive_blocked_sub_label);
++                        R.string.website_settings_ads_default_allowed,
++                        R.string.website_settings_ads_default_blocked);
+ 
+             case ContentSettingsType.ANTI_ABUSE:
+                 return new ResourceItem(
+diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleCategorySettings.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleCategorySettings.java
+--- a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleCategorySettings.java
++++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleCategorySettings.java
+@@ -1324,7 +1324,8 @@ public class SingleCategorySettings extends BaseSiteSettingsFragment
+         if (mGlobalToggleLayout != GlobalToggleLayout.BINARY_TOGGLE) {
+             screen.removePreference(binaryToggle);
+         }
+-        if (mGlobalToggleLayout != GlobalToggleLayout.BINARY_RADIO_BUTTON) {
++        boolean hideAdsDefault = isAdsDefaultHidden();
++        if (mGlobalToggleLayout != GlobalToggleLayout.BINARY_RADIO_BUTTON || hideAdsDefault) {
+             screen.removePreference(binaryRadioButton);
+         }
+         if (mGlobalToggleLayout != GlobalToggleLayout.TRI_STATE_TOGGLE) {
+@@ -1338,7 +1339,7 @@ public class SingleCategorySettings extends BaseSiteSettingsFragment
+                 configureBinaryToggle(binaryToggle, contentType);
+                 break;
+             case GlobalToggleLayout.BINARY_RADIO_BUTTON:
+-                configureBinaryRadioButton(binaryRadioButton, contentType);
++                if (!hideAdsDefault) configureBinaryRadioButton(binaryRadioButton, contentType);
+                 break;
+             case GlobalToggleLayout.TRI_STATE_TOGGLE:
+                 configureTriStateToggle(triStateToggle, contentType);
+@@ -1602,6 +1603,34 @@ public class SingleCategorySettings extends BaseSiteSettingsFragment
+                 WebsitePreferenceBridge.isCategoryEnabled(browserContextHandle, contentType));
+     }
+ 
++    /**
++     * Whether the Ads page shows no setting for all sites. The ad blocking settings hold the one
++     * switch for ad blocking on all sites, so the setting here is shown only where it matters:
++     * when ads are allowed by default, when a policy sets it, or when a site has ads blocked on
++     * its own, so that the setting stays reachable after it is changed.
++     */
++    private boolean isAdsDefaultHidden() {
++        if (mCategory.getType() != SiteSettingsCategory.Type.ADS) return false;
++        BrowserContextHandle browserContextHandle = getBrowserContextHandle();
++        if (WebsitePreferenceBridge.isCategoryEnabled(
++                        browserContextHandle, ContentSettingsType.ADS)
++                || WebsitePreferenceBridge.isContentSettingManaged(
++                        browserContextHandle, ContentSettingsType.ADS)) {
++            return false;
++        }
++        for (ContentSettingException exception :
++                new WebsitePreferenceBridge()
++                        .getContentSettingsExceptions(
++                                browserContextHandle, ContentSettingsType.ADS)) {
++            // The list also holds the setting for all sites itself, from the default provider.
++            if (exception.getSource() != ProviderType.DEFAULT_PROVIDER
++                    && exception.getContentSetting() == ContentSetting.BLOCK) {
++                return false;
++            }
++        }
++        return true;
++    }
++
+     private void configureBinaryRadioButton(
+             BinaryStatePermissionPreference binaryRadioButton, int contentType) {
+         binaryRadioButton.setOnPreferenceChangeListener(this);
+diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java
+--- a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java
++++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java
+@@ -55,6 +55,7 @@ import org.chromium.components.embedder_support.util.Origin;
+ import org.chromium.components.permissions.PermissionsAndroidFeatureList;
+ import org.chromium.components.permissions.PermissionsAndroidFeatureMap;
+ import org.chromium.content_public.browser.BrowserContextHandle;
++import org.chromium.url.GURL;
+ 
+ import java.util.ArrayList;
+ import java.util.Collection;
+@@ -1792,12 +1793,19 @@ public class SingleWebsiteSettings extends BaseSiteSettingsFragment
+ 
+         // However, if the blocking is activated, we still want to show the permission, even if it
+         // is in the default state.
++        // Only an exception for exactly this address is merged into the site, so the setting
++        // that applies here, for example from a [*.]example.com exception, is read for it.
+         if (setting == null) {
++            GURL url = new GURL(mSite.getAddress().getOrigin());
+             setting =
+                     createDefaultPermissionSetting(
+                             ContentSettingsType.ADS,
+-                            WebsitePreferenceBridge.isCategoryEnabled(
+-                                            browserContextHandle, ContentSettingsType.ADS)
++                            WebsitePreferenceBridge.getContentSetting(
++                                                    browserContextHandle,
++                                                    ContentSettingsType.ADS,
++                                                    url,
++                                                    url)
++                                            == ContentSetting.ALLOW
+                                     ? ContentSetting.ALLOW
+                                     : ContentSetting.BLOCK,
+                             /* isOneTime= */ false);
+diff --git a/components/browser_ui/strings/android/site_settings.grdp b/components/browser_ui/strings/android/site_settings.grdp
+--- a/components/browser_ui/strings/android/site_settings.grdp
++++ b/components/browser_ui/strings/android/site_settings.grdp
+@@ -425,22 +425,22 @@
+     Block ads based on the current filters
+   </message>
+   <message name="IDS_WEBSITE_SETTINGS_CATEGORY_ADS_BLOCKED_LIST" desc="Summary text explaining that the Ads permission is set to block ads on some sites. To be shown in the list of permission categories.">
+-    Blocked on some sites
++    Blocked
+   </message>
+   <message name="IDS_SITE_SETTINGS_PAGE_INTRUSIVE_ADS_LABEL" desc="We're renaming the existing 'Ads' setting (visit chrome://settings/content and click 'Additional content settings'). We need to rename this setting because we're introducing 3 new ad settings on the new 'Ad privacy' page. This string is the name of a setting. Here, it serves as the label of a button that opens the 'Intrusive ads' page.">
+-    Intrusive ads
++    Ads
+   </message>
+   <message name="IDS_SITE_SETTINGS_PAGE_INTRUSIVE_ALLOWED_SUB_LABEL" desc="1 of 2 states for the 'Intrusive ads' setting.">
+-    Any site you visit can show any ad to you
++    Allowed
+   </message>
+   <message name="IDS_SITE_SETTINGS_PAGE_INTRUSIVE_BLOCKED_SUB_LABEL" desc="2 of 2 states for the 'intrusive ads' setting.">
+-    Ads are blocked on sites known to show intrusive or misleading ads
++    Blocked
+   </message>
+   <message name="IDS_SITE_SETTINGS_PAGE_INTRUSIVE_ADS_A11Y" desc="The screen reader announcement describing a toggle with two states to either allow all ads or to block intrusive ads. It is important to keep this string as two full sentences terminated by a period.">
+     When on, sites can show any ad to you. When off, sites can’t show intrusive or misleading ads.
+   </message>
+   <message name="IDS_WEBSITE_SETTINGS_ADS_PAGE_DESCRIPTION" desc="Description of intrusive ads content setting.">
+-    Sites usually show ads so that they can provide content or services free of charge. But, some sites are known to show intrusive or misleading ads.
++    Ads are not blocked on the allowed sites below. They are also listed in the ad blocking settings under Allowed sites, where ad blocking is turned on or off for all sites.
+   </message>
+ 
+   <!-- Anti-abuse -->
+diff --git a/components/browser_ui/strings/bromite_content_settings/ads.grdp b/components/browser_ui/strings/bromite_content_settings/ads.grdp
+new file mode 100644
+--- /dev/null
++++ b/components/browser_ui/strings/bromite_content_settings/ads.grdp
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<grit-part>
++  <message name="IDS_WEBSITE_SETTINGS_ADS_DEFAULT_ALLOWED" desc="Option on the Ads page in Site settings: by default ads are not blocked, but sites with their own block keep it." formatter_data="android_java">
++    Allow ads by default, except on sites where they are blocked
++  </message>
++  <message name="IDS_WEBSITE_SETTINGS_ADS_DEFAULT_BLOCKED" desc="Option on the Ads page in Site settings: by default ads are blocked, but allowed sites keep their exception." formatter_data="android_java">
++    Block ads by default, except on allowed sites
++  </message>
++</grit-part>
+diff --git a/components/site_settings_strings.grdp b/components/site_settings_strings.grdp
+--- a/components/site_settings_strings.grdp
++++ b/components/site_settings_strings.grdp
+@@ -3,10 +3,10 @@
+   <part file="browser_ui/strings/bromite_content_settings/placeholder.txt"/>
+   <!-- Site Settings common -->
+   <message name="IDS_SITE_SETTINGS_TYPE_ADS" desc="This string is the name of the intrusive ads setting (visit chrome://settings/content and click 'Additional content settings').">
+-    Intrusive ads
++    Ads
+   </message>
+   <message name="IDS_SITE_SETTINGS_TYPE_ADS_MID_SENTENCE" desc="This string is the name of the intrusive ads setting (visit chrome://settings/content and click 'Additional content settings') when used mid-sentence.">
+-    intrusive ads
++    ads
+   </message>
+   <message name="IDS_SITE_SETTINGS_TYPE_ANTI_ABUSE" desc="The label used for the anti-abuse site settings controls.">
+     Auto-verify
+--
