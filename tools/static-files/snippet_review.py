@@ -177,7 +177,10 @@ def rules(text_lines):
 
 
 def read(path):
-    return open(path, encoding="utf-8", errors="replace").read().splitlines()
+    # The browser splits a list at LF only (std::getline); callers trim ASCII
+    # whitespace, which also removes a CR before the LF.
+    with open(path, "rb") as f:
+        return f.read().decode("utf-8", errors="replace").split("\n")
 
 
 def review(old_lines, new_lines):
