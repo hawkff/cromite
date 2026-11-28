@@ -73,7 +73,7 @@ suit Cromite logic.
  .../persistent_filtering_configuration.h      |    8 +-
  .../core/converter/flatbuffer_converter.cc    |    2 +-
  .../converter/parser/filter_classifier.cc     |    5 +-
- .../adblock/core/converter/parser/metadata.cc |   68 +-
+ .../adblock/core/converter/parser/metadata.cc |   61 +-
  .../core/converter/parser/url_filter.cc       |   20 +-
  .../converter/parser/url_filter_options.cc    |   34 +-
  .../serializer/filter_keyword_extractor.cc    |   13 +-
@@ -125,7 +125,7 @@ suit Cromite logic.
  .../renderer/core/dom/events/event_target.cc  |    5 +-
  .../renderer/core/exported/web_document.cc    |   13 +-
  .../blink/renderer/core/html/html_element.cc  |    8 +-
- 120 files changed, 9291 insertions(+), 799 deletions(-)
+ 120 files changed, 9284 insertions(+), 799 deletions(-)
  rename chrome/browser/adblock/android/java/res/xml/{adblock_preferences.xml => eyeo_adblock_preferences.xml} (67%)
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.cc
  create mode 100644 components/adblock/content/browser/adblock_blocking_page.h
@@ -4621,7 +4621,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
  
    std::string homepage;
    std::string title;
-@@ -39,19 +52,55 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
+@@ -39,19 +52,48 @@ absl::optional<Metadata> Metadata::FromStream(std::istream& filter_stream) {
    base::TimeDelta expires = kDefaultExpirationInterval;
  
    std::string line;
@@ -4636,39 +4636,32 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
 +                               ? kUtf8ByteOrderMark.size()
 +                               : 0;
 +  line.erase(0, mark_size);
-+  const std::string_view first_line =
-+      base::TrimWhitespaceASCII(line, base::TRIM_ALL);
-+  // A web page sent with status 200, for example by a captive portal, is not
-+  // a filter list. Rejecting it keeps the installed list.
-+  if (first_line.empty()) {
-+    const auto after_first_line = filter_stream.tellg();
-+    std::string next_line;
-+    while (std::getline(filter_stream, next_line)) {
-+      const std::string_view text =
-+          base::TrimWhitespaceASCII(next_line, base::TRIM_ALL);
-+      if (text.empty()) {
-+        continue;
-+      }
-+      if (IsWebPageStart(text)) {
-+        VLOG(1) << "[eyeo] Invalid filter list: it is a web page.";
-+        return {};
-+      }
++  // Leading blank lines are skipped, and parsing goes on at the first nonblank
++  // line.
++  auto first_text_position = start_of_stream + std::streamoff(mark_size);
++  std::string first_text(base::TrimWhitespaceASCII(line, base::TRIM_ALL));
++  while (first_text.empty() && filter_stream.good()) {
++    first_text_position = filter_stream.tellg();
++    if (!std::getline(filter_stream, line)) {
 +      break;
 +    }
-+    filter_stream.clear();
-+    filter_stream.seekg(after_first_line);
-+  } else if (IsWebPageStart(first_line)) {
++    first_text = std::string(base::TrimWhitespaceASCII(line, base::TRIM_ALL));
++  }
++  // A web page sent with status 200, for example by a captive portal, is not
++  // a filter list. Rejecting it keeps the installed list.
++  if (IsWebPageStart(first_text)) {
 +    VLOG(1) << "[eyeo] Invalid filter list: it is a web page.";
      return {};
    }
++  filter_stream.clear();
++  filter_stream.seekg(first_text_position);
 +  // Lists without a header are accepted. A first line that is a filter or a
-+  // metadata comment is read again below; a blank line or another comment is
-+  // skipped, as a header is.
-+  if (!IsValidAdblockHeader(line) && !first_line.empty() &&
-+      (!base::StartsWith(first_line, "!") ||
-+       re2::RE2::FullMatch(first_line, *comment_re))) {
-+    filter_stream.clear();
-+    filter_stream.seekg(start_of_stream + std::streamoff(mark_size));
++  // metadata comment is read again below; a header or another comment is
++  // skipped.
++  if (IsValidAdblockHeader(first_text) ||
++      (base::StartsWith(first_text, "!") &&
++       !re2::RE2::FullMatch(first_text, *comment_re))) {
++    std::getline(filter_stream, line);
 +  }
  
    std::string key, value;
@@ -4681,7 +4674,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
        break;
      }
  
-@@ -108,14 +157,15 @@ Metadata::~Metadata() = default;
+@@ -108,14 +150,15 @@ Metadata::~Metadata() = default;
  
  // static
  bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
@@ -4699,7 +4692,7 @@ diff --git a/components/adblock/core/converter/parser/metadata.cc b/components/a
      return false;
    }
    return true;
-@@ -126,11 +176,11 @@ bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
+@@ -126,11 +169,11 @@ bool Metadata::IsValidAdblockHeader(const std::string& adblock_header) {
  // static
  base::TimeDelta Metadata::ParseExpirationTime(
      const std::string& expiration_value) {

@@ -568,7 +568,7 @@ new file mode 100644
 diff --git a/components/browser_ui/site_settings/android/website_preference_bridge.cc b/components/browser_ui/site_settings/android/website_preference_bridge.cc
 --- a/components/browser_ui/site_settings/android/website_preference_bridge.cc
 +++ b/components/browser_ui/site_settings/android/website_preference_bridge.cc
-@@ -1357,6 +1357,25 @@ JNI_WebsitePreferenceBridge_ToHostOnlyPattern(JNIEnv* env,
+@@ -1368,6 +1368,25 @@ JNI_WebsitePreferenceBridge_ToHostOnlyPattern(JNIEnv* env,
    return ConvertUTF8ToJavaString(env, host_only_pattern.ToString());
  }
  

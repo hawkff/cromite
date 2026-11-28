@@ -36,6 +36,7 @@ Require: bromite-build-utils.patch
  .../WebsitePreferenceBridge.java              |   3 +-
  .../impl/include_all_directory.java           |   1 +
  ...miteCustomContentSettingImplBase.java.tmpl |  48 ++
+ .../android/website_preference_bridge.cc      |  11 +
  .../bromite_content_settings/placeholder.txt  |   1 +
  components/content_settings/android/BUILD.gn  |   1 +
  .../content_settings/core/browser/BUILD.gn    |   6 +
@@ -64,7 +65,7 @@ Require: bromite-build-utils.patch
  .../platform/web_content_settings_client.h    |  13 +
  .../execution_context/execution_context.cc    |  16 +
  .../execution_context/execution_context.h     |   5 +
- 53 files changed, 1454 insertions(+), 81 deletions(-)
+ 54 files changed, 1465 insertions(+), 81 deletions(-)
  create mode 100644 components/browser_ui/settings/android/java/res/layout/preference_spinner_single_widget.xml
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSetting.java
  create mode 100644 components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/BromiteCustomContentSettingImpl.java
@@ -1882,6 +1883,38 @@ new file mode 100644
 +    }}
 +
 +}}
+diff --git a/components/browser_ui/site_settings/android/website_preference_bridge.cc b/components/browser_ui/site_settings/android/website_preference_bridge.cc
+--- a/components/browser_ui/site_settings/android/website_preference_bridge.cc
++++ b/components/browser_ui/site_settings/android/website_preference_bridge.cc
+@@ -7,6 +7,7 @@
+ #include <algorithm>
+ #include <set>
+ #include <string>
++#include <utility>
+ #include <variant>
+ #include <vector>
+ 
+@@ -1211,10 +1212,20 @@ static void JNI_WebsitePreferenceBridge_GetContentSettingsExceptions(
+     const JavaRef<jobject>& list) {
+   BrowserContext* browser_context = unwrap(jbrowser_context_handle);
+   std::vector<std::string> seen_origins;
++  // Off the record, rules come in precedence order and an incognito rule comes
++  // before the inherited rule with the same patterns, which it overrides.
++  std::vector<std::pair<ContentSettingsPattern, ContentSettingsPattern>>
++      incognito_patterns;
+   for (const ContentSettingPatternSource& entry :
+        GetHostContentSettingsMap(browser_context)
+            ->GetSettingsForOneType(
+                static_cast<ContentSettingsType>(content_settings_type))) {
++    std::pair patterns(entry.primary_pattern, entry.secondary_pattern);
++    if (entry.incognito) {
++      incognito_patterns.push_back(patterns);
++    } else if (std::ranges::contains(incognito_patterns, patterns)) {
++      continue;
++    }
+     std::string origin = entry.primary_pattern.ToString();
+     seen_origins.push_back(origin);
+     auto hasExpiration = !entry.metadata.expiration().is_null();
 diff --git a/components/browser_ui/strings/bromite_content_settings/placeholder.txt b/components/browser_ui/strings/bromite_content_settings/placeholder.txt
 new file mode 100644
 --- /dev/null
