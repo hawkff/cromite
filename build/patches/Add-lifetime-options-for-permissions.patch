@@ -56,6 +56,7 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../one_time_permissions_tracker.cc           | 35 +++++++-
  .../one_time_permissions_tracker.h            |  4 +-
  .../one_time_permissions_tracker_factory.cc   |  2 +-
+ .../modaldialog/ModalDialogView.java          |  2 +
  .../site_settings/SingleWebsiteSettings.java  | 11 +++
  .../android/website_preference_bridge.cc      |  3 +-
  .../strings/android/browser_ui_strings.grd    |  4 +
@@ -80,14 +81,14 @@ License: GPL-3.0-only - https://spdx.org/licenses/GPL-3.0-only.html
  .../android/res/layout/permission_dialog.xml  | 10 +++
  .../geolocation_permission_context_android.cc | 34 +++++--
  .../geolocation_permission_context_android.h  | 11 ++-
- .../permissions/permission_context_base.cc    | 74 ++++++++++++++--
+ .../permissions/permission_context_base.cc    | 80 +++++++++++++++--
  .../permissions/permission_context_base.h     | 30 ++++++-
  components/permissions/permission_prompt.h    |  4 +-
  components/permissions/permission_request.cc  | 43 ++++++++-
  components/permissions/permission_request.h   | 17 +++-
  .../permissions/permission_request_manager.cc | 53 +++++++----
  .../permissions/permission_request_manager.h  | 10 ++-
- 35 files changed, 567 insertions(+), 71 deletions(-)
+ 36 files changed, 575 insertions(+), 71 deletions(-)
 
 diff --git a/chrome/browser/permissions/last_tab_standing_tracker.cc b/chrome/browser/permissions/last_tab_standing_tracker.cc
 --- a/chrome/browser/permissions/last_tab_standing_tracker.cc
@@ -234,6 +235,18 @@ diff --git a/chrome/browser/permissions/one_time_permissions_tracker_factory.cc 
 -  return std::make_unique<OneTimePermissionsTracker>();
 +  return std::make_unique<OneTimePermissionsTracker>(context);
  }
+diff --git a/components/browser_ui/modaldialog/android/java/src/org/chromium/components/browser_ui/modaldialog/ModalDialogView.java b/components/browser_ui/modaldialog/android/java/src/org/chromium/components/browser_ui/modaldialog/ModalDialogView.java
+--- a/components/browser_ui/modaldialog/android/java/src/org/chromium/components/browser_ui/modaldialog/ModalDialogView.java
++++ b/components/browser_ui/modaldialog/android/java/src/org/chromium/components/browser_ui/modaldialog/ModalDialogView.java
+@@ -480,6 +480,8 @@ public class ModalDialogView extends BoundedLinearLayout implements View.OnClick
+             mCustomViewContainer.addView(view);
+         }
+         mCustomViewContainer.setVisibility(wasVisible);
++        // The scroll view visibility depends on this flag, and the initial bind order is not fixed.
++        updateContentVisibility();
+     }
+ 
+     /**
 diff --git a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java
 --- a/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java
 +++ b/components/browser_ui/site_settings/android/java/src/org/chromium/components/browser_ui/site_settings/SingleWebsiteSettings.java
@@ -1086,7 +1099,7 @@ diff --git a/components/permissions/permission_context_base.cc b/components/perm
    DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
    content::PermissionResult new_permission_result =
        permission_result ? *permission_result
-@@ -804,10 +848,11 @@ void PermissionContextBase::NotifyPermissionSet(
+@@ -804,10 +848,17 @@ void PermissionContextBase::NotifyPermissionSet(
  
    if (persist) {
      CHECK(new_permission_result.retrieved_permission_setting.has_value());
@@ -1094,15 +1107,21 @@ diff --git a/components/permissions/permission_context_base.cc b/components/perm
 -                  new_permission_result.retrieved_permission_setting.value(),
 -                  /*is_one_time=*/decision.overall_decision ==
 -                      PermissionDecision::kAllowThisTime);
-+    UpdateSettingImpl(request_data,
-+                      new_permission_result.retrieved_permission_setting.value(),
-+                      /*is_one_time=*/decision.overall_decision ==
-+                          PermissionDecision::kAllowThisTime,
-+                      use_lifetime_option, lifetime_option);
++    const PermissionSetting& setting =
++        new_permission_result.retrieved_permission_setting.value();
++    const bool is_one_time =
++        decision.overall_decision == PermissionDecision::kAllowThisTime;
++    // Without a lifetime, keep the context's own UpdateSetting() override.
++    if (use_lifetime_option) {
++      UpdateSettingImpl(request_data, setting, is_one_time,
++                        /*use_lifetime_option=*/true, lifetime_option);
++    } else {
++      UpdateSetting(request_data, setting, is_one_time);
++    }
    }
  
    // Note that rfh may be null, see crbug.com/426909787.
-@@ -863,6 +908,16 @@ void PermissionContextBase::UpdateSetting(
+@@ -863,6 +914,16 @@ void PermissionContextBase::UpdateSetting(
      const PermissionRequestData& request_data,
      const PermissionSetting& setting,
      bool is_one_time) {
@@ -1119,7 +1138,7 @@ diff --git a/components/permissions/permission_context_base.cc b/components/perm
    auto* info = content_settings::PermissionSettingsRegistry::GetInstance()->Get(
        content_settings_type_);
    CHECK(info);
-@@ -877,6 +932,11 @@ void PermissionContextBase::UpdateSetting(
+@@ -877,6 +938,11 @@ void PermissionContextBase::UpdateSetting(
    constraints.set_session_model(
        is_one_time ? content_settings::mojom::SessionModel::ONE_TIME
                    : content_settings::mojom::SessionModel::DURABLE);
